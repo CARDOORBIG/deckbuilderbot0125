@@ -1,7 +1,7 @@
 [
   {
     "id": "SD01-001 (AVATAR) - (SR)",
-    "name": "พระอิศวร1",
+    "name": "พระอิศวร",
     "type": "Avatar",
     "faction": "เทพ",
     "rarity": "SR",
