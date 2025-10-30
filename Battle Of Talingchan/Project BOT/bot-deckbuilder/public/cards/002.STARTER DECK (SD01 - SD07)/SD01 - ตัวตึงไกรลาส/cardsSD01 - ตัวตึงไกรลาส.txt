@@ -51,7 +51,7 @@
     "power": 1,
     "gem": 2,
     "colorType": "Red",
-    "text": "เมื่อ Avatar ตัวนี้อยู่บนสนาม POWER +1 ให้ Avatar ทุกใบบนสนามฝ่ายเรา",
+    "text": "เมื่อ Avatar ตัวนี้อยู่บนสนาม POWER +1 ให้ Avatar เทพ ทุกใบบนสนามฝ่ายเรา",
     "image": "SD01-004 (AVATAR) - (C).png",
     "lifeEligible": false
   },
