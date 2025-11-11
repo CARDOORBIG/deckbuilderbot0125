@@ -5,6 +5,10 @@ import { HTML5Backend } from "react-dnd-html5-backend";
 import { Chart as ChartJS, RadialLinearScale, PointElement, LineElement, Filler, Tooltip, Legend } from 'chart.js';
 import { Radar } from 'react-chartjs-2';
 
+// 1. Import สำหรับ Google Login
+import { GoogleLogin } from '@react-oauth/google';
+import { jwtDecode } from 'jwt-decode';
+
 ChartJS.register(RadialLinearScale, PointElement, LineElement, Filler, Tooltip, Legend);
 
 
@@ -87,8 +91,201 @@ function DeckAnalysisModal({ isOpen, onClose, mainDeck, lifeDeck, showAlert }) {
 
     return createPortal( <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-[250] p-4"> <div className="bg-slate-900/80 border border-emerald-500/30 rounded-xl shadow-2xl w-full h-full flex flex-col max-w-7xl max-h-[90vh]"> <header className="flex items-center justify-between p-4 border-b border-emerald-500/20 shrink-0"> <h2 className="text-2xl font-bold text-white">ผลลัพธ์การสร้างเด็ค</h2> <Button onClick={onClose}>Close</Button> </header> <div className="flex-grow overflow-hidden grid grid-cols-1 md:grid-cols-3 gap-6 p-6"> <div className="md:col-span-1 flex flex-col gap-6 overflow-y-auto pr-2"> <div> <h3 className="text-xl font-semibold text-amber-300 border-b border-amber-400/20 pb-1 mb-3">สถิติเด็ค</h3> <div className="grid grid-cols-3 gap-4 text-center"> <div><span className="text-sm text-gray-400">Avg Cost</span><p className="text-2xl font-bold text-emerald-400">{analysis.avgCost}</p></div> <div><span className="text-sm text-gray-400">Avg Power</span><p className="text-2xl font-bold text-red-400">{analysis.avgPower}</p></div> <div><span className="text-sm text-gray-400">Avg Gem</span><p className="text-2xl font-bold text-amber-400">{analysis.avgGem}</p></div> </div> </div> <div className="aspect-square w-full max-w-[350px] mx-auto"> <Radar data={analysis.radarData} options={analysis.radarOptions} /> </div> <div> <h3 className="text-xl font-semibold text-amber-300 border-b border-amber-400/20 pb-1 mb-3">ประเภทการ์ด</h3> <ul className="space-y-1 text-sm"> {analysis.cardTypes.map(([type, count]) => ( <li key={type} className="flex justify-between"> <span>{type}</span> <span>{count} ใบ</span> </li> ))} </ul> </div> <div> <h3 className="text-xl font-semibold text-amber-300 border-b border-amber-400/20 pb-1 mb-3">รหัส Export</h3> <Button onClick={handleCopyCode} className="w-full"> <CopyIcon /> คัดลอกรหัสเด็ค </Button> </div> </div> <div className="md:col-span-2 overflow-y-auto pr-2 border-l border-emerald-500/20 pl-6"> <h3 className="text-xl font-semibold text-amber-300 border-b border-amber-400/20 pb-1 mb-4">การ์ดในเด็ค ({mainDeck.length} ใบ)</h3> {analysis.only1Card && ( <div className="mb-6 flex flex-col items-center"> <h4 className="text-lg font-semibold text-emerald-300 mb-3">Only #1</h4> <div className="relative w-36 mx-auto"> <img src={`/cards/${encodePath(analysis.only1Card.imagePath)}/${encodeURIComponent(analysis.only1Card.id.replace(' - Only#1', ''))}.png`} alt={analysis.only1Card.name} className="w-full rounded-md shadow" onError={(e) => { e.currentTarget.src = e.currentTarget.src.replace('.png', '.jpg'); }} /> </div> </div> )} {renderCardSection("Avatar Cards", analysis.avatars)} {renderCardSection("Magic Cards", analysis.magics)} {renderCardSection("Construct Cards", analysis.constructs)} {analysis.otherCards.length > 0 && renderCardSection("Other Cards", analysis.otherCards)} </div> </div> </div> </div>, document.body ); }
 
+// === [เพิ่ม] Deck List Modal ===
+function DeckListModal({
+  isOpen,
+  onClose,
+  userProfile,
+  userDecks,       // State ที่เก็บเด็คทั้งหมด
+  setUserDecks,    // Function อัปเดต State
+  mainDeck,        // Deck ปัจจุบันที่กำลังจัด
+  lifeDeck,        // Life Deck ปัจจุบัน
+  setMainDeck,     // Function โหลดเด็ค (set state)
+  setLifeDeck,     // Function โหลดเด็ค (set state)
+  showAlert,
+  encodeDeckCode,
+  decodeDeckCode,
+  allCards         // Card DB (สำหรับ Import)
+}) {
+  const [importingSlot, setImportingSlot] = useState(null); // (0 หรือ 1)
+  const [importCode, setImportCode] = useState('');
+
+  if (!isOpen || !userProfile) return null;
+
+  const email = userProfile.email;
+
+  // ฟังก์ชันช่วยสร้าง/ดึงข้อมูล slot ของผู้ใช้
+  const getUserSlots = () => {
+    const defaultSlots = [
+      { name: "Slot 1", main: [], life: [] },
+      { name: "Slot 2", main: [], life: [] }
+    ];
+    const userData = userDecks[email] || { slots: defaultSlots };
+    // ถ้าผู้ใช้ยังไม่มีข้อมูลในระบบ, สร้างให้เลย
+    if (!userDecks[email]) {
+      setUserDecks(prev => ({ ...prev, [email]: userData }));
+    }
+    return userData.slots;
+  };
+
+  const slots = getUserSlots();
+
+  // อัปเดตข้อมูลใน userDecks
+  const updateSlots = (newSlots) => {
+    setUserDecks(prev => ({
+      ...prev,
+      [email]: { ...prev[email], slots: newSlots }
+    }));
+  };
+
+  // --- Functions
+  const handleNameChange = (index, newName) => {
+    const newSlots = [...slots];
+    newSlots[index].name = newName;
+    updateSlots(newSlots);
+  };
+
+  const handleSave = (index) => {
+    const newSlots = [...slots];
+    newSlots[index] = {
+      ...newSlots[index],
+      main: mainDeck, // บันทึกเด็คที่จัดอยู่ปัจจุบัน
+      life: lifeDeck
+    };
+    updateSlots(newSlots);
+    showAlert("Deck Saved!", `บันทึกเด็คปัจจุบันลงใน "${newSlots[index].name}" แล้ว`);
+  };
+
+  const handleLoad = (index) => {
+    const slot = slots[index];
+    if (slot.main.length === 0 && slot.life.length === 0) {
+      showAlert("Empty Slot", "Slot นี้ว่างเปล่า ไม่มีอะไรให้โหลด");
+      return;
+    }
+    setMainDeck(slot.main);
+    setLifeDeck(slot.life);
+    showAlert("Deck Loaded!", `โหลดเด็ค "${slot.name}" เรียบร้อย`);
+    onClose();
+  };
+
+  const handleExport = (index) => {
+    const slot = slots[index];
+    if (slot.main.length === 0 && slot.life.length === 0) {
+      showAlert("Empty Slot", "ไม่สามารถ Export Slot ที่ว่างเปล่าได้");
+      return;
+    }
+    const code = encodeDeckCode(slot.main, slot.life);
+    navigator.clipboard.writeText(code)
+      .then(() => showAlert("Success!", `✅ คัดลอกรหัส Export ของ "${slot.name}" แล้ว!`))
+      .catch(err => showAlert("Error", "ไม่สามารถคัดลอกรหัสได้"));
+  };
+
+  const handleImport = (index) => {
+    setImportingSlot(index); // เปิด Modal Import (index 0 หรือ 1)
+    setImportCode('');
+  };
+
+  const confirmInternalImport = () => {
+    const decoded = decodeDeckCode(importCode, allCards);
+    if (decoded) {
+      const newSlots = [...slots];
+      newSlots[importingSlot].main = decoded.main;
+      newSlots[importingSlot].life = decoded.life;
+      updateSlots(newSlots);
+      showAlert("Import Success", `นำเข้าเด็คลงใน "${slots[importingSlot].name}" สำเร็จ!`);
+    } else {
+      showAlert("Import Error", "รหัสเด็คไม่ถูกต้อง หรือไม่พบการ์ด");
+    }
+    setImportingSlot(null); // ปิด Modal Import
+  };
+
+  return createPortal(
+    <>
+      <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-[220] p-4">
+        <div className="bg-slate-900/80 border border-emerald-500/30 rounded-xl shadow-2xl w-full max-w-4xl max-h-[80vh] flex flex-col">
+          <header className="flex items-center justify-between p-4 border-b border-emerald-500/20 shrink-0">
+            <h2 className="text-2xl font-bold text-white">Deck List Manager</h2>
+            <Button onClick={onClose}>Close</Button>
+          </header>
+          
+          <div className="flex-grow overflow-y-auto p-6">
+            <p className="text-gray-300 mb-6">
+              บันทึกเด็คของคุณที่เชื่อมต่อกับบัญชี: <span className="font-bold text-amber-300">{userProfile.email}</span>
+            </p>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* === Deck Slot 1 & 2 === */}
+              {slots.map((slot, index) => {
+                const deckSize = slot.main.length + slot.life.length;
+                return (
+                  <CardShell key={index} className="flex flex-col gap-4">
+                    {/* Input ชื่อ */}
+                    <input
+                      type="text"
+                      value={slot.name}
+                      onChange={(e) => handleNameChange(index, e.target.value)}
+                      className="w-full px-3 py-2 border border-emerald-500/30 rounded-lg focus:ring-2 focus:ring-amber-500 focus:outline-none transition bg-slate-700/50 placeholder-gray-400 text-white text-lg font-bold"
+                    />
+                    
+                    <p className="text-sm text-slate-400">
+                      {deckSize > 0 ? `มี ${slot.main.length} / ${slot.life.length} ใบ` : "Slot ว่าง"}
+                    </p>
+
+                    {/* ปุ่ม Load / Save */}
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button onClick={() => handleLoad(index)} disabled={deckSize === 0} className="bg-emerald-600/30 border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/50 hover:text-white">
+                        Load
+                      </Button>
+                      <Button onClick={() => handleSave(index)} className="bg-amber-600/30 border-amber-500/30 text-amber-300 hover:bg-amber-500/50 hover:text-white">
+                        Save Current
+                      </Button>
+                    </div>
+
+                    {/* ปุ่ม Import / Export */}
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button onClick={() => handleImport(index)}>
+                        <ImportIcon /> Import
+                      </Button>
+                      <Button onClick={() => handleExport(index)} disabled={deckSize === 0}>
+                        <ExportIcon /> Export
+                      </Button>
+                    </div>
+                  </CardShell>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Modal ซ้อน Modal สำหรับ Import (ใช้ UI คล้ายๆ ของเดิม) */}
+      {importingSlot !== null && createPortal(
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[230] p-4">
+          <div className="bg-slate-800 border border-emerald-500/30 rounded-xl shadow-2xl p-6 w-full max-w-md">
+            <h2 className="text-xl font-bold text-white mb-4">Import Deck Code (to {slots[importingSlot].name})</h2>
+            <textarea
+              value={importCode}
+              onChange={(e) => setImportCode(e.target.value)}
+              placeholder="วางรหัสเด็คที่นี่..."
+              rows="4"
+              className="w-full px-3 py-2 border border-emerald-500/30 rounded-lg focus:ring-2 focus:ring-amber-500 focus:outline-none transition bg-slate-700/50 placeholder-gray-400 text-white mb-6 resize-none"
+            />
+            <div className="flex justify-end gap-3">
+              <Button onClick={() => setImportingSlot(null)} className="bg-slate-700/50 border-slate-600 text-gray-300 hover:bg-slate-600">Cancel</Button>
+              <Button onClick={confirmInternalImport} className="bg-emerald-900/50 border-emerald-500/30 text-emerald-300 hover:bg-emerald-800/50 hover:text-white">
+                <ImportIcon /> Import
+              </Button>
+            </div>
+          </div>
+        </div>, document.body
+      )}
+    </>,
+    document.body
+  );
+}
+
 // === Sidebar ===
-function LeftSidebar({ isSidebarOpen, searchTerm, setSearchTerm, allCardTypes, filterTypes, setFilterTypes, filterMagicType, setFilterMagicType, allColorTypes, filterColors, setFilterColors, allRarities, filterRarities, setFilterRarities, allSets, selectedSets, onSetSelectionChange, statFilters, onStatFilterChange, mainDeck, lifeDeck, RULES, addToMain, addToLife, removeFromMain, removeFromLife, handleImport, handleExport, handleClear, handleReloadFromTxt, mainDeckRef, onViewDeck, onAnalyzeDeck, isLoadingAnalysis, }) { const allMagicTypes = ['Modification', 'Land', 'React', 'Normal']; const handleToggle = (setter, value) => { setter(prev => prev.includes(value) ? prev.filter(item => item !== value) : [...prev, value]); }; return ( <aside className={`w-full flex flex-col p-4 bg-black/40 md:h-full md:w-full md:shrink-0 md:border-r border-emerald-700/30 backdrop-blur-lg z-30 transition-opacity duration-300 ${isSidebarOpen ? 'opacity-100' : 'opacity-0 md:opacity-100'}`}> <div className="flex-1 md:overflow-y-auto pr-2 space-y-4"> <div> <h2 className="text-xl font-bold text-white mb-2">Filters</h2> <input type="search" placeholder="ค้นหาชื่อการ์ดหรือข้อความ..." className="w-full px-4 py-2 border border-emerald-500/30 rounded-lg focus:ring-2 focus:ring-amber-500 focus:outline-none transition bg-slate-700/50 placeholder-gray-400 text-white" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} /> </div> {allCardTypes.length > 0 && ( <div className="flex flex-wrap gap-2"> <button onClick={() => setFilterTypes([])} className={`px-3 py-1 text-sm rounded-full transition-colors ${filterTypes.length === 0 ? 'bg-amber-500 text-white font-semibold shadow' : 'bg-slate-700 hover:bg-slate-600 text-gray-300'}`}>All</button> {allCardTypes.map((type) => (<button key={type} onClick={() => handleToggle(setFilterTypes, type)} className={`px-3 py-1 text-sm rounded-full transition-colors ${filterTypes.includes(type) ? 'bg-amber-500 text-white font-semibold shadow' : 'bg-slate-700 hover:bg-slate-600 text-gray-300'}`}>{type}</button>))} </div> )} {filterTypes.includes('Magic') && ( <div className="pl-4 mt-2 border-l-2 border-slate-600"> <h3 className="text-sm font-semibold text-gray-400 mt-2 mb-2 uppercase tracking-wider">Magic Type</h3> <div className="flex flex-wrap gap-2"> {['All', ...allMagicTypes].map((magicType) => ( <button key={magicType} onClick={() => setFilterMagicType(magicType)} className={`px-3 py-1 text-xs rounded-full transition-colors ${filterMagicType === magicType ? 'bg-amber-600 text-white font-semibold shadow' : 'bg-slate-600 hover:bg-slate-500 text-gray-300'}`} > {magicType} </button> ))} </div> </div> )} {allColorTypes.length > 0 && ( <div> <h3 className="text-sm font-semibold text-gray-400 mt-4 mb-2 uppercase tracking-wider">Color Type</h3> <div className="flex flex-wrap gap-2"> <button onClick={() => setFilterColors([])} className={`px-3 py-1 text-sm rounded-full transition-colors ${filterColors.length === 0 ? 'bg-amber-500 text-white font-semibold shadow' : 'bg-slate-700 hover:bg-slate-600 text-gray-300'}`}>All</button> {allColorTypes.map((color) => ( <button key={color} onClick={() => handleToggle(setFilterColors, color)} className={`px-3 py-1 text-sm rounded-full transition-colors ${filterColors.includes(color) ? 'bg-amber-500 text-white font-semibold shadow' : 'bg-slate-700 hover:bg-slate-600 text-gray-300'}`}>{color}</button> ))} </div> </div> )} {allRarities.length > 0 && ( <div> <h3 className="text-sm font-semibold text-gray-400 mt-4 mb-2 uppercase tracking-wider">Rarity</h3> <div className="flex flex-wrap gap-2"> <button onClick={() => setFilterRarities([])} className={`px-3 py-1 text-sm rounded-full transition-colors ${filterRarities.length === 0 ? 'bg-amber-500 text-white font-semibold shadow' : 'bg-slate-700 hover:bg-slate-600 text-gray-300'}`}>All</button> {allRarities.map((rarity) => ( <button key={rarity} onClick={() => handleToggle(setFilterRarities, rarity)} className={`px-3 py-1 text-sm rounded-full transition-colors ${filterRarities.includes(rarity) ? 'bg-amber-500 text-white font-semibold shadow' : 'bg-slate-700 hover:bg-slate-600 text-gray-300'}`}>{rarity}</button> ))} </div> </div> )} {allSets.length > 0 && ( <div> <h3 className="text-lg font-semibold text-white mb-2 mt-4">Card Sets</h3> <div className="space-y-2 max-h-40 overflow-y-auto pr-2"> {allSets.map(set => ( <label key={set} className="flex items-center gap-2 text-gray-300 cursor-pointer"> <input type="checkbox" checked={selectedSets.includes(set)} onChange={() => onSetSelectionChange(set)} className="w-4 h-4 rounded bg-slate-600 border-slate-500 text-amber-500 focus:ring-amber-500" /> {typeof set === 'string' ? (set.split('/')[1] || set) : set} </label> ))} </div> </div> )} <div> <h3 className="text-lg font-semibold text-white mb-2 mt-4">Stats</h3> <div className="grid grid-cols-3 gap-2 text-sm"> {['cost', 'power', 'gem'].map(stat => ( <div key={stat}> <label className="capitalize text-gray-400">{stat}</label> <input type="number" placeholder="Min" min="0" value={statFilters[stat].min} onChange={(e) => onStatFilterChange(stat, 'min', e.target.value)} className="w-full mt-1 px-2 py-1 border border-emerald-500/30 rounded-md bg-slate-700/50 text-white text-center" /> <input type="number" placeholder="Max" min="0" value={statFilters[stat].max} onChange={(e) => onStatFilterChange(stat, 'max', e.target.value)} className="w-full mt-1 px-2 py-1 border border-emerald-500/30 rounded-md bg-slate-700/50 text-white text-center" /> </div> ))} </div> </div> </div> <div className="shrink-0 pt-4"> <div className="flex flex-col gap-4 mb-4"> <DeckTray ref={mainDeckRef} title={`Main Deck`} deck={mainDeck} capacity={RULES.main.size} onDropCard={addToMain} onRemoveCard={removeFromMain} highlight onViewDeck={() => onViewDeck('main')} /> <DeckTray title={`Life Deck`} deck={lifeDeck} capacity={RULES.life.size} onDropCard={addToLife} onRemoveCard={removeFromLife} onViewDeck={() => onViewDeck('life')} /> </div> <Button onClick={onAnalyzeDeck} disabled={isLoadingAnalysis} className="w-full bg-emerald-600/30 border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/50 hover:text-white"> {isLoadingAnalysis ? 'กำลังประมวลผล...' : 'สร้างเด็ค'} </Button> <div className="grid grid-cols-2 gap-2 pt-4 mt-4 border-t border-emerald-700/30"> <Button onClick={handleImport}><ImportIcon /> Import</Button> <Button onClick={handleExport}><ExportIcon /> Export</Button> <Button onClick={handleClear} className="col-span-2 bg-red-900/50 border-red-500/30 text-red-300 hover:bg-red-800/50 hover:text-white"><ClearIcon/> Clear Deck</Button> <Button onClick={handleReloadFromTxt} className="col-span-2"><DBLoadIcon /> Reload from TXT</Button> </div> </div> </aside> ); }
+function LeftSidebar({ isSidebarOpen, searchTerm, setSearchTerm, allCardTypes, filterTypes, setFilterTypes, filterMagicType, setFilterMagicType, allColorTypes, filterColors, setFilterColors, allRarities, filterRarities, setFilterRarities, allSets, selectedSets, onSetSelectionChange, statFilters, onStatFilterChange, mainDeck, lifeDeck, RULES, addToMain, addToLife, removeFromMain, removeFromLife, handleImport, handleExport, handleClear, handleReloadFromTxt, mainDeckRef, onViewDeck, onAnalyzeDeck, isLoadingAnalysis, }) { const allMagicTypes = ['Modification', 'Land', 'React', 'Normal']; const handleToggle = (setter, value) => { setter(prev => prev.includes(value) ? prev.filter(item => item !== value) : [...prev, value]); }; return ( <aside className={`w-full flex flex-col p-4 bg-black/40 md:h-full md:w-full md:shrink-0 md:border-r border-emerald-700/30 backdrop-blur-lg z-30 transition-opacity duration-300 ${isSidebarOpen ? 'opacity-100' : 'opacity-0 md:opacity-100'}`}> <div className="flex-1 md:overflow-y-auto pr-2 space-y-4"> <div> <h2 className="text-xl font-bold text-white mb-2">Filters</h2> <input type="search" placeholder="ค้นหาชื่อการ์ดหรือข้อความ..." className="w-full px-4 py-2 border border-emerald-500/30 rounded-lg focus:ring-2 focus:ring-amber-500 focus:outline-none transition bg-slate-700/50 placeholder-gray-400 text-white" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} /> </div> {allCardTypes.length > 0 && ( <div className="flex flex-wrap gap-2"> <button onClick={() => setFilterTypes([])} className={`px-3 py-1 text-sm rounded-full transition-colors ${filterTypes.length === 0 ? 'bg-amber-500 text-white font-semibold shadow' : 'bg-slate-700 hover:bg-slate-600 text-gray-300'}`}>All</button> {allCardTypes.map((type) => (<button key={type} onClick={() => handleToggle(setFilterTypes, type)} className={`px-3 py-1 text-sm rounded-full transition-colors ${filterTypes.includes(type) ? 'bg-amber-500 text-white font-semibold shadow' : 'bg-slate-700 hover:bg-slate-600 text-gray-300'}`}>{type}</button>))} </div> )} {filterTypes.includes('Magic') && ( <div className="pl-4 mt-2 border-l-2 border-slate-600"> <h3 className="text-sm font-semibold text-gray-400 mt-2 mb-2 uppercase tracking-wider">Magic Type</h3> <div className="flex flex-wrap gap-2"> {['All', ...allMagicTypes].map((magicType) => ( <button key={magicType} onClick={() => setFilterMagicType(magicType)} className={`px-3 py-1 text-xs rounded-full transition-colors ${filterMagicType === magicType ? 'bg-amber-600 text-white font-semibold shadow' : 'bg-slate-600 hover:bg-slate-500 text-gray-300'}`} > {magicType} </button> ))} </div> </div> )} {allColorTypes.length > 0 && ( <div> <h3 className="text-sm font-semibold text-gray-400 mt-4 mb-2 uppercase tracking-wider">Color Type</h3> <div className="flex flex-wrap gap-2"> <button onClick={() => setFilterColors([])} className={`px-3 py-1 text-sm rounded-full transition-colors ${filterColors.length === 0 ? 'bg-amber-500 text-white font-semibold shadow' : 'bg-slate-700 hover:bg-slate-600 text-gray-300'}`}>All</button> {allColorTypes.map((color) => ( <button key={color} onClick={() => handleToggle(setFilterColors, color)} className={`px-3 py-1 text-sm rounded-full transition-colors ${filterColors.includes(color) ? 'bg-amber-500 text-white font-semibold shadow' : 'bg-slate-700 hover:bg-slate-600 text-gray-300'}`}>{color}</button> ))} </div> </div> )} {allRarities.length > 0 && ( <div> <h3 className="text-sm font-semibold text-gray-400 mt-4 mb-2 uppercase tracking-wider">Rarity</h3> <div className="flex flex-wrap gap-2"> <button onClick={() => setFilterRarities([])} className={`px-3 py-1 text-sm rounded-full transition-colors ${filterRarities.length === 0 ? 'bg-amber-500 text-white font-semibold shadow' : 'bg-slate-700 hover:bg-slate-600 text-gray-300'}`}>All</button> {allRarities.map((rarity) => ( <button key={rarity} onClick={() => handleToggle(setFilterRarities, rarity)} className={`px-3 py-1 text-sm rounded-full transition-colors ${filterRarities.includes(rarity) ? 'bg-amber-500 text-white font-semibold shadow' : 'bg-slate-700 hover:bg-slate-600 text-gray-300'}`}>{rarity}</button>))} </div> </div> )} {allSets.length > 0 && ( <div> <h3 className="text-lg font-semibold text-white mb-2 mt-4">Card Sets</h3> <div className="space-y-2 max-h-40 overflow-y-auto pr-2"> {allSets.map(set => ( <label key={set} className="flex items-center gap-2 text-gray-300 cursor-pointer"> <input type="checkbox" checked={selectedSets.includes(set)} onChange={() => onSetSelectionChange(set)} className="w-4 h-4 rounded bg-slate-600 border-slate-500 text-amber-500 focus:ring-amber-500" /> {typeof set === 'string' ? (set.split('/')[1] || set) : set} </label> ))} </div> </div> )} <div> <h3 className="text-lg font-semibold text-white mb-2 mt-4">Stats</h3> <div className="grid grid-cols-3 gap-2 text-sm"> {['cost', 'power', 'gem'].map(stat => ( <div key={stat}> <label className="capitalize text-gray-400">{stat}</label> <input type="number" placeholder="Min" min="0" value={statFilters[stat].min} onChange={(e) => onStatFilterChange(stat, 'min', e.target.value)} className="w-full mt-1 px-2 py-1 border border-emerald-500/30 rounded-md bg-slate-700/50 text-white text-center" /> <input type="number" placeholder="Max" min="0" value={statFilters[stat].max} onChange={(e) => onStatFilterChange(stat, 'max', e.target.value)} className="w-full mt-1 px-2 py-1 border border-emerald-500/30 rounded-md bg-slate-700/50 text-white text-center" /> </div> ))} </div> </div> </div> <div className="shrink-0 pt-4"> <div className="flex flex-col gap-4 mb-4"> <DeckTray ref={mainDeckRef} title={`Main Deck`} deck={mainDeck} capacity={RULES.main.size} onDropCard={addToMain} onRemoveCard={removeFromMain} highlight onViewDeck={() => onViewDeck('main')} /> <DeckTray title={`Life Deck`} deck={lifeDeck} capacity={RULES.life.size} onDropCard={addToLife} onRemoveCard={removeFromLife} onViewDeck={() => onViewDeck('life')} /> </div> <Button onClick={onAnalyzeDeck} disabled={isLoadingAnalysis} className="w-full bg-emerald-600/30 border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/50 hover:text-white"> {isLoadingAnalysis ? 'กำลังประมวลผล...' : 'สร้างเด็ค'} </Button> <div className="grid grid-cols-2 gap-2 pt-4 mt-4 border-t border-emerald-700/30"> <Button onClick={handleImport}><ImportIcon /> Import</Button> <Button onClick={handleExport}><ExportIcon /> Export</Button> <Button onClick={handleClear} className="col-span-2 bg-red-900/50 border-red-500/30 text-red-300 hover:bg-red-800/50 hover:text-white"><ClearIcon/> Clear Deck</Button> <Button onClick={handleReloadFromTxt} className="col-span-2"><DBLoadIcon /> Reload from TXT</Button> </div> </div> </aside> ); }
 
 // === Card grid (right) ===
 function CardGrid({ cards, onDoubleClick, onViewDetails, onAddCard }) { if (cards.length === 0) { return (<CardShell><div className="text-center py-16 text-slate-300">ไม่พบการ์ดตามเงื่อนไข</div></CardShell>); } return ( <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-x-4 gap-y-8"> {cards.map((card) => ( <CardItem key={card.id} card={card} onDoubleClick={onDoubleClick} onViewDetails={onViewDetails} onAddCard={onAddCard}/> ))} </div> ); }
@@ -99,7 +296,14 @@ const getMagicSubType = (card) => { if (card.type !== 'Magic') { return null; } 
 
 // === Main App ===
 export default function App() {
-  const [mainDeck, setMainDeck] = useLocalStorage("bot-mainDeck-v32-final", []); const [lifeDeck, setLifeDeck] = useLocalStorage("bot-lifeDeck-v32-final", []); const [cardDb, setCardDb] = useLocalStorage("bot-cardDb-v32-final", []);
+  const [mainDeck, setMainDeck] = useLocalStorage("bot-mainDeck-v32-final", []); 
+  const [lifeDeck, setLifeDeck] = useLocalStorage("bot-lifeDeck-v32-final", []); 
+  const [cardDb, setCardDb] = useLocalStorage("bot-cardDb-v32-final", []);
+  
+  // [เพิ่ม] State สำหรับ Deck List
+  const [userDecks, setUserDecks] = useLocalStorage("bot-userDecks-v1", {}); // { "email@gmail.com": { slots: [ ... ] } }
+  const [isDeckListModalOpen, setIsDeckListModalOpen] = useState(false);
+
   const [isAnimating, setIsAnimating] = useState(false); const [flyingCard, setFlyingCard] = useState(null); const mainDeckRef = useRef(null); const [zoomedCard, setZoomedCard] = useState(null); const [isAnalyzing, setIsAnalyzing] = useState(false); const [isLoadingAnalysis, setIsLoadingAnalysis] = useState(false); const [activeView, setActiveView] = useState('cards');
   const [searchTerm, setSearchTerm] = useState(""); const [filterTypes, setFilterTypes] = useState([]); const [filterMagicType, setFilterMagicType] = useState("All"); const [filterColors, setFilterColors] = useState([]); const [filterRarities, setFilterRarities] = useState([]); const [selectedSets, setSelectedSets] = useState([]); const [statFilters, setStatFilters] = useState({ cost: { min: '', max: '' }, power: { min: '', max: '' }, gem: { min: '', max: '' } });
   const allCardTypes = useMemo(() => Array.from(new Set(cardDb.map(c => c.type).filter(Boolean))).sort(), [cardDb]); const allColorTypes = useMemo(() => Array.from(new Set(cardDb.map(c => c.colorType).filter(Boolean))).sort(), [cardDb]); const allRarities = useMemo(() => Array.from(new Set(cardDb.map(c => c.rarity).filter(Boolean))).sort(), [cardDb]); const allSets = useMemo(() => Array.from(new Set(cardDb.map(c => c.imagePath).filter(Boolean))).sort(), [cardDb]);
@@ -107,6 +311,50 @@ export default function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true); const toggleSidebar = () => setIsSidebarOpen(prev => !prev);
   const [modal, setModal] = useState({ isOpen: false, title: '', message: '', onConfirm: null }); const [isImportModalOpen, setIsImportModalOpen] = useState(false); 
   const closeModal = () => setModal({ isOpen: false, title: '', message: '', onConfirm: null }); const showAlert = (title, message) => setModal({ isOpen: true, title, message, onConfirm: null }); const closeImportModal = () => setIsImportModalOpen(false);
+
+  // [เพิ่ม] State สำหรับ Login
+  const [userProfile, setUserProfile] = useLocalStorage("bot-userProfile-v1", null);
+
+  const handleLoginSuccess = (credentialResponse) => {
+    console.log("Google Login Success:", credentialResponse);
+    try {
+      const decoded = jwtDecode(credentialResponse.credential);
+      console.log("Decoded User Info:", decoded);
+      setUserProfile({
+        name: decoded.name,
+        email: decoded.email,
+        picture: decoded.picture
+      });
+      
+      // [เพิ่ม] เมื่อ Login สำเร็จ, เช็คว่ามีข้อมูลเด็คหรือยัง
+      if (!userDecks[decoded.email]) {
+        console.log("Creating new deck slots for user:", decoded.email);
+        setUserDecks(prev => ({
+          ...prev,
+          [decoded.email]: {
+            slots: [
+              { name: "Slot 1", main: [], life: [] },
+              { name: "Slot 2", main: [], life: [] }
+            ]
+          }
+        }));
+      }
+
+    } catch (error) {
+      console.error("Failed to decode JWT:", error);
+    }
+  };
+
+  const handleLoginError = () => {
+    console.log('Login Failed');
+    showAlert("Login Failed", "ไม่สามารถเข้าสู่ระบบด้วย Google ได้ โปรดลองอีกครั้ง");
+  };
+
+  const handleLogout = () => {
+    setUserProfile(null); // ล้างข้อมูลผู้ใช้
+    setIsDeckListModalOpen(false); // [เพิ่ม] ปิด Modal Deck List ถ้าเปิดอยู่
+    console.log("User logged out.");
+  };
 
   useEffect(() => { if (cardDb.length === 0) { handleReloadFromTxt(); } }, []);
   useEffect(() => { setCurrentPage(1); }, [searchTerm, filterTypes, filterMagicType, filterColors, filterRarities, selectedSets, statFilters]);
@@ -139,7 +387,57 @@ export default function App() {
         <CustomDragLayer />
         {flyingCard && <FlyingCard {...flyingCard} onComplete={handleAnimationComplete} />}
         <div className="h-screen flex flex-col text-gray-200 bg-black">
-           <header className="px-4 lg:px-6 py-2 border-b border-emerald-700/30 bg-black/60 backdrop-blur-sm shrink-0 z-40"> <div className="flex items-center justify-between gap-4"><h1 className="text-2xl md:text-3xl font-extrabold tracking-tight bg-gradient-to-r from-amber-300 to-emerald-400 bg-clip-text text-transparent">Battle Of Talingchan</h1></div> </header>
+           <header className="px-4 lg:px-6 py-2 border-b border-emerald-700/30 bg-black/60 backdrop-blur-sm shrink-0 z-40">
+            <div className="flex items-center justify-between gap-4">
+              <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight bg-gradient-to-r from-amber-300 to-emerald-400 bg-clip-text text-transparent">
+                Battle Of Talingchan
+              </h1>
+              
+              <div className="flex items-center gap-3">
+                {/* [เพิ่ม] ปุ่ม Deck List จะแสดงเมื่อ Login แล้ว */}
+                {userProfile && (
+                  <Button 
+                    onClick={() => setIsDeckListModalOpen(true)}
+                    className="bg-gradient-to-r from-amber-500 to-emerald-600 text-white border-none shadow-lg hover:from-amber-400 hover:to-emerald-500"
+                  >
+                    <DeckIcon />
+                    <span className="hidden md:inline">Deck List</span>
+                  </Button>
+                )}
+                
+                {/* --- ส่วน Login/Logout --- */}
+                {userProfile ? (
+                  <>
+                    <img 
+                      src={userProfile.picture} 
+                      alt={userProfile.name} 
+                      className="w-8 h-8 rounded-full border-2 border-emerald-500"
+                      title={`Logged in as ${userProfile.name} (${userProfile.email})`} 
+                    />
+                    <span className="text-white hidden md:block text-sm">
+                      {userProfile.name}
+                    </span>
+                    <Button 
+                      onClick={handleLogout} 
+                      className="bg-red-900/50 border-red-500/30 text-red-300 hover:bg-red-800/50 hover:text-white px-3 py-1 text-sm"
+                    >
+                      Logout
+                    </Button>
+                  </>
+                ) : (
+                  <GoogleLogin
+                    onSuccess={handleLoginSuccess}
+                    onError={handleLoginError}
+                    theme="filled_black"
+                    size="medium"
+                    shape="pill"
+                    text="signin_with"
+                    logo_alignment="left"
+                  />
+                )}
+              </div>
+            </div>
+           </header>
           <main className="flex-1 flex flex-col md:flex-row overflow-hidden">
             {/* Sidebar Wrapper */}
             <div className={` ${activeView === 'deck' ? 'block' : 'hidden'} md:block ${isSidebarOpen ? 'md:w-[360px]' : 'md:w-0'} transition-all duration-300 ease-in-out overflow-hidden shrink-0 relative md:h-full w-full h-full overflow-y-auto md:overflow-y-hidden pb-16 md:pb-0 `}>
@@ -168,12 +466,30 @@ export default function App() {
           </main>
           {/* Mobile Nav */}
           <nav className="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-black/80 backdrop-blur-lg border-t border-emerald-700/30 z-50 flex items-stretch"> <button className={`flex-1 flex flex-col items-center justify-center p-2 text-xs transition-colors ${activeView === 'cards' ? 'text-emerald-400' : 'text-gray-400 hover:text-white'}`} onClick={() => setActiveView('cards')}> <CardsIcon /> <span>การ์ด</span> </button> <button className={`flex-1 flex flex-col items-center justify-center p-2 text-xs transition-colors ${activeView === 'deck' ? 'text-emerald-400' : 'text-gray-400 hover:text-white'}`} onClick={() => setActiveView('deck')}> <DeckIcon /> <span>เด็ค</span> </button> </nav>
+          
           {/* Modals */}
           <Modal isOpen={modal.isOpen} title={modal.title} onClose={closeModal} onConfirm={modal.onConfirm} confirmText={modal.onConfirm ? modal.confirmText || "Confirm" : undefined} confirmIcon={modal.onConfirm ? modal.confirmIcon || <ClearIcon /> : undefined} > {modal.message} </Modal>
           <ImportDeckModal isOpen={isImportModalOpen} onClose={closeImportModal} onImport={confirmImport} />
           <DeckAnalysisModal isOpen={isAnalyzing} onClose={() => setIsAnalyzing(false)} mainDeck={mainDeck} lifeDeck={lifeDeck} showAlert={showAlert} />
           <DeckViewModal isOpen={viewingDeck !== null} onClose={() => setViewingDeck(null)} deck={viewingDeck === 'main' ? mainDeck : lifeDeck} rules={viewingDeck === 'main' ? RULES.main : RULES.life} onAddCard={viewingDeck === 'main' ? addToMain : addToLife} onRemoveCard={viewingDeck === 'main' ? removeFromMain : removeFromLife} title={viewingDeck === 'main' ? "Main Deck" : "Life Deck"} />
           <CardDetailModal card={zoomedCard} onClose={() => setZoomedCard(null)} />
+        
+          {/* [เพิ่ม] เรียกใช้ DeckListModal ที่สร้างขึ้นมา */}
+          <DeckListModal
+            isOpen={isDeckListModalOpen}
+            onClose={() => setIsDeckListModalOpen(false)}
+            userProfile={userProfile}
+            userDecks={userDecks}
+            setUserDecks={setUserDecks}
+            mainDeck={mainDeck}
+            lifeDeck={lifeDeck}
+            setMainDeck={setMainDeck}
+            setLifeDeck={setLifeDeck}
+            showAlert={showAlert}
+            encodeDeckCode={encodeDeckCode}
+            decodeDeckCode={decodeDeckCode}
+            allCards={cardDb} // ส่ง cardDb ไปเป็น allCards
+          />
         </div>
       </DndStateProvider>
     </DndProvider>
