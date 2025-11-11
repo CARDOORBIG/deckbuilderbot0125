@@ -1,0 +1,5 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* (และโค้ด CSS อื่นๆ เช่น ::-webkit-scrollbar ถ้าคุณมี) */
