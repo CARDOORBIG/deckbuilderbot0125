@@ -36,6 +36,8 @@
 
     "firebase": "^12.5.0",
 
+    "html2canvas": "^1.4.1",
+
     "jwt-decode": "^4.0.0",
 
     "react": "^19.1.1",

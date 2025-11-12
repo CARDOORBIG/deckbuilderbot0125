@@ -4,12 +4,13 @@ import { getFirestore } from "firebase/firestore";
 // 🛑 [สำคัญมาก]
 // วางโค้ด config ที่คัดลอกมาจาก Firebase Console ของคุณ
 const firebaseConfig = {
-  apiKey: "AIz...YOUR_API_KEY",
-  authDomain: "your-project-id.firebaseapp.com",
-  projectId: "your-project-id",
-  storageBucket: "your-project-id.appspot.com",
-  messagingSenderId: "1234567890",
-  appId: "1:1234567890:web:abcdef123456"
+  apiKey: "AIzaSyBdP9emGgja_VWZDXUhW11RP9fMZnePLuU",
+  authDomain: "battle-of-talingchan-builder.firebaseapp.com",
+  projectId: "battle-of-talingchan-builder",
+  storageBucket: "battle-of-talingchan-builder.firebasestorage.app",
+  messagingSenderId: "618176300223",
+  appId: "1:618176300223:web:a917a3d7a07c11b973b20a",
+  measurementId: "G-RW09XRTQFN"
 };
 
 // Initialize Firebase

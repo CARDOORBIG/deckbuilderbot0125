@@ -7,8 +7,13 @@ import { Radar } from 'react-chartjs-2';
 import { GoogleLogin } from '@react-oauth/google';
 import { jwtDecode } from 'jwt-decode';
 import { Link } from 'react-router-dom';
-import { db } from './firebase'; // <--- Import
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore'; // <--- Import
+import { db } from './firebase';
+import { 
+  collection, 
+  doc, 
+  writeBatch, 
+  serverTimestamp 
+} from 'firebase/firestore';
 ChartJS.register(RadialLinearScale, PointElement, LineElement, Filler, Tooltip, Legend);
 
 
@@ -33,7 +38,7 @@ const Button = ({ className = "", children, ...props }) => ( <button className={
 const Pill = ({ children, className = "" }) => ( <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${className}`}>{children}</span> );
 const CardShell = forwardRef(function CardShell({ children, className = "", ...props }, ref) { return ( <div ref={ref} className={`bg-slate-900/70 backdrop-blur-sm p-4 rounded-xl border border-emerald-500/20 shadow-lg transition-all hover:border-amber-400/50 hover:shadow-amber-500/10 ${className}`} {...props}> {children} </div> ); });
 const ColorPip = ({ color }) => { const colorClasses = { Red: 'bg-red-500', Green: 'bg-green-500', Purple: 'bg-purple-500', Blue: 'bg-blue-500', Yellow: 'bg-yellow-500', Black: 'bg-gray-800', White: 'bg-slate-200' }; return <span className={`w-3 h-3 rounded-full ${colorClasses[color] || 'bg-slate-400'}`} title={color}></span>; };
-const Modal = ({ isOpen, title, children, onClose, onConfirm, confirmText = "Confirm", confirmIcon = <ClearIcon/>, maxWidth = 'max-w-md' }) => { if (!isOpen) return null; return createPortal( <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[200] p-4"> <div className={`bg-slate-800 border border-emerald-500/30 rounded-xl shadow-2xl p-6 w-full m-4 ${maxWidth}`}> <h2 className="text-xl font-bold text-white mb-4">{title}</h2> <div className="text-gray-300 mb-6">{children}</div> <div className="flex justify-end gap-3"> <Button onClick={onClose} className="bg-slate-700/50 border-slate-600 text-gray-300 hover:bg-slate-600">{onConfirm ? "Cancel" : "Close"}</Button> {onConfirm && ( <Button onClick={onConfirm} className="bg-emerald-900/50 border-emerald-500/30 text-emerald-300 hover:bg-emerald-800/50 hover:text-white"> {confirmIcon} {confirmText} </Button> )} </div> </div> </div>, document.body ); };
+const Modal = ({ isOpen, title, children, onClose, onConfirm, confirmText = "Confirm", confirmIcon = <ClearIcon/>, maxWidth = 'max-w-md' }) => { if (!isOpen) return null; return createPortal( <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[400] p-4"> <div className={`bg-slate-800 border border-emerald-500/30 rounded-xl shadow-2xl p-6 w-full m-4 ${maxWidth}`}> <h2 className="text-xl font-bold text-white mb-4">{title}</h2> <div className="text-gray-300 mb-6">{children}</div> <div className="flex justify-end gap-3"> <Button onClick={onClose} className="bg-slate-700/50 border-slate-600 text-gray-300 hover:bg-slate-600">{onConfirm ? "Cancel" : "Close"}</Button> {onConfirm && ( <Button onClick={onConfirm} className="bg-emerald-900/50 border-emerald-500/30 text-emerald-300 hover:bg-emerald-800/50 hover:text-white"> {confirmIcon} {confirmText} </Button> )} </div> </div> </div>, document.body ); };
 const ImportDeckModal = ({ isOpen, onClose, onImport }) => { const [code, setCode] = useState(''); const handleImportClick = () => { onImport(code); setCode(''); }; if (!isOpen) return null; return createPortal( <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[210] p-4"> <div className="bg-slate-800 border border-emerald-500/30 rounded-xl shadow-2xl p-6 w-full max-w-md"> <h2 className="text-xl font-bold text-white mb-4">Import Deck Code</h2> <textarea value={code} onChange={(e) => setCode(e.target.value)} placeholder="วางรหัสเด็คที่นี่..." rows="4" className="w-full px-3 py-2 border border-emerald-500/30 rounded-lg focus:ring-2 focus:ring-amber-500 focus:outline-none transition bg-slate-700/50 placeholder-gray-400 text-white mb-6 resize-none" /> <div className="flex justify-end gap-3"> <Button onClick={onClose} className="bg-slate-700/50 border-slate-600 text-gray-300 hover:bg-slate-600">Cancel</Button> <Button onClick={handleImportClick} className="bg-emerald-900/50 border-emerald-500/30 text-emerald-300 hover:bg-emerald-800/50 hover:text-white"> <ImportIcon /> Import </Button> </div> </div> </div>, document.body ); };
 
 // === Rules & utils ===
@@ -65,7 +70,7 @@ const DeckTray = forwardRef(function DeckTray({ title, deck, onDropCard, onRemov
 function CardDetailModal({ card, onClose }) { if (!card) return null; const encodedImagePath = encodePath(card.imagePath); const fileId = card.id.replace(' - Only#1', ''); const imgPng = `/cards/${encodedImagePath}/${encodeURIComponent(fileId)}.png`; const imgJpg = `/cards/${encodedImagePath}/${encodeURIComponent(fileId)}.jpg`; return createPortal( <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-[300] p-4" onClick={onClose}> <img src={imgPng} alt={card.name} className="max-w-full max-h-full h-auto w-auto object-contain rounded-xl shadow-2xl" onClick={(e) => e.stopPropagation()} onError={(e) => { if (!e.currentTarget.src.endsWith('.jpg')) { e.currentTarget.src = imgJpg; } }} /> <button onClick={onClose} className="absolute top-4 right-4 text-white bg-slate-800/50 rounded-full p-2 hover:bg-slate-700"> <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg> </button> </div>, document.body ); }
 
 // === DeckViewModal ===
-function DeckViewModal({ isOpen, onClose, deck, rules, onAddCard, onRemoveCard, title }) { const groupedDeck = useMemo(() => { if (!deck) return []; return Object.values(deck.reduce((m, card) => { const key = nameKey(card.name); if (!m[key]) m[key] = { card, count: 0 }; m[key].count++; return m; }, {})).sort((a, b) => a.card.name.localeCompare(b.card.name, 'th')); }, [deck]); if (!isOpen) return null; return createPortal( <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-[200] p-4"> <div className="bg-slate-900/70 border border-emerald-500/30 rounded-xl shadow-2xl w-full h-full flex flex-col"> <header className="flex items-center justify-between p-4 border-b border-emerald-500/20 shrink-0"> <h2 className="text-2xl font-bold text-white">{title} ({deck.length} / {rules.size})</h2> <Button onClick={onClose}>Close</Button> </header> <div className="flex-grow overflow-y-auto p-4"> {groupedDeck.length === 0 ? ( <div className="flex items-center justify-center h-full"><p className="text-slate-400">เด็คนี้ว่างเปล่า</p></div> ) : ( <div className="flex flex-wrap justify-center gap-4"> {groupedDeck.map(({ card, count }) => { const encodedImagePath = encodePath(card.imagePath); const fileId = card.id.replace(' - Only#1', ''); const thumbPng = `/cards/${encodedImagePath}/${encodeURIComponent(fileId)}.png`; const isAtMaxCopies = rules.maxCopiesPerName && count >= rules.maxCopiesPerName; return ( <div key={card.id} className="w-40 flex flex-col items-center"> <img src={thumbPng} alt={card.name} className="w-full rounded-lg shadow-md mb-2" /> <div className="w-full flex items-center justify-around gap-2 bg-slate-800/50 p-1 rounded-md"> <button onClick={() => onRemoveCard(card)} className="flex items-center justify-center w-7 h-7 bg-red-800/70 rounded-full hover:bg-red-700 transition active:scale-95 text-white font-bold text-xl">-</button> <span className="font-bold text-lg text-white w-6 text-center">{count}</span> <button onClick={() => onAddCard(card)} disabled={isAtMaxCopies} className="flex items-center justify-center w-7 h-7 bg-emerald-800/70 rounded-full hover:bg-emerald-700 transition active:scale-95 text-white font-bold text-xl disabled:bg-slate-600 disabled:cursor-not-allowed">+</button> </div> </div> ); })} </div> )} </div> </div> </div>, document.body ); }
+function DeckViewModal({ isOpen, onClose, deck, rules, onAddCard, onRemoveCard, title }) { const groupedDeck = useMemo(() => { if (!deck) return []; return Object.values(deck.reduce((m, card) => { const key = nameKey(card.name); if (!m[key]) m[key] = { card, count: 0 }; m[key].count++; return m; }, {})).sort((a, b) => a.card.name.localeCompare(b.card.name, 'th')); }, [deck]); if (!isOpen) return null; return createPortal( <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-[400] p-4"> <div className="bg-slate-900/70 border border-emerald-500/30 rounded-xl shadow-2xl w-full h-full flex flex-col"> <header className="flex items-center justify-between p-4 border-b border-emerald-500/20 shrink-0"> <h2 className="text-2xl font-bold text-white">{title} ({deck.length} / {rules.size})</h2> <Button onClick={onClose}>Close</Button> </header> <div className="flex-grow overflow-y-auto p-4"> {groupedDeck.length === 0 ? ( <div className="flex items-center justify-center h-full"><p className="text-slate-400">เด็คนี้ว่างเปล่า</p></div> ) : ( <div className="flex flex-wrap justify-center gap-4"> {groupedDeck.map(({ card, count }) => { const encodedImagePath = encodePath(card.imagePath); const fileId = card.id.replace(' - Only#1', ''); const thumbPng = `/cards/${encodedImagePath}/${encodeURIComponent(fileId)}.png`; const isAtMaxCopies = rules.maxCopiesPerName && count >= rules.maxCopiesPerName; return ( <div key={card.id} className="w-40 flex flex-col items-center"> <img src={thumbPng} alt={card.name} className="w-full rounded-lg shadow-md mb-2" /> <div className="w-full flex items-center justify-around gap-2 bg-slate-800/50 p-1 rounded-md"> <button onClick={() => onRemoveCard(card)} className="flex items-center justify-center w-7 h-7 bg-red-800/70 rounded-full hover:bg-red-700 transition active:scale-95 text-white font-bold text-xl">-</button> <span className="font-bold text-lg text-white w-6 text-center">{count}</span> <button onClick={() => onAddCard(card)} disabled={isAtMaxCopies} className="flex items-center justify-center w-7 h-7 bg-emerald-800/70 rounded-full hover:bg-emerald-700 transition active:scale-95 text-white font-bold text-xl disabled:bg-slate-600 disabled:cursor-not-allowed">+</button> </div> </div> ); })} </div> )} </div> </div> </div>, document.body ); }
 
 // === Deck Analysis Modal ===
 function DeckAnalysisModal({ isOpen, onClose, mainDeck, lifeDeck, showAlert }) { 
@@ -204,10 +209,11 @@ function DeckListModal({
   };
 
 // === [แก้ไข] อัปเกรด Handler สำหรับ Share Deck ===
+// === [แก้ไข] อัปเกรด Handler สำหรับ Share Deck (แยก Collection) ===
 const handleShareDeck = async (index) => {
   const slot = slots[index];
 
-  // 1. ตรวจสอบว่ามี Only#1 Card หรือไม่ (เพื่อใช้เป็นรูปปก)
+  // 1. ตรวจสอบว่ามี Only#1 Card หรือไม่
   const only1Card = slot.main.find(c => c.onlyRank === 1);
   if (!only1Card) {
     showAlert("ไม่สามารถแชร์ได้", "เด็คของคุณต้องมี 'Only #1' Card (การ์ดหลัก) ก่อนจึงจะแชร์ได้ค่ะ");
@@ -215,34 +221,65 @@ const handleShareDeck = async (index) => {
   }
 
   // 2. ถามเพื่อยืนยัน
-  setModal({ // (ใช้ setModal ที่ส่งมาจาก App.jsx)
+  setModal({ 
     isOpen: true,
     title: "Confirm Share Deck",
     message: `คุณต้องการแชร์เด็ค "${slot.name}" สู่สาธารณะใช่หรือไม่? (ชื่อและรูปโปรไฟล์ Google ของคุณจะถูกแสดง)`,
     onConfirm: async () => {
-      closeModal(); // (ปิด Modal ยืนยัน)
+      closeModal(); 
       try {
-        // 3. เตรียมข้อมูลที่จะส่ง
-        const deckData = {
+        // === [เริ่มการแก้ไข] ===
+
+        // 1. สร้าง Batch
+        const batch = writeBatch(db);
+
+        // 2. สร้าง ID ใหม่สำหรับเอกสาร (เราต้องใช้ ID เดียวกันทั้ง 2 ที่)
+        const newDeckRef = doc(collection(db, "publicDecks")); 
+        const deckId = newDeckRef.id;
+
+        // 3. เตรียมข้อมูลสำหรับ "หน้า List" (เบาๆ)
+        const allCardsInDeck = [...slot.main, ...slot.life];
+        const factions = [...new Set(allCardsInDeck.map(c => c.faction).filter(Boolean))];
+
+        const listData = {
           deckName: slot.name,
-          mainDeck: slot.main.map(c => c.id), // (เราเก็บแค่ ID เพื่อประหยัดพื้นที่)
-          lifeDeck: slot.life.map(c => c.id), // (เราเก็บแค่ ID)
-          only1CardData: { // (เก็บข้อมูลการ์ดปก)
+          only1CardData: {
             id: only1Card.id,
             name: only1Card.name,
             imagePath: only1Card.imagePath,
           },
-          user: { // (ข้อมูลผู้แชร์)
+          user: {
             name: userProfile.name,
             picture: userProfile.picture,
-            email: userProfile.email, // (อาจใช้สำหรับยืนยันตัวตน)
+            email: userProfile.email,
           },
-          sharedAt: serverTimestamp() // (เก็บเวลาที่แชร์)
+          sharedAt: serverTimestamp(),
+          likeCount: 0,
+          likedBy: [],
+          factions: factions, // (เราใส่ Faction ค้างไว้ แต่โค้ดเก่าคุณลบไปแล้ว ไม่เป็นไรครับ ใส่ไว้ไม่เสียหาย)
         };
 
-        // 4. ส่งข้อมูลไปยัง Firestore
-        const docRef = await addDoc(collection(db, "publicDecks"), deckData);
-        console.log("Deck shared with ID: ", docRef.id);
+        // 4. เตรียมข้อมูลสำหรับ "หน้ารายละเอียด"
+        const detailData = {
+          mainDeck: slot.main.map(c => c.id),
+          lifeDeck: slot.life.map(c => c.id),
+        };
+
+        // 5. สั่ง Batch ให้เขียน 2 ที่
+        
+        // เขียนที่ 1: "publicDecks" (สำหรับหน้า List)
+        batch.set(newDeckRef, listData); 
+
+        // เขียนที่ 2: "publicDeckDetails" (สำหรับหน้ารายละเอียด)
+        const detailRef = doc(db, "publicDeckDetails", deckId); // <--- ใช้ ID เดียวกัน
+        batch.set(detailRef, detailData);
+
+        // 6. ส่งข้อมูลทั้งหมด
+        await batch.commit();
+
+        // === [สิ้นสุดการแก้ไข] ===
+
+        console.log("Deck shared with ID: ", deckId);
         showAlert("แชร์สำเร็จ!", `เด็ค "${slot.name}" ของคุณถูกแชร์สู่สาธารณะแล้ว!`);
 
       } catch (e) {
