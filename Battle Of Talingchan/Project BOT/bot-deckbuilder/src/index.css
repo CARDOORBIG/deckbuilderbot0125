@@ -1,3 +1,21 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  /* background-color: #1a202c; */
+  color: white;
+  font-family: 'Poppins', sans-serif;
+  overflow: hidden; 
+
+  /* === [แก้ไข] ส่วนของพื้นหลัง === */
+  background-image: url('/assets/wallblue.jpg'); /* <--- [แก้ไข] ใช้พาธนี้ */
+  background-size: cover; 
+  background-position: center; 
+  background-repeat: no-repeat; 
+  background-attachment: fixed; 
+  /* === [สิ้นสุดการแก้ไข] === */
+}

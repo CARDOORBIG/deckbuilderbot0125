@@ -257,6 +257,7 @@ const handleShareDeck = async (index) => {
           likeCount: 0,
           likedBy: [],
           factions: factions, // (เราใส่ Faction ค้างไว้ แต่โค้ดเก่าคุณลบไปแล้ว ไม่เป็นไรครับ ใส่ไว้ไม่เสียหาย)
+          viewCount: 0 // <--- [เพิ่ม] เพิ่มตัวนับยอดวิวเริ่มต้น
         };
 
         // 4. เตรียมข้อมูลสำหรับ "หน้ารายละเอียด"
@@ -532,66 +533,78 @@ export default function App() {
 
           {/* === ส่วนบังคับ Login === */}
           {!userProfile ? (
-            // --- 1. หน้าจอเมื่อยังไม่ Login ---
-            <div className="flex-1 flex flex-col items-center justify-center p-8 gap-6 bg-gradient-to-br from-slate-900 to-black">
-              <img 
-                src="/cards/LOGOBOT.png" 
-                alt="Battle Of Talingchan Logo" 
-                className="w-32 h-32 object-contain"
-                onError={(e) => { e.currentTarget.style.display = 'none'; }}
-              />
-              <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight bg-gradient-to-r from-amber-300 to-emerald-400 bg-clip-text text-transparent text-center">
-                Deck Builder
-              </h1>
-              <p className="text-xl text-gray-300">กรุณาเข้าสู่ระบบด้วย Google เพื่อใช้งาน</p>
-              <div className="mt-4 scale-110">
-                <GoogleLogin
-                  onSuccess={handleLoginSuccess}
-                  onError={handleLoginError}
-                  theme="filled_black"
-                  size="large"
-                  shape="pill"
-                  text="signin_with"
-                  logo_alignment="left"
-                />
-              </div>
-
-              {/* === [แก้ไข] ส่วน QR Code และ VDO === */}
-              <div className="mt-12 pt-8 border-t border-emerald-700/30 w-full max-w-sm flex flex-col items-center">
-                <h3 className="text-lg font-semibold text-amber-300 mb-4 text-center">
-                  สามารถสนับสนุนค่ากาแฟและค่าเซิร์ฟเวอร์ได้ที่นี่นะคะ ❤️❤️❤️
-                </h3>
+            // --- 1. [ออกแบบใหม่] หน้าจอ Login (บาร์ซ้าย + พื้นหลังขวา) ---
+            <div className="flex-1 flex flex-row items-stretch overflow-hidden">
+              
+              {/* === [ใหม่] คอลัมน์ซ้าย (Login Bar) === */}
+              {/* (จอมือถือจะกว้างเต็ม, จอคอมจะกว้าง 384px) */}
+              <div className="w-full max-w-md md:w-96 shrink-0 flex flex-col items-center justify-start p-8 gap-6 bg-black/80 backdrop-blur-lg overflow-y-auto h-full border-r border-emerald-700/30">
+                
                 <img 
-                  src="/assets/QRCODE.png" 
-                  alt="Donate QR Code" 
-                  className="w-48 h-48 mx-auto rounded-lg border-4 border-emerald-500/30"
-                  onError={(e) => { 
-                    console.warn("QR Code image not found at /assets/QRCODE.png. Make sure it's in the /public/assets/ folder.");
-                    e.currentTarget.style.display = 'none'; 
-                  }}
+                  src="/cards/LOGOBOT.png" 
+                  alt="Battle Of Talingchan Logo" 
+                  className="w-32 h-32 object-contain shrink-0"
+                  onError={(e) => { e.currentTarget.style.display = 'none'; }}
                 />
+                <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight bg-gradient-to-r from-amber-300 to-emerald-400 bg-clip-text text-transparent text-center">
+                  Deck Builder
+                </h1>
+                <div className="mt-4 scale-110 shrink-0">
+                  <GoogleLogin
+                    onSuccess={handleLoginSuccess}
+                    onError={handleLoginError}
+                    theme="filled_black"
+                    size="large"
+                    shape="pill"
+                    text="signin_with"
+                    logo_alignment="left"
+                  />
+                </div>
 
-                {/* === [เพิ่ม] ส่วน VDO === */}
-                <video
-                  src="/assets/VDO.mov"  // <-- [สำคัญ] ตรวจสอบนามสกุลไฟล์ VDO ของคุณ! (เช่น .mp4, .webm)
-                  autoPlay
-                  loop
-                  muted
-                  playsInline
-                  className="w-full h-auto max-w-[400px] mt-6 rounded-lg border-4 border-emerald-500/30"
-                  width="540" // ให้ขนาดต้นฉบับ
-                  height="540" // ให้ขนาดต้นฉบับ
-                  onError={(e) => {
-                    console.warn("VDO file not found at /assets/VDO.mp4. Make sure it's in the /public/assets/ folder and the extension is correct.");
-                    e.currentTarget.style.display = 'none';
-                  }}
-                >
-                  Your browser does not support the video tag.
-                </video>
-                {/* === [สิ้นสุด] ส่วน VDO === */}
-
+                <div className="mt-12 pt-8 border-t border-emerald-700/30 w-full max-w-sm flex flex-col items-center">
+                  <h3 className="text-lg font-semibold text-amber-300 mb-4 text-center">
+                    สามารถสนับสนุนค่ากาแฟและค่าเซิร์ฟเวอร์ได้ที่นี่นะคะ ❤️❤️❤️
+                  </h3>
+                  <img 
+                    src="/assets/QRCODE.png" 
+                    alt="Donate QR Code" 
+                    className="w-48 h-48 mx-auto rounded-lg border-4 border-emerald-500/30"
+                    onError={(e) => { 
+                      console.warn("QR Code image not found at /assets/QRCODE.png. Make sure it's in the /public/assets/ folder.");
+                      e.currentTarget.style.display = 'none'; 
+                    }}
+                  />
+                  <video
+                    src="/assets/VDO.mov"
+                    autoPlay
+                    loop
+                    muted
+                    playsInline
+                    className="w-full h-auto max-w-[400px] mt-6 rounded-lg border-4 border-emerald-500/30"
+                    width="540" 
+                    height="540"
+                    onError={(e) => {
+                      console.warn("VDO file not found at /assets/VDO.mov. Make sure it's in the /public/assets/ folder and the extension is correct.");
+                      e.currentTarget.style.display = 'none';
+                    }}
+                  >
+                    Your browser does not support the video tag.
+                  </video>
+                </div>
               </div>
-              {/* === [สิ้นสุด] ส่วน QR Code และ VDO === */}
+
+              {/* === [ใหม่] คอลัมน์ขวา (พื้นหลังตารางซ้ำ) === */}
+              <div 
+                className="flex-1 hidden md:block" // <-- ซ่อนในจอมือถือ
+                style={{ 
+                  backgroundImage: "url('/assets/wallblueL.jpg')", // <-- ใช้ wallblueL
+                  backgroundRepeat: 'repeat',   // <--- [ทำซ้ำ]
+                  backgroundSize: 'auto',     // <--- [ขนาดเดิม]
+                  backgroundPosition: 'top left'
+                }} 
+              >
+                {/* (พื้นที่ว่างสำหรับพื้นหลัง) */}
+              </div>
 
             </div>
           ) : (
