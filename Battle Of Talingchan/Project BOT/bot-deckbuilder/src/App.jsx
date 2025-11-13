@@ -4,48 +4,236 @@ import { DndProvider, useDrag, useDrop, useDragLayer } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
 import { Chart as ChartJS, RadialLinearScale, PointElement, LineElement, Filler, Tooltip, Legend } from 'chart.js';
 import { Radar } from 'react-chartjs-2';
-import { GoogleLogin } from '@react-oauth/google';
+import { GoogleLogin, googleLogout } from '@react-oauth/google';
 import { jwtDecode } from 'jwt-decode';
 import { Link } from 'react-router-dom';
 import { db } from './firebase';
 import { 
-  collection, 
-  doc, 
-  writeBatch, 
-  serverTimestamp 
+  collection, doc, writeBatch, serverTimestamp, getDoc, setDoc,
+  query, where, getDocs 
 } from 'firebase/firestore';
+
 ChartJS.register(RadialLinearScale, PointElement, LineElement, Filler, Tooltip, Legend);
 
-
 // === Icons ===
-const ImportIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></svg> );
-const ExportIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg> );
-const ClearIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /><line x1="10" y1="11" x2="10" y2="17" /><line x1="14" y1="11" x2="14" y2="17" /></svg> );
-const DBLoadIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 2v6h-6" /><path d="M3 12a9 9 0 0 1 15-6.7L21 8" /><path d="M3 22v-6h6" /><path d="M21 12a9 9 0 0 1-15 6.7L3 16" /></svg> );
-const EyeIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"> <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /> <circle cx="12" cy="12" r="3" /> </svg> );
-const CopyIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"> <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect> <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path> </svg> );
-const PlusIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg> );
-const CardsIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect><path d="M16 2H8a2 2 0 0 0-2 2v3h12V4a2 2 0 0 0-2-2z"></path></svg>;
-const DeckIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><line x1="10" y1="9" x2="8" y2="9"></line></svg>;
-const ChevronLeftIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>;
-const ChevronRightIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>;
-
-const UsersIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>;
-const UploadIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>;
+const Svg = ({ p, ...r }) => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...r}>{p}</svg>;
+const ImportIcon = () => <Svg p={<><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></>} />;
+const ExportIcon = () => <Svg p={<><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></>} />;
+const TrashIcon = () => <Svg p={<><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /><line x1="10" y1="11" x2="10" y2="17" /><line x1="14" y1="11" x2="14" y2="17" /></>} />;
+const CloseIcon = () => <Svg width="24" height="24" p={<><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></>} />;
+const DBLoadIcon = () => <Svg p={<><path d="M21 2v6h-6" /><path d="M3 12a9 9 0 0 1 15-6.7L21 8" /><path d="M3 22v-6h6" /><path d="M21 12a9 9 0 0 1-15 6.7L3 16" /></>} />;
+const EyeIcon = () => <Svg p={<><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></>} />;
+const CopyIcon = () => <Svg p={<><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></>} />;
+const PlusIcon = () => <Svg width="20" height="20" strokeWidth="2.5" p={<><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></>} />;
+const CardsIcon = () => <Svg width="24" height="24" p={<><rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect><path d="M16 2H8a2 2 0 0 0-2 2v3h12V4a2 2 0 0 0-2-2z"></path></>} />;
+const DeckIcon = () => <Svg width="24" height="24" p={<><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><line x1="10" y1="9" x2="8" y2="9"></line></>} />;
+const ChevronLeftIcon = () => <Svg width="24" height="24" p={<polyline points="15 18 9 12 15 6"></polyline>} />;
+const ChevronRightIcon = () => <Svg width="24" height="24" p={<polyline points="9 18 15 12 9 6"></polyline>} />;
+const UsersIcon = () => <Svg width="24" height="24" p={<><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></>} />;
+const UploadIcon = () => <Svg p={<><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></>} />;
+const MenuIcon = () => <Svg width="24" height="24" p={<><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></>} />;
+const UserCogIcon = () => <Svg width="24" height="24" p={<><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle><circle cx="12" cy="12" r="3"></circle></>} />;
+const ImageIcon = () => <Svg p={<><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></>} />;
+const ClearIcon = TrashIcon;
 
 // === UI helpers ===
 const Button = ({ className = "", children, ...props }) => ( <button className={`flex items-center justify-center gap-2 px-4 py-2 rounded-lg shadow-lg border border-amber-400/20 bg-amber-900/30 text-amber-300 hover:bg-amber-700/50 hover:text-white hover:border-amber-400/60 active:scale-[.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-amber-900/30 ${className}`} {...props} > {children} </button> );
 const Pill = ({ children, className = "" }) => ( <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${className}`}>{children}</span> );
 const CardShell = forwardRef(function CardShell({ children, className = "", ...props }, ref) { return ( <div ref={ref} className={`bg-slate-900/70 backdrop-blur-sm p-4 rounded-xl border border-emerald-500/20 shadow-lg transition-all hover:border-amber-400/50 hover:shadow-amber-500/10 ${className}`} {...props}> {children} </div> ); });
-const ColorPip = ({ color }) => { const colorClasses = { Red: 'bg-red-500', Green: 'bg-green-500', Purple: 'bg-purple-500', Blue: 'bg-blue-500', Yellow: 'bg-yellow-500', Black: 'bg-gray-800', White: 'bg-slate-200' }; return <span className={`w-3 h-3 rounded-full ${colorClasses[color] || 'bg-slate-400'}`} title={color}></span>; };
-const Modal = ({ isOpen, title, children, onClose, onConfirm, confirmText = "Confirm", confirmIcon = <ClearIcon/>, maxWidth = 'max-w-md' }) => { if (!isOpen) return null; return createPortal( <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[400] p-4"> <div className={`bg-slate-800 border border-emerald-500/30 rounded-xl shadow-2xl p-6 w-full m-4 ${maxWidth}`}> <h2 className="text-xl font-bold text-white mb-4">{title}</h2> <div className="text-gray-300 mb-6">{children}</div> <div className="flex justify-end gap-3"> <Button onClick={onClose} className="bg-slate-700/50 border-slate-600 text-gray-300 hover:bg-slate-600">{onConfirm ? "Cancel" : "Close"}</Button> {onConfirm && ( <Button onClick={onConfirm} className="bg-emerald-900/50 border-emerald-500/30 text-emerald-300 hover:bg-emerald-800/50 hover:text-white"> {confirmIcon} {confirmText} </Button> )} </div> </div> </div>, document.body ); };
+const ColorPip = ({ color }) => { const c = { Red: 'bg-red-500', Green: 'bg-green-500', Purple: 'bg-purple-500', Blue: 'bg-blue-500', Yellow: 'bg-yellow-500', Black: 'bg-gray-800', White: 'bg-slate-200' }; return <span className={`w-3 h-3 rounded-full ${c[color] || 'bg-slate-400'}`} title={color}></span>; };
+const Modal = ({ isOpen, title, children, onClose, onConfirm, confirmText="Confirm", confirmIcon=<TrashIcon/>, maxWidth='max-w-md' }) => !isOpen ? null : createPortal( <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[400] p-4"><div className={`bg-slate-800 border border-emerald-500/30 rounded-xl shadow-2xl p-6 w-full m-4 ${maxWidth}`}><h2 className="text-xl font-bold text-white mb-4">{title}</h2><div className="text-gray-300 mb-6">{children}</div><div className="flex justify-end gap-3"><Button onClick={onClose} className="bg-slate-700/50 border-slate-600 text-gray-300 hover:bg-slate-600">{onConfirm?"Cancel":"Close"}</Button>{onConfirm && <Button onClick={onConfirm} className="bg-emerald-900/50 border-emerald-500/30 text-emerald-300 hover:bg-emerald-800/50 hover:text-white">{confirmIcon} {confirmText}</Button>}</div></div></div>, document.body );
 const ImportDeckModal = ({ isOpen, onClose, onImport }) => { const [code, setCode] = useState(''); const handleImportClick = () => { onImport(code); setCode(''); }; if (!isOpen) return null; return createPortal( <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[210] p-4"> <div className="bg-slate-800 border border-emerald-500/30 rounded-xl shadow-2xl p-6 w-full max-w-md"> <h2 className="text-xl font-bold text-white mb-4">Import Deck Code</h2> <textarea value={code} onChange={(e) => setCode(e.target.value)} placeholder="วางรหัสเด็คที่นี่..." rows="4" className="w-full px-3 py-2 border border-emerald-500/30 rounded-lg focus:ring-2 focus:ring-amber-500 focus:outline-none transition bg-slate-700/50 placeholder-gray-400 text-white mb-6 resize-none" /> <div className="flex justify-end gap-3"> <Button onClick={onClose} className="bg-slate-700/50 border-slate-600 text-gray-300 hover:bg-slate-600">Cancel</Button> <Button onClick={handleImportClick} className="bg-emerald-900/50 border-emerald-500/30 text-emerald-300 hover:bg-emerald-800/50 hover:text-white"> <ImportIcon /> Import </Button> </div> </div> </div>, document.body ); };
+
+// === Helper: Image Resizer ===
+const resizeImage = (file) => {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        const MAX_SIZE = 256;
+        let width = img.width;
+        let height = img.height;
+        if (width > height) { if (width > MAX_SIZE) { height *= MAX_SIZE / width; width = MAX_SIZE; } } 
+        else { if (height > MAX_SIZE) { width *= MAX_SIZE / height; height = MAX_SIZE; } }
+        canvas.width = width;
+        canvas.height = height;
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', 0.8));
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+};
+
+// === Profile Setup Modal ===
+const ProfileSetupModal = ({ isOpen, onClose, userProfile, onSave }) => {
+  const [nickname, setNickname] = useState(userProfile?.name || '');
+  const [avatarUrl, setAvatarUrl] = useState(userProfile?.picture || '');
+  const [useGoogleAvatar, setUseGoogleAvatar] = useState(true);
+  const fileInputRef = useRef(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      setNickname(userProfile?.name || '');
+      setAvatarUrl(userProfile?.picture || '');
+      setUseGoogleAvatar(true);
+    }
+  }, [isOpen, userProfile]);
+
+  const handleFileChange = async (e) => {
+    if (e.target.files && e.target.files[0]) {
+      const resized = await resizeImage(e.target.files[0]);
+      setAvatarUrl(resized);
+      setUseGoogleAvatar(false);
+    }
+  };
+
+  const handleSave = () => {
+    onSave({
+      displayName: nickname,
+      avatarUrl: useGoogleAvatar ? userProfile.picture : avatarUrl
+    });
+  };
+
+  if (!isOpen) return null;
+
+  return createPortal(
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-[500] p-4">
+      <div className="bg-slate-900 border-2 border-emerald-500/50 rounded-2xl shadow-2xl p-8 w-full max-w-md flex flex-col gap-6">
+        <div className="text-center">
+          <h2 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-amber-300 to-emerald-400 mb-2">
+            ยินดีต้อนรับ!
+          </h2>
+          <p className="text-gray-400">ตั้งค่าโปรไฟล์ของคุณเพื่อให้ชุมชนรู้จัก</p>
+        </div>
+
+        <div className="space-y-4">
+          <div className="flex flex-col items-center gap-3">
+            <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-emerald-500 shadow-lg relative group">
+              <img 
+                src={useGoogleAvatar ? userProfile.picture : avatarUrl} 
+                alt="Avatar Preview" 
+                className="w-full h-full object-cover"
+                onError={(e) => e.target.src = "https://placehold.co/100x100/1e293b/ffffff?text=User"}
+              />
+              {!useGoogleAvatar && (
+                <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer" onClick={() => fileInputRef.current.click()}>
+                  <div className="text-white text-xs">เปลี่ยนรูป</div>
+                </div>
+              )}
+            </div>
+            <div className="flex gap-2 text-sm">
+              <button 
+                onClick={() => setUseGoogleAvatar(true)}
+                className={`px-3 py-1 rounded-full border ${useGoogleAvatar ? 'bg-emerald-600 border-emerald-500 text-white' : 'border-slate-600 text-gray-400 hover:bg-slate-800'}`}
+              >
+                รูป Google
+              </button>
+              <button 
+                onClick={() => fileInputRef.current.click()}
+                className={`px-3 py-1 rounded-full border ${!useGoogleAvatar ? 'bg-emerald-600 border-emerald-500 text-white' : 'border-slate-600 text-gray-400 hover:bg-slate-800'}`}
+              >
+                <div className="flex items-center gap-1"><ImageIcon /> อัปโหลดรูป</div>
+              </button>
+              <input 
+                type="file" 
+                ref={fileInputRef} 
+                hidden 
+                accept="image/*"
+                onChange={handleFileChange}
+              />
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <div>
+              <label className="text-sm text-gray-400 mb-1 block">นามแฝง (Display Name)</label>
+              <input 
+                type="text" 
+                value={nickname}
+                onChange={(e) => setNickname(e.target.value)}
+                className="w-full bg-slate-800 border border-slate-600 rounded-lg px-4 py-2 text-white focus:border-emerald-500 outline-none"
+                placeholder="ชื่อเท่ๆ ของคุณ"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="flex gap-3 mt-2">
+          <Button onClick={onClose} className="flex-1 bg-slate-800 border-slate-700 text-gray-400 hover:bg-slate-700">ข้ามไปก่อน</Button>
+          <Button onClick={handleSave} className="flex-1 bg-gradient-to-r from-emerald-600 to-teal-600 border-none text-white hover:shadow-lg hover:scale-105">บันทึกโปรไฟล์</Button>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+};
+
+// === Settings Sidebar ===
+const SettingsDrawer = ({ isOpen, onClose, userProfile, onEditProfile, onLogout }) => {
+  return (
+    <>
+      <div 
+        className={`fixed inset-0 bg-black/60 backdrop-blur-sm z-[600] transition-opacity duration-300 ${isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+        onClick={onClose}
+      />
+      <div className={`fixed top-0 left-0 h-full w-80 bg-slate-900 border-r border-emerald-700/30 shadow-2xl z-[610] transform transition-transform duration-300 ease-out flex flex-col ${isOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+        <div className="p-6 border-b border-emerald-700/20 flex items-center justify-between">
+          <h2 className="text-xl font-bold text-white flex items-center gap-2">
+            <UserCogIcon /> ตั้งค่าผู้ใช้
+          </h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-white"><CloseIcon /></button>
+        </div>
+        
+        <div className="p-6 flex flex-col items-center gap-4">
+          <img 
+            src={userProfile?.picture} 
+            alt={userProfile?.name} 
+            className="w-24 h-24 rounded-full border-4 border-emerald-500 shadow-lg object-cover"
+          />
+          <div className="text-center">
+            <h3 className="text-xl font-bold text-white">{userProfile?.name}</h3>
+            <p className="text-sm text-gray-400">{userProfile?.email}</p>
+          </div>
+          
+          <Button onClick={() => { onEditProfile(); onClose(); }} className="w-full mt-4 bg-slate-800 border-slate-600 text-emerald-400 hover:bg-slate-700">
+            แก้ไขโปรไฟล์
+          </Button>
+        </div>
+
+        <div className="mt-auto p-6 border-t border-emerald-700/20">
+          <Button onClick={onLogout} className="w-full bg-red-900/30 border-red-500/30 text-red-400 hover:bg-red-900/50 hover:text-white">
+            ออกจากระบบ
+          </Button>
+        </div>
+      </div>
+    </>
+  );
+};
 
 // === Rules & utils ===
 const RULES = { main: { size: 50, maxCopiesPerName: 4, requireOnlyRank1Exactly: 1 }, life: { size: 5, uniqueNames: true, maxCopiesPerName: 1 }, };
 const nameKey = (n) => (n || "").trim().toLowerCase();
 function countBy(arr, keyFn) { return arr.reduce((m, x) => { const k = keyFn(x); m[k] = (m[k] || 0) + 1; return m; }, {}); }
-function useLocalStorage(key, initial) { const [v, s] = useState(() => { try { const raw = localStorage.getItem(key); if (!raw || raw === "[]" || raw === "null") return initial; return JSON.parse(raw); } catch { return initial; } }); useEffect(() => { try { localStorage.setItem(key, JSON.stringify(v)); } catch {} }, [key, v]); return [v, s]; }
+
+function useLocalStorage(key, initial) { 
+  const [v, s] = useState(() => { 
+    try { 
+      const raw = localStorage.getItem(key); 
+      if (!raw || raw === "[]" || raw === "null") return initial;
+      return JSON.parse(raw); 
+    } catch { return initial; } 
+  }); 
+  useEffect(() => { 
+    try { localStorage.setItem(key, JSON.stringify(v)); } catch {} 
+  }, [key, v]); 
+  return [v, s]; 
+}
+
 function validate(mainDeck, lifeDeck) { const problems = []; const ok = { main: true, life: true }; if (mainDeck.length !== RULES.main.size) { problems.push(`Main Deck ต้องมี ${RULES.main.size} ใบ (ปัจจุบัน ${mainDeck.length})`); ok.main = false; } const byNameMain = countBy(mainDeck, (c) => nameKey(c.name)); const overCopies = Object.entries(byNameMain).filter(([, n]) => n > RULES.main.maxCopiesPerName); if (overCopies.length) { overCopies.forEach(([k, n]) => problems.push(`การ์ด “${k}” ใน Main Deck ซ้ำเกิน ${RULES.main.maxCopiesPerName} ใบ (มี ${n} ใบ)`)); ok.main = false; } const onlyRank1Count = mainDeck.filter((c) => c.onlyRank === 1).length; if (mainDeck.length > 0 && onlyRank1Count > 0 && onlyRank1Count !== RULES.main.requireOnlyRank1Exactly) { problems.push(`Main Deck สามารถมี “Only #1” ได้แค่ ${RULES.main.requireOnlyRank1Exactly} ใบ (ปัจจุบัน ${onlyRank1Count})`); ok.main = false; } if (lifeDeck.length !== RULES.life.size) { problems.push(`Life Deck ต้องมี ${RULES.life.size} ใบ (ปัจจุบัน ${lifeDeck.length})`); ok.life = false; } if (RULES.life.uniqueNames) { const byNameLife = countBy(lifeDeck, (c) => nameKey(c.name)); const duplicateLife = Object.entries(byNameLife).filter(([, n]) => n > 1); if (duplicateLife.length) { duplicateLife.forEach(([k]) => problems.push(`การ์ดใน Life Deck ต้องชื่อไม่ซ้ำกัน: “${k}”`)); ok.life = false; } } return { problems, ok }; }
 const avg = (arr) => { const valid = arr.filter(n => typeof n === 'number' && !isNaN(n)); if (valid.length === 0) return '0.00'; return (valid.reduce((a, b) => a + b, 0) / valid.length).toFixed(2); };
 const encodeDeckCode = (mainDeck, lifeDeck) => { const mainIds = mainDeck.map(c => c.id); const lifeIds = lifeDeck.map(c => c.id); const dataString = JSON.stringify({ m: mainIds, l: lifeIds }); try { return btoa(dataString).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, ''); } catch (e) { console.error("Encoding failed:", e); return ""; } };
@@ -101,7 +289,6 @@ function DeckAnalysisModal({ isOpen, onClose, mainDeck, lifeDeck, showAlert }) {
     return createPortal( <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-[250] p-4"> <div className="bg-slate-900/80 border border-emerald-500/30 rounded-xl shadow-2xl w-full h-full flex flex-col max-w-7xl max-h-[90vh]"> <header className="flex items-center justify-between p-4 border-b border-emerald-500/20 shrink-0"> <h2 className="text-2xl font-bold text-white">ผลลัพธ์การสร้างเด็ค</h2> <Button onClick={onClose}>Close</Button> </header> <div className="flex-grow overflow-hidden grid grid-cols-1 md:grid-cols-3 gap-6 p-6"> <div className="md:col-span-1 flex flex-col gap-6 overflow-y-auto pr-2"> <div> <h3 className="text-xl font-semibold text-amber-300 border-b border-amber-400/20 pb-1 mb-3">สถิติเด็ค</h3> <div className="grid grid-cols-3 gap-4 text-center"> <div><span className="text-sm text-gray-400">Avg Cost</span><p className="text-2xl font-bold text-emerald-400">{analysis.avgCost}</p></div> <div><span className="text-sm text-gray-400">Avg Power</span><p className="text-2xl font-bold text-red-400">{analysis.avgPower}</p></div> <div><span className="text-sm text-gray-400">Avg Gem</span><p className="text-2xl font-bold text-amber-400">{analysis.avgGem}</p></div> </div> </div> <div className="aspect-square w-full max-w-[350px] mx-auto"> <Radar data={analysis.radarData} options={analysis.radarOptions} /> </div> <div> <h3 className="text-xl font-semibold text-amber-300 border-b border-amber-400/20 pb-1 mb-3">ประเภทการ์ด</h3> <ul className="space-y-1 text-sm"> {analysis.cardTypes.map(([type, count]) => ( <li key={type} className="flex justify-between"> <span>{type}</span> <span>{count} ใบ</span> </li> ))} </ul> </div> <div> <h3 className="text-xl font-semibold text-amber-300 border-b border-amber-400/20 pb-1 mb-3">รหัส Export</h3> <Button onClick={handleCopyCode} className="w-full"> <CopyIcon /> คัดลอกรหัสเด็ค </Button> </div> </div> <div className="md:col-span-2 overflow-y-auto pr-2 border-l border-emerald-500/20 pl-6"> <h3 className="text-xl font-semibold text-amber-300 border-b border-amber-400/20 pb-1 mb-4">การ์ดในเด็ค ({mainDeck.length} ใบ)</h3> {analysis.only1Card && ( <div className="mb-6 flex flex-col items-center"> <h4 className="text-lg font-semibold text-emerald-300 mb-3">Only #1</h4> <div className="relative w-36 mx-auto"> <img src={`/cards/${encodePath(analysis.only1Card.imagePath)}/${encodeURIComponent(analysis.only1Card.id.replace(' - Only#1', ''))}.png`} alt={analysis.only1Card.name} className="w-full rounded-md shadow" onError={(e) => { e.currentTarget.src = e.currentTarget.src.replace('.png', '.jpg'); }} /> </div> </div> )} {renderCardSection("Avatar Cards", analysis.avatars)} {renderCardSection("Magic Cards", analysis.magics)} {renderCardSection("Construct Cards", analysis.constructs)} {analysis.otherCards.length > 0 && renderCardSection("Other Cards", analysis.otherCards)} </div> </div> </div> </div>, document.body ); }
 
 // === Deck List Modal ===
-// [FIX 1] เพิ่ม setModal และ closeModal
 function DeckListModal({
   isOpen,
   onClose,
@@ -113,8 +300,8 @@ function DeckListModal({
   setMainDeck,
   setLifeDeck,
   showAlert,
-  setModal,      // <--- ✨ เพิ่มตรงนี้
-  closeModal,    // <--- ✨ และเพิ่มตรงนี้
+  setModal,
+  closeModal,
   encodeDeckCode,
   decodeDeckCode,
   allCards,
@@ -208,19 +395,31 @@ function DeckListModal({
     setImportingSlot(null);
   };
 
-// === [แก้ไข] อัปเกรด Handler สำหรับ Share Deck ===
-// === [แก้ไข] อัปเกรด Handler สำหรับ Share Deck (แยก Collection) ===
+  // [แก้ไข] เพิ่มฟังก์ชัน handleClearSlot เพื่อลบเด็คใน Slot
+  const handleClearSlot = (index) => {
+    setModal({
+        title: "Clear Slot",
+        message: `คุณต้องการล้างข้อมูลใน "${slots[index].name}" ใช่หรือไม่?`,
+        onConfirm: () => {
+            const newSlots = [...slots];
+            newSlots[index] = { ...newSlots[index], main: [], life: [] };
+            updateSlots(newSlots);
+            closeModal();
+            showAlert("Slot Cleared", "ล้างข้อมูลเรียบร้อยแล้ว");
+        },
+        confirmText: "Clear",
+        confirmIcon: <TrashIcon />
+    });
+  };
+
 const handleShareDeck = async (index) => {
   const slot = slots[index];
-
-  // 1. ตรวจสอบว่ามี Only#1 Card หรือไม่
   const only1Card = slot.main.find(c => c.onlyRank === 1);
   if (!only1Card) {
     showAlert("ไม่สามารถแชร์ได้", "เด็คของคุณต้องมี 'Only #1' Card (การ์ดหลัก) ก่อนจึงจะแชร์ได้ค่ะ");
     return;
   }
 
-  // 2. ถามเพื่อยืนยัน
   setModal({ 
     isOpen: true,
     title: "Confirm Share Deck",
@@ -228,16 +427,9 @@ const handleShareDeck = async (index) => {
     onConfirm: async () => {
       closeModal(); 
       try {
-        // === [เริ่มการแก้ไข] ===
-
-        // 1. สร้าง Batch
         const batch = writeBatch(db);
-
-        // 2. สร้าง ID ใหม่สำหรับเอกสาร (เราต้องใช้ ID เดียวกันทั้ง 2 ที่)
         const newDeckRef = doc(collection(db, "publicDecks")); 
         const deckId = newDeckRef.id;
-
-        // 3. เตรียมข้อมูลสำหรับ "หน้า List" (เบาๆ)
         const allCardsInDeck = [...slot.main, ...slot.life];
         const factions = [...new Set(allCardsInDeck.map(c => c.faction).filter(Boolean))];
 
@@ -256,29 +448,19 @@ const handleShareDeck = async (index) => {
           sharedAt: serverTimestamp(),
           likeCount: 0,
           likedBy: [],
-          factions: factions, // (เราใส่ Faction ค้างไว้ แต่โค้ดเก่าคุณลบไปแล้ว ไม่เป็นไรครับ ใส่ไว้ไม่เสียหาย)
-          viewCount: 0 // <--- [เพิ่ม] เพิ่มตัวนับยอดวิวเริ่มต้น
+          factions: factions,
+          viewCount: 0
         };
 
-        // 4. เตรียมข้อมูลสำหรับ "หน้ารายละเอียด"
         const detailData = {
           mainDeck: slot.main.map(c => c.id),
           lifeDeck: slot.life.map(c => c.id),
         };
 
-        // 5. สั่ง Batch ให้เขียน 2 ที่
-        
-        // เขียนที่ 1: "publicDecks" (สำหรับหน้า List)
         batch.set(newDeckRef, listData); 
-
-        // เขียนที่ 2: "publicDeckDetails" (สำหรับหน้ารายละเอียด)
-        const detailRef = doc(db, "publicDeckDetails", deckId); // <--- ใช้ ID เดียวกัน
+        const detailRef = doc(db, "publicDeckDetails", deckId);
         batch.set(detailRef, detailData);
-
-        // 6. ส่งข้อมูลทั้งหมด
         await batch.commit();
-
-        // === [สิ้นสุดการแก้ไข] ===
 
         console.log("Deck shared with ID: ", deckId);
         showAlert("แชร์สำเร็จ!", `เด็ค "${slot.name}" ของคุณถูกแชร์สู่สาธารณะแล้ว!`);
@@ -293,7 +475,6 @@ const handleShareDeck = async (index) => {
     confirmIcon: <UploadIcon />
   });
 };
-// === [สิ้นสุดการแก้ไข] ===
 
   return createPortal(
     <>
@@ -306,7 +487,7 @@ const handleShareDeck = async (index) => {
           
           <div className="flex-grow overflow-y-auto p-6">
             <p className="text-gray-300 mb-6">
-              บันทึกเด็คของคุณที่เชื่อมต่อกับบัญชี: <span className="font-bold text-amber-300">{userProfile.email}</span>
+              บันทึกเด็คของคุณที่เชื่อมต่อกับบัญชี: <span className="font-bold text-amber-300">{userProfile.name} ({userProfile.email})</span>
             </p>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -342,15 +523,13 @@ const handleShareDeck = async (index) => {
                       <EyeIcon /> Show Cards
                     </Button>
 
-                    {/* === [แก้ไข] เพิ่มปุ่ม Share === */}
-                    <div className="grid grid-cols-3 gap-2"> {/* 1. เปลี่ยนเป็น 3 คอลัมน์ */}
+                    <div className="grid grid-cols-3 gap-2">
                       <Button onClick={() => handleImport(index)}>
                         <ImportIcon /> Import
                       </Button>
                       <Button onClick={() => handleExport(index)} disabled={deckSize === 0}>
                         <ExportIcon /> Export
                       </Button>
-                      {/* 2. เพิ่มปุ่ม Share */}
                       <Button 
                         onClick={() => handleShareDeck(index)} 
                         disabled={deckSize === 0}
@@ -359,7 +538,14 @@ const handleShareDeck = async (index) => {
                         <UploadIcon /> Share
                       </Button>
                     </div>
-                    {/* === [สิ้นสุดการแก้ไข] === */}
+                    
+                    <Button 
+                      onClick={() => handleClearSlot(index)} 
+                      className="w-full mt-2 bg-red-900/30 border-red-500/30 text-red-300 hover:bg-red-800/50 hover:text-white"
+                    >
+                       <TrashIcon /> Clear Slot
+                    </Button>
+
                   </CardShell>
                 );
               })}
@@ -368,7 +554,6 @@ const handleShareDeck = async (index) => {
         </div>
       </div>
 
-      {/* Modal ซ้อน Modal สำหรับ Import */}
       {importingSlot !== null && createPortal(
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[230] p-4">
           <div className="bg-slate-800 border border-emerald-500/30 rounded-xl shadow-2xl p-6 w-full max-w-md">
@@ -395,7 +580,7 @@ const handleShareDeck = async (index) => {
 }
 
 // === Sidebar ===
-function LeftSidebar({ isSidebarOpen, searchTerm, setSearchTerm, allCardTypes, filterTypes, setFilterTypes, filterMagicType, setFilterMagicType, allColorTypes, filterColors, setFilterColors, allRarities, filterRarities, setFilterRarities, allSets, selectedSets, onSetSelectionChange, statFilters, onStatFilterChange, mainDeck, lifeDeck, RULES, addToMain, addToLife, removeFromMain, removeFromLife, handleImport, handleExport, handleClear, handleReloadFromTxt, mainDeckRef, onViewDeck, onAnalyzeDeck, isLoadingAnalysis, }) { const allMagicTypes = ['Modification', 'Land', 'React', 'Normal']; const handleToggle = (setter, value) => { setter(prev => prev.includes(value) ? prev.filter(item => item !== value) : [...prev, value]); }; return ( <aside className={`w-full flex flex-col p-4 bg-black/40 md:h-full md:w-full md:shrink-0 md:border-r border-emerald-700/30 backdrop-blur-lg z-30 transition-opacity duration-300 ${isSidebarOpen ? 'opacity-100' : 'opacity-0 md:opacity-100'}`}> <div className="flex-1 md:overflow-y-auto pr-2 space-y-4"> <div> <h2 className="text-xl font-bold text-white mb-2">Filters</h2> <input type="search" placeholder="ค้นหาชื่อการ์ดหรือข้อความ..." className="w-full px-4 py-2 border border-emerald-500/30 rounded-lg focus:ring-2 focus:ring-amber-500 focus:outline-none transition bg-slate-700/50 placeholder-gray-400 text-white" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} /> </div> {allCardTypes.length > 0 && ( <div className="flex flex-wrap gap-2"> <button onClick={() => setFilterTypes([])} className={`px-3 py-1 text-sm rounded-full transition-colors ${filterTypes.length === 0 ? 'bg-amber-500 text-white font-semibold shadow' : 'bg-slate-700 hover:bg-slate-600 text-gray-300'}`}>All</button> {allCardTypes.map((type) => (<button key={type} onClick={() => handleToggle(setFilterTypes, type)} className={`px-3 py-1 text-sm rounded-full transition-colors ${filterTypes.includes(type) ? 'bg-amber-500 text-white font-semibold shadow' : 'bg-slate-700 hover:bg-slate-600 text-gray-300'}`}>{type}</button>))} </div> )} {filterTypes.includes('Magic') && ( <div className="pl-4 mt-2 border-l-2 border-slate-600"> <h3 className="text-sm font-semibold text-gray-400 mt-2 mb-2 uppercase tracking-wider">Magic Type</h3> <div className="flex flex-wrap gap-2"> {['All', ...allMagicTypes].map((magicType) => ( <button key={magicType} onClick={() => setFilterMagicType(magicType)} className={`px-3 py-1 text-xs rounded-full transition-colors ${filterMagicType === magicType ? 'bg-amber-600 text-white font-semibold shadow' : 'bg-slate-600 hover:bg-slate-500 text-gray-300'}`} > {magicType} </button> ))} </div> </div> )} {allColorTypes.length > 0 && ( <div> <h3 className="text-sm font-semibold text-gray-400 mt-4 mb-2 uppercase tracking-wider">Color Type</h3> <div className="flex flex-wrap gap-2"> <button onClick={() => setFilterColors([])} className={`px-3 py-1 text-sm rounded-full transition-colors ${filterColors.length === 0 ? 'bg-amber-500 text-white font-semibold shadow' : 'bg-slate-700 hover:bg-slate-600 text-gray-300'}`}>All</button> {allColorTypes.map((color) => ( <button key={color} onClick={() => handleToggle(setFilterColors, color)} className={`px-3 py-1 text-sm rounded-full transition-colors ${filterColors.includes(color) ? 'bg-amber-500 text-white font-semibold shadow' : 'bg-slate-700 hover:bg-slate-600 text-gray-300'}`}>{color}</button> ))} </div> </div> )} {allRarities.length > 0 && ( <div> <h3 className="text-sm font-semibold text-gray-400 mt-4 mb-2 uppercase tracking-wider">Rarity</h3> <div className="flex flex-wrap gap-2"> <button onClick={() => setFilterRarities([])} className={`px-3 py-1 text-sm rounded-full transition-colors ${filterRarities.length === 0 ? 'bg-amber-500 text-white font-semibold shadow' : 'bg-slate-700 hover:bg-slate-600 text-gray-300'}`}>All</button> {allRarities.map((rarity) => ( <button key={rarity} onClick={() => handleToggle(setFilterRarities, rarity)} className={`px-3 py-1 text-sm rounded-full transition-colors ${filterRarities.includes(rarity) ? 'bg-amber-500 text-white font-semibold shadow' : 'bg-slate-700 hover:bg-slate-600 text-gray-300'}`}>{rarity}</button> ))} </div> </div> )} {allSets.length > 0 && ( <div> <h3 className="text-lg font-semibold text-white mb-2 mt-4">Card Sets</h3> <div className="space-y-2 max-h-40 overflow-y-auto pr-2"> {allSets.map(set => ( <label key={set} className="flex items-center gap-2 text-gray-300 cursor-pointer"> <input type="checkbox" checked={selectedSets.includes(set)} onChange={() => onSetSelectionChange(set)} className="w-4 h-4 rounded bg-slate-600 border-slate-500 text-amber-500 focus:ring-amber-500" /> {typeof set === 'string' ? (set.split('/')[1] || set) : set} </label> ))} </div> </div> )} <div> <h3 className="text-lg font-semibold text-white mb-2 mt-4">Stats</h3> <div className="grid grid-cols-3 gap-2 text-sm"> {['cost', 'power', 'gem'].map(stat => ( <div key={stat}> <label className="capitalize text-gray-400">{stat}</label> <input type="number" placeholder="Min" min="0" value={statFilters[stat].min} onChange={(e) => onStatFilterChange(stat, 'min', e.target.value)} className="w-full mt-1 px-2 py-1 border border-emerald-500/30 rounded-md bg-slate-700/50 text-white text-center" /> <input type="number" placeholder="Max" min="0" value={statFilters[stat].max} onChange={(e) => onStatFilterChange(stat, 'max', e.target.value)} className="w-full mt-1 px-2 py-1 border border-emerald-500/30 rounded-md bg-slate-700/50 text-white text-center" /> </div> ))} </div> </div> </div> <div className="shrink-0 pt-4"> <div className="flex flex-col gap-4 mb-4"> <DeckTray ref={mainDeckRef} title={`Main Deck`} deck={mainDeck} capacity={RULES.main.size} onDropCard={addToMain} onRemoveCard={removeFromMain} highlight onViewDeck={() => onViewDeck('main')} /> <DeckTray title={`Life Deck`} deck={lifeDeck} capacity={RULES.life.size} onDropCard={addToLife} onRemoveCard={removeFromLife} onViewDeck={() => onViewDeck('life')} /> </div> <Button onClick={onAnalyzeDeck} disabled={isLoadingAnalysis} className="w-full bg-emerald-600/30 border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/50 hover:text-white"> {isLoadingAnalysis ? 'กำลังประมวลผล...' : 'สร้างเด็ค'} </Button> <div className="grid grid-cols-2 gap-2 pt-4 mt-4 border-t border-emerald-700/30"> <Button onClick={handleImport}><ImportIcon /> Import</Button> <Button onClick={handleExport}><ExportIcon /> Export</Button> <Button onClick={handleClear} className="col-span-2 bg-red-900/50 border-red-500/30 text-red-300 hover:bg-red-800/50 hover:text-white"><ClearIcon/> Clear Deck</Button> <Button onClick={handleReloadFromTxt} className="col-span-2"><DBLoadIcon /> Reload from TXT</Button> </div> </div> </aside> ); }
+function LeftSidebar({ isSidebarOpen, searchTerm, setSearchTerm, allCardTypes, filterTypes, setFilterTypes, filterMagicType, setFilterMagicType, allColorTypes, filterColors, setFilterColors, allRarities, filterRarities, setFilterRarities, allSets, selectedSets, onSetSelectionChange, statFilters, onStatFilterChange, mainDeck, lifeDeck, RULES, addToMain, addToLife, removeFromMain, removeFromLife, handleImport, handleExport, handleClear, handleReloadFromTxt, mainDeckRef, onViewDeck, onAnalyzeDeck, isLoadingAnalysis, }) { const allMagicTypes = ['Modification', 'Land', 'React', 'Normal']; const handleToggle = (setter, value) => { setter(prev => prev.includes(value) ? prev.filter(item => item !== value) : [...prev, value]); }; return ( <aside className={`w-full flex flex-col p-4 bg-black/40 md:h-full md:w-full md:shrink-0 md:border-r border-emerald-700/30 backdrop-blur-lg z-30 transition-opacity duration-300 ${isSidebarOpen ? 'opacity-100' : 'opacity-0 md:opacity-100'}`}> <div className="flex-1 md:overflow-y-auto pr-2 space-y-4"> <div> <h2 className="text-xl font-bold text-white mb-2">Filters</h2> <input type="search" placeholder="ค้นหาชื่อการ์ด..." className="w-full px-4 py-2 border border-emerald-500/30 rounded-lg focus:ring-2 focus:ring-amber-500 focus:outline-none transition bg-slate-700/50 placeholder-gray-400 text-white" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} /> </div> {allCardTypes.length > 0 && ( <div className="flex flex-wrap gap-2"> <button onClick={() => setFilterTypes([])} className={`px-3 py-1 text-sm rounded-full transition-colors ${filterTypes.length === 0 ? 'bg-amber-500 text-white font-semibold shadow' : 'bg-slate-700 hover:bg-slate-600 text-gray-300'}`}>All</button> {allCardTypes.map((type) => (<button key={type} onClick={() => handleToggle(setFilterTypes, type)} className={`px-3 py-1 text-sm rounded-full transition-colors ${filterTypes.includes(type) ? 'bg-amber-500 text-white font-semibold shadow' : 'bg-slate-700 hover:bg-slate-600 text-gray-300'}`}>{type}</button>))} </div> )} {filterTypes.includes('Magic') && ( <div className="pl-4 mt-2 border-l-2 border-slate-600"> <h3 className="text-sm font-semibold text-gray-400 mt-2 mb-2 uppercase tracking-wider">Magic Type</h3> <div className="flex flex-wrap gap-2"> {['All', ...allMagicTypes].map((magicType) => ( <button key={magicType} onClick={() => setFilterMagicType(magicType)} className={`px-3 py-1 text-xs rounded-full transition-colors ${filterMagicType === magicType ? 'bg-amber-600 text-white font-semibold shadow' : 'bg-slate-600 hover:bg-slate-500 text-gray-300'}`} > {magicType} </button> ))} </div> </div> )} {allColorTypes.length > 0 && ( <div> <h3 className="text-sm font-semibold text-gray-400 mt-4 mb-2 uppercase tracking-wider">Color</h3> <div className="flex flex-wrap gap-2"> <button onClick={() => setFilterColors([])} className={`px-3 py-1 text-sm rounded-full transition-colors ${filterColors.length === 0 ? 'bg-amber-500 text-white font-semibold shadow' : 'bg-slate-700 hover:bg-slate-600 text-gray-300'}`}>All</button> {allColorTypes.map((color) => ( <button key={color} onClick={() => handleToggle(setFilterColors, color)} className={`px-3 py-1 text-sm rounded-full transition-colors ${filterColors.includes(color) ? 'bg-amber-500 text-white font-semibold shadow' : 'bg-slate-700 hover:bg-slate-600 text-gray-300'}`}>{color}</button> ))} </div> </div> )} {allRarities.length > 0 && ( <div> <h3 className="text-sm font-semibold text-gray-400 mt-4 mb-2 uppercase tracking-wider">Rarity</h3> <div className="flex flex-wrap gap-2"> <button onClick={() => setFilterRarities([])} className={`px-3 py-1 text-sm rounded-full transition-colors ${filterRarities.length === 0 ? 'bg-amber-500 text-white font-semibold shadow' : 'bg-slate-700 hover:bg-slate-600 text-gray-300'}`}>All</button> {allRarities.map((rarity) => ( <button key={rarity} onClick={() => handleToggle(setFilterRarities, rarity)} className={`px-3 py-1 text-sm rounded-full transition-colors ${filterRarities.includes(rarity) ? 'bg-amber-500 text-white font-semibold shadow' : 'bg-slate-700 hover:bg-slate-600 text-gray-300'}`}>{rarity}</button> ))} </div> </div> )} {allSets.length > 0 && ( <div> <h3 className="text-lg font-semibold text-white mb-2 mt-4">Sets</h3> <div className="space-y-2 max-h-40 overflow-y-auto pr-2"> {allSets.map(set => ( <label key={set} className="flex items-center gap-2 text-gray-300 cursor-pointer"> <input type="checkbox" checked={selectedSets.includes(set)} onChange={() => onSetSelectionChange(set)} className="w-4 h-4 rounded bg-slate-600 border-slate-500 text-amber-500 focus:ring-amber-500" /> {typeof set === 'string' ? (set.split('/')[1] || set) : set} </label> ))} </div> </div> )} <div> <h3 className="text-lg font-semibold text-white mb-2 mt-4">Stats</h3> <div className="grid grid-cols-3 gap-2 text-sm"> {['cost', 'power', 'gem'].map(stat => ( <div key={stat}> <label className="capitalize text-gray-400">{stat}</label> <input type="number" placeholder="Min" min="0" value={statFilters[stat].min} onChange={(e) => onStatFilterChange(stat, 'min', e.target.value)} className="w-full mt-1 px-2 py-1 border border-emerald-500/30 rounded-md bg-slate-700/50 text-white text-center" /> <input type="number" placeholder="Max" min="0" value={statFilters[stat].max} onChange={(e) => onStatFilterChange(stat, 'max', e.target.value)} className="w-full mt-1 px-2 py-1 border border-emerald-500/30 rounded-md bg-slate-700/50 text-white text-center" /> </div> ))} </div> </div> </div> <div className="shrink-0 pt-4"> <div className="flex flex-col gap-4 mb-4"> <DeckTray ref={mainDeckRef} title={`Main Deck`} deck={mainDeck} capacity={RULES.main.size} onDropCard={addToMain} onRemoveCard={removeFromMain} highlight onViewDeck={() => onViewDeck('main')} /> <DeckTray title={`Life Deck`} deck={lifeDeck} capacity={RULES.life.size} onDropCard={addToLife} onRemoveCard={removeFromLife} onViewDeck={() => onViewDeck('life')} /> </div> <Button onClick={onAnalyzeDeck} disabled={isLoadingAnalysis} className="w-full bg-emerald-600/30 border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/50 hover:text-white"> {isLoadingAnalysis ? 'กำลังประมวลผล...' : 'สร้างเด็ค'} </Button> <div className="grid grid-cols-2 gap-2 pt-4 mt-4 border-t border-emerald-700/30"> <Button onClick={handleImport}><ImportIcon /> Import</Button> <Button onClick={handleExport}><ExportIcon /> Export</Button> <Button onClick={handleClear} className="col-span-2 bg-red-900/50 border-red-500/30 text-red-300 hover:bg-red-800/50 hover:text-white"><TrashIcon/> Clear Deck</Button> <Button onClick={handleReloadFromTxt} className="col-span-2"><DBLoadIcon /> Reload from TXT</Button> </div> </div> </aside> ); }
 
 // === Card grid (right) ===
 function CardGrid({ cards, onDoubleClick, onViewDetails, onAddCard }) { if (cards.length === 0) { return (<CardShell><div className="text-center py-16 text-slate-300">ไม่พบการ์ดตามเงื่อนไข</div></CardShell>); } return ( <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-x-4 gap-y-8"> {cards.map((card) => ( <CardItem key={card.id} card={card} onDoubleClick={onDoubleClick} onViewDetails={onViewDetails} onAddCard={onAddCard}/> ))} </div> ); }
@@ -445,61 +630,123 @@ export default function App() {
 
   const [userProfile, setUserProfile] = useLocalStorage("bot-userProfile-v1", null);
 
-  const handleLoginSuccess = (credentialResponse) => {
-    console.log("Google Login Success:", credentialResponse);
-    try {
-      const decoded = jwtDecode(credentialResponse.credential);
-      console.log("Decoded User Info:", decoded);
-      setUserProfile({
-        name: decoded.name,
-        email: decoded.email,
-        picture: decoded.picture
-      });
-      
-      if (!userDecks[decoded.email]) {
-        console.log("Creating new deck slots for user:", decoded.email);
-        setUserDecks(prev => ({
-          ...prev,
-          [decoded.email]: {
-            slots: [
-              { name: "Slot 1", main: [], life: [] },
-              { name: "Slot 2", main: [], life: [] }
-            ]
-          }
-        }));
-      }
+  const [customProfile, setCustomProfile] = useState(null);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
-    } catch (error) {
-      console.error("Failed to decode JWT:", error);
+  const displayUser = useMemo(() => {
+    if (!userProfile) return null;
+    if (!customProfile) return userProfile;
+    return {
+      ...userProfile,
+      name: customProfile.displayName || userProfile.name,
+      picture: customProfile.avatarUrl || userProfile.picture
+    };
+  }, [userProfile, customProfile]);
+
+  const fetchUserProfile = async (email) => {
+    if (!email) return;
+    try {
+      const docRef = doc(db, "users", email);
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        setCustomProfile(data);
+        if (!data.isSetup) setIsProfileModalOpen(true);
+      } else {
+        setIsProfileModalOpen(true);
+      }
+    } catch (err) {
+      console.error("Error fetching profile:", err);
     }
   };
 
-  const handleLoginError = () => {
-    console.log('Login Failed');
-    showAlert("Login Failed", "ไม่สามารถเข้าสู่ระบบด้วย Google ได้ โปรดลองอีกครั้ง");
+  const handleLoginSuccess = (credentialResponse) => {
+    try {
+      const decoded = jwtDecode(credentialResponse.credential);
+      setUserProfile({ name: decoded.name, email: decoded.email, picture: decoded.picture });
+      
+      if (!userDecks[decoded.email]) {
+        setUserDecks(prev => ({
+          ...prev,
+          [decoded.email]: {
+            slots: [ { name: "Slot 1", main: [], life: [] }, { name: "Slot 2", main: [], life: [] } ]
+          }
+        }));
+      }
+      fetchUserProfile(decoded.email);
+
+    } catch (error) { console.error("Failed to decode JWT:", error); }
   };
+
+  const handleLoginError = () => { showAlert("Login Failed", "ไม่สามารถเข้าสู่ระบบได้"); };
 
   const handleLogout = () => {
+    googleLogout(); 
     setUserProfile(null);
+    setCustomProfile(null);
     setIsDeckListModalOpen(false);
-    console.log("User logged out.");
+    setIsSettingsOpen(false);
   };
 
-  // [FIX 2] ลบ handleShowPublicDecks ที่ไม่ใช้ออก
+  const handleSaveProfile = async (data) => {
+    if (!userProfile) return;
+    try {
+      const batch = writeBatch(db);
+      
+      // 1. อัปเดตข้อมูล User หลัก
+      batch.set(doc(db, "users", userProfile.email), { 
+        displayName: data.displayName, 
+        avatarUrl: data.avatarUrl, 
+        isSetup: true, 
+        updatedAt: serverTimestamp() 
+      }, { merge: true });
+      
+      // 2. อัปเดตหน้าปกเด็ค (Public Decks) ของเรา
+      const decksSnap = await getDocs(query(collection(db, "publicDecks"), where("user.email", "==", userProfile.email)));
+      decksSnap.forEach(doc => batch.update(doc.ref, { "user.name": data.displayName, "user.picture": data.avatarUrl }));
+
+      // 3. อัปเดตคอมเม้นท์ทั้งหมด (ใช้วิธีเดินหาทีละเด็ค เพื่อความชัวร์และไม่ง้อ Index)
+      const allDecksSnap = await getDocs(collection(db, "publicDecks"));
+      const currentName = customProfile?.displayName || userProfile.name;
+      const oldNameTarget = "Siwakorn Reangchinda"; // ชื่อเก่าที่ต้องการแก้ (Fallback)
+
+      for (const deckDoc of allDecksSnap.docs) {
+         const commentsSnap = await getDocs(collection(db, "publicDecks", deckDoc.id, "comments"));
+         commentsSnap.forEach(cDoc => {
+           const cData = cDoc.data();
+           // เช็คว่าเป็นคอมเม้นท์ของเราหรือไม่ (เช็คอีเมล, ชื่อปัจจุบัน, หรือชื่อเก่า)
+           if (cData.userId === userProfile.email || cData.userName === currentName || cData.userName === oldNameTarget) {
+             batch.update(cDoc.ref, { 
+               userId: userProfile.email, // ยึดเป็นของเรา
+               userName: data.displayName, 
+               userPicture: data.avatarUrl 
+             });
+           }
+         });
+      }
+
+      await batch.commit();
+      setCustomProfile(p => ({ ...p, ...data, isSetup: true })); 
+      setIsProfileModalOpen(false); 
+      showAlert("Success", "บันทึกข้อมูลเรียบร้อย!");
+    } catch (e) { 
+      console.error(e); 
+      showAlert("Error", "บันทึกไม่สำเร็จ"); 
+    }
+  };
 
   useEffect(() => { if (cardDb.length === 0) { handleReloadFromTxt(); } }, []);
   useEffect(() => { setCurrentPage(1); }, [searchTerm, filterTypes, filterMagicType, filterColors, filterRarities, selectedSets, statFilters]);
+  
+  useEffect(() => {
+    if (userProfile?.email) fetchUserProfile(userProfile.email);
+  }, []);
 
   const handleAnalyzeDeck = () => { 
-    if (mainDeck.length === 0) { 
-      showAlert("ไม่มีการ์ดในเด็ค", "โปรดใส่การ์ดใน Main Deck ก่อนทำการสร้างเด็ค"); 
-      return; 
-    } 
+    if (mainDeck.length === 0) { showAlert("ไม่มีการ์ดในเด็ค", "โปรดใส่การ์ดใน Main Deck ก่อนทำการสร้างเด็ค"); return; } 
     setIsLoadingAnalysis(true); 
-    setTimeout(() => { 
-      setIsLoadingAnalysis(false); 
-      setAnalysisDeck({ main: mainDeck, life: lifeDeck });
-    }, 500); 
+    setTimeout(() => { setIsLoadingAnalysis(false); setAnalysisDeck({ main: mainDeck, life: lifeDeck }); }, 500); 
   };
   
   const handleReloadFromTxt = async () => { const all = await fetchAllTxt(); if (all.length > 0) setCardDb(all); };
@@ -520,7 +767,7 @@ export default function App() {
   const handleImport = () => { setIsImportModalOpen(true); };
   const confirmImport = (code) => { closeImportModal(); if (!code) { return; } const decoded = decodeDeckCode(code, cardDb); if (decoded) { setMainDeck(decoded.main); setLifeDeck(decoded.life); showAlert("Import Success", "นำเข้าเด็คสำเร็จ!"); } else { showAlert("Import Error", "รหัสเด็คไม่ถูกต้อง หรือไม่พบการ์ดบางใบในฐานข้อมูลปัจจุบัน"); } };
   const handleExport = handleExportCode; 
-  const handleClear = () => { setModal({ isOpen: true, title: "Confirm Clear Deck", message: "คุณต้องการล้างเด็คทั้งหมด (Main และ Life) ใช่หรือไม่? การกระทำนี้ไม่สามารถย้อนกลับได้", onConfirm: () => { setMainDeck([]); setLifeDeck([]); closeModal(); }, confirmText: "Confirm Clear", confirmIcon: <ClearIcon /> }); };
+  const handleClear = () => { setModal({ isOpen: true, title: "Confirm Clear Deck", message: "คุณต้องการล้างเด็คทั้งหมด (Main และ Life) ใช่หรือไม่? การกระทำนี้ไม่สามารถย้อนกลับได้", onConfirm: () => { setMainDeck([]); setLifeDeck([]); closeModal(); }, confirmText: "Confirm Clear", confirmIcon: <TrashIcon /> }); };
 
   return (
     <DndProvider backend={HTML5Backend}>
@@ -531,160 +778,62 @@ export default function App() {
         
         <div className="h-screen flex flex-col text-gray-200 bg-black">
 
-          {/* === ส่วนบังคับ Login === */}
           {!userProfile ? (
-            // --- 1. [ออกแบบใหม่] หน้าจอ Login (บาร์ซ้าย + พื้นหลังขวา) ---
             <div className="flex-1 flex flex-row items-stretch overflow-hidden">
-              
-              {/* === [ใหม่] คอลัมน์ซ้าย (Login Bar) === */}
-              {/* (จอมือถือจะกว้างเต็ม, จอคอมจะกว้าง 384px) */}
               <div className="w-full max-w-md md:w-96 shrink-0 flex flex-col items-center justify-start p-8 gap-6 bg-black/80 backdrop-blur-lg overflow-y-auto h-full border-r border-emerald-700/30">
-                
-                <img 
-                  src="/cards/LOGOBOT.png" 
-                  alt="Battle Of Talingchan Logo" 
-                  className="w-32 h-32 object-contain shrink-0"
-                  onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                />
-                <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight bg-gradient-to-r from-amber-300 to-emerald-400 bg-clip-text text-transparent text-center">
-                  Deck Builder
-                </h1>
+                <img src="/cards/LOGOBOT.png" alt="Logo" className="w-32 h-32 object-contain shrink-0" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+                <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight bg-gradient-to-r from-amber-300 to-emerald-400 bg-clip-text text-transparent text-center">Deck Builder</h1>
                 <div className="mt-4 scale-110 shrink-0">
-                  <GoogleLogin
-                    onSuccess={handleLoginSuccess}
-                    onError={handleLoginError}
-                    theme="filled_black"
-                    size="large"
-                    shape="pill"
-                    text="signin_with"
-                    logo_alignment="left"
-                  />
+                  <GoogleLogin onSuccess={handleLoginSuccess} onError={handleLoginError} theme="filled_black" size="large" shape="pill" text="signin_with" logo_alignment="left" />
                 </div>
-
                 <div className="mt-12 pt-8 border-t border-emerald-700/30 w-full max-w-sm flex flex-col items-center">
-                  <h3 className="text-lg font-semibold text-amber-300 mb-4 text-center">
-                    สามารถสนับสนุนค่ากาแฟและค่าเซิร์ฟเวอร์ได้ที่นี่นะคะ ❤️❤️❤️
-                  </h3>
-                  <img 
-                    src="/assets/QRCODE.png" 
-                    alt="Donate QR Code" 
-                    className="w-48 h-48 mx-auto rounded-lg border-4 border-emerald-500/30"
-                    onError={(e) => { 
-                      console.warn("QR Code image not found at /assets/QRCODE.png. Make sure it's in the /public/assets/ folder.");
-                      e.currentTarget.style.display = 'none'; 
-                    }}
-                  />
-                  <video
-                    src="/assets/VDO.mov"
-                    autoPlay
-                    loop
-                    muted
-                    playsInline
-                    className="w-full h-auto max-w-[400px] mt-6 rounded-lg border-4 border-emerald-500/30"
-                    width="540" 
-                    height="540"
-                    onError={(e) => {
-                      console.warn("VDO file not found at /assets/VDO.mov. Make sure it's in the /public/assets/ folder and the extension is correct.");
-                      e.currentTarget.style.display = 'none';
-                    }}
-                  >
-                    Your browser does not support the video tag.
-                  </video>
+                  <h3 className="text-lg font-semibold text-amber-300 mb-4 text-center">สนับสนุนค่ากาแฟและค่าเซิร์ฟเวอร์ ❤️</h3>
+                  <img src="/assets/QRCODE.png" alt="QR Code" className="w-48 h-48 mx-auto rounded-lg border-4 border-emerald-500/30" onError={(e) => e.currentTarget.style.display = 'none'} />
+                  <video src="/assets/VDO.mov" autoPlay loop muted playsInline className="w-full h-auto max-w-[400px] mt-6 rounded-lg border-4 border-emerald-500/30" width="540" height="540" onError={(e) => e.currentTarget.style.display = 'none'} />
                 </div>
               </div>
-
-              {/* === [ใหม่] คอลัมน์ขวา (พื้นหลังตารางซ้ำ) === */}
-              <div 
-                className="flex-1 hidden md:block" // <-- ซ่อนในจอมือถือ
-                style={{ 
-                  backgroundImage: "url('/assets/wallblueL.jpg')", // <-- ใช้ wallblueL
-                  backgroundRepeat: 'repeat',   // <--- [ทำซ้ำ]
-                  backgroundSize: 'auto',     // <--- [ขนาดเดิม]
-                  backgroundPosition: 'top left'
-                }} 
-              >
-                {/* (พื้นที่ว่างสำหรับพื้นหลัง) */}
-              </div>
-
+              <div className="flex-1 hidden md:block" style={{ backgroundImage: "url('/assets/wallblueL.jpg')", backgroundRepeat: 'repeat', backgroundSize: 'auto', backgroundPosition: 'top left' }} />
             </div>
           ) : (
-            // --- 2. หน้าแอปหลัก (เมื่อ Login แล้ว) ---
             <>
               <header className="px-4 lg:px-6 py-2 border-b border-emerald-700/30 bg-black/60 backdrop-blur-sm shrink-0 z-40">
                 <div className="flex items-center justify-between gap-4">
-                  <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight bg-gradient-to-r from-amber-300 to-emerald-400 bg-clip-text text-transparent">
-                    Battle Of Talingchan
-                  </h1>
-                  
-                  {/* === [แก้ไข] ส่วนปุ่มด้านขวาบน === */}
                   <div className="flex items-center gap-3">
-                    {userProfile && (
-                      <>
-                        {/* [FIX 3] เปลี่ยนเป็น Link */}
-                        <Link to="/public-decks">
-                          <Button
-                            as="span"
-                            className="bg-gradient-to-r from-blue-500 to-purple-600 text-white border-none shadow-lg hover:from-blue-400 hover:to-purple-500"
-                          >
-                            <UsersIcon />
-                            <span className="hidden md:inline">Public Decks</span>
-                          </Button>
-                        </Link>
-
-                        {/* ปุ่ม Deck List (เดิม) */}
-                        <Button 
-                          onClick={() => setIsDeckListModalOpen(true)}
-                          className="bg-gradient-to-r from-amber-500 to-emerald-600 text-white border-none shadow-lg hover:from-amber-400 hover:to-emerald-500"
-                        >
-                          <DeckIcon />
-                          <span className="hidden md:inline">My Deck List</span> {/* (ปรับข้อความ) */}
-                        </Button>
-                      </>
-                    )}
-                    
-                    {userProfile ? (
-                      <>
-                        <img 
-                          src={userProfile.picture} 
-                          alt={userProfile.name} 
-                          className="w-8 h-8 rounded-full border-2 border-emerald-500"
-                          title={`Logged in as ${userProfile.name} (${userProfile.email})`} 
-                        />
-                        <span className="text-white hidden md:block text-sm">
-                          {userProfile.name}
-                        </span>
-                        <Button 
-                          onClick={handleLogout} 
-                          className="bg-red-900/50 border-red-500/30 text-red-300 hover:bg-red-800/50 hover:text-white px-3 py-1 text-sm"
-                        >
-                          Logout
-                        </Button>
-                      </>
-                    ) : (
-                      <GoogleLogin
-                        onSuccess={handleLoginSuccess}
-                        onError={handleLoginError}
-                        theme="filled_black"
-                        size="medium"
-                        shape="pill"
-                        text="signin_with"
-                        logo_alignment="left"
-                      />
-                    )}
+                    <button onClick={() => setIsSettingsOpen(true)} className="p-2 hover:bg-slate-800 rounded-full text-white transition-colors">
+                      <MenuIcon />
+                    </button>
+                    <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight bg-gradient-to-r from-amber-300 to-emerald-400 bg-clip-text text-transparent">
+                      Battle Of Talingchan
+                    </h1>
                   </div>
-                  {/* === [สิ้นสุดการแก้ไข] === */}
+                  
+                  <div className="flex items-center gap-3">
+                    <Link to="/public-decks">
+                      <Button as="span" className="bg-gradient-to-r from-blue-500 to-purple-600 text-white border-none shadow-lg hover:from-blue-400 hover:to-purple-500">
+                        <UsersIcon /> <span className="hidden md:inline">Public Decks</span>
+                      </Button>
+                    </Link>
+                    <Button onClick={() => setIsDeckListModalOpen(true)} className="bg-gradient-to-r from-amber-500 to-emerald-600 text-white border-none shadow-lg hover:from-amber-400 hover:to-emerald-500">
+                      <DeckIcon /> <span className="hidden md:inline">My Deck List</span>
+                    </Button>
+                    
+                    <img 
+                      src={displayUser.picture} 
+                      alt={displayUser.name} 
+                      className="w-8 h-8 rounded-full border-2 border-emerald-500 object-cover"
+                      title={`Logged in as ${displayUser.name}`} 
+                    />
+                    <span className="text-white hidden md:block text-sm font-semibold">{displayUser.name}</span>
+                  </div>
                 </div>
               </header>
 
               <main className="flex-1 flex flex-col md:flex-row overflow-hidden">
-                {/* Sidebar Wrapper */}
                 <div className={` ${activeView === 'deck' ? 'block' : 'hidden'} md:block ${isSidebarOpen ? 'md:w-[360px]' : 'md:w-0'} transition-all duration-300 ease-in-out overflow-hidden shrink-0 relative md:h-full w-full h-full overflow-y-auto md:overflow-y-hidden pb-16 md:pb-0 `}>
                     <LeftSidebar isSidebarOpen={isSidebarOpen} searchTerm={searchTerm} setSearchTerm={setSearchTerm} allCardTypes={allCardTypes} filterTypes={filterTypes} setFilterTypes={setFilterTypes} filterMagicType={filterMagicType} setFilterMagicType={setFilterMagicType} allColorTypes={allColorTypes} filterColors={filterColors} setFilterColors={setFilterColors} allRarities={allRarities} filterRarities={filterRarities} setFilterRarities={setFilterRarities} allSets={allSets} selectedSets={selectedSets} onSetSelectionChange={handleSetSelectionChange} statFilters={statFilters} onStatFilterChange={handleStatFilterChange} mainDeck={mainDeck} lifeDeck={lifeDeck} RULES={RULES} addToMain={addToMain} addToLife={addToLife} removeFromMain={removeFromMain} removeFromLife={removeFromLife} handleImport={handleImport} handleExport={handleExport} handleClear={handleClear} handleReloadFromTxt={handleReloadFromTxt} mainDeckRef={mainDeckRef} onViewDeck={setViewingDeck} onAnalyzeDeck={handleAnalyzeDeck} isLoadingAnalysis={isLoadingAnalysis} />
                 </div>
-                {/* Sidebar Toggle Button */}
                 <div className="hidden md:flex items-center justify-center shrink-0 border-l border-emerald-700/30 bg-black/40"> <button onClick={toggleSidebar} className="p-1 text-emerald-400 hover:text-white hover:bg-emerald-700/50 rounded-full transition-colors" title={isSidebarOpen ? "ซ่อน Filter" : "แสดง Filter"}> {isSidebarOpen ? <ChevronLeftIcon /> : <ChevronRightIcon />} </button> </div>
                 
-                {/* Card Grid Area */}
                 <div className={`${activeView === 'cards' ? 'flex' : 'hidden'} md:flex flex-1 flex-col`}>
                     <section className={` flex-1 overflow-y-auto transition-all duration-300 ease-in-out p-4 lg:py-8 md:pr-12 lg:pr-16 ${isSidebarOpen ? 'md:pl-12 lg:pl-16' : 'md:pl-16 lg:pl-24 xl:pl-32'} `}> 
                         <div className="relative bg-slate-900 text-center py-8 px-4 border-b border-emerald-700/30 overflow-hidden rounded-lg mb-10"> <div className="absolute inset-0 bg-gradient-to-b from-black/30 to-slate-900 opacity-50"></div> <div className="absolute inset-0 bg-cover bg-center opacity-10" style={{backgroundImage: "url('https://www.tcgthailand.com/assets/img/banner.1b838965.webp')"}}></div> <div className="relative z-10 flex flex-col items-center justify-center"> <img src="/cards/LOGOBOT.png" alt="Battle Of Talingchan Logo" className="w-24 h-24 md:w-28 md:h-28 mb-2 object-contain drop-shadow-lg" onError={(e) => { e.currentTarget.style.display = 'none'; }} /> <h1 className="text-3xl md:text-5xl font-extrabold tracking-tight text-white drop-shadow-md">Battle Of Talingchan</h1> </div> </div>
@@ -698,20 +847,9 @@ export default function App() {
                                 <Button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}> ถัดไป </Button>
                               </div>
                             )}
-
                             <footer className="relative z-[70] mt-16 py-10 text-center border-t border-emerald-700/30">
-                              <h3 className="text-lg font-semibold text-amber-300 mb-4">
-                                สามารถสนับสนุนค่ากาแฟและค่าเซิร์ฟเวอร์ได้ที่นี่นะคะ ❤️❤️❤️
-                              </h3>
-                              <img 
-                                src="/assets/QRCODE.png" 
-                                alt="Donate QR Code" 
-                                className="w-48 h-48 mx-auto rounded-lg border-4 border-emerald-500/30"
-                                onError={(e) => { 
-                                  console.warn("QR Code image not found at /assets/QRCODE.png. Make sure it's in the /public/assets/ folder.");
-                                  e.currentTarget.style.display = 'none'; 
-                                }}
-                              />
+                              <h3 className="text-lg font-semibold text-amber-300 mb-4">สามารถสนับสนุนค่ากาแฟและค่าเซิร์ฟเวอร์ได้ที่นี่นะคะ ❤️❤️❤️</h3>
+                              <img src="/assets/QRCODE.png" alt="Donate QR Code" className="w-48 h-48 mx-auto rounded-lg border-4 border-emerald-500/30" onError={(e) => e.currentTarget.style.display = 'none'} />
                             </footer>
                           </>
                         )}
@@ -719,47 +857,19 @@ export default function App() {
                 </div>
               </main>
               
-              <nav className="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-black/80 backdrop-blur-lg border-t border-emerald-700/30 z-50 flex items-stretch"> <button className={`flex-1 flex flex-col items-center justify-center p-2 text-xs transition-colors ${activeView === 'cards' ? 'text-emerald-400' : 'text-gray-400 hover:text-white'}`} onClick={() => setActiveView('cards')}> <CardsIcon /> <span>การ์ด</span> </button> <button className={`flex-1 flex flex-col items-center justify-center p-2 text-xs transition-colors ${activeView === 'deck' ? 'text-emerald-400' : 'text-gray-400 hover:text-white'}`} onClick={() => setActiveView('deck')}> <DeckIcon /> <span>เด็ค</span> </button> </nav>
-              
               {/* Modals */}
-              <Modal isOpen={modal.isOpen} title={modal.title} onClose={closeModal} onConfirm={modal.onConfirm} confirmText={modal.onConfirm ? modal.confirmText || "Confirm" : undefined} confirmIcon={modal.onConfirm ? modal.confirmIcon || <ClearIcon /> : undefined} > {modal.message} </Modal>
+              <Modal isOpen={modal.isOpen} title={modal.title} onClose={closeModal} onConfirm={modal.onConfirm} confirmText={modal.onConfirm ? modal.confirmText || "Confirm" : undefined} confirmIcon={modal.onConfirm ? modal.confirmIcon || <TrashIcon /> : undefined} > {modal.message} </Modal>
               <ImportDeckModal isOpen={isImportModalOpen} onClose={closeImportModal} onImport={confirmImport} />
-              
-              <DeckAnalysisModal 
-                isOpen={analysisDeck !== null} 
-                onClose={() => setAnalysisDeck(null)} 
-                mainDeck={analysisDeck ? analysisDeck.main : []} 
-                lifeDeck={analysisDeck ? analysisDeck.life : []} 
-                showAlert={showAlert} 
-              />
-              
+              <DeckAnalysisModal isOpen={analysisDeck !== null} onClose={() => setAnalysisDeck(null)} mainDeck={analysisDeck ? analysisDeck.main : []} lifeDeck={analysisDeck ? analysisDeck.life : []} showAlert={showAlert} />
               <DeckViewModal isOpen={viewingDeck !== null} onClose={() => setViewingDeck(null)} deck={viewingDeck === 'main' ? mainDeck : lifeDeck} rules={viewingDeck === 'main' ? RULES.main : RULES.life} onAddCard={viewingDeck === 'main' ? addToMain : addToLife} onRemoveCard={viewingDeck === 'main' ? removeFromMain : removeFromLife} title={viewingDeck === 'main' ? "Main Deck" : "Life Deck"} />
               <CardDetailModal card={zoomedCard} onClose={() => setZoomedCard(null)} />
-            
-              {/* [FIX 4] เพิ่ม setModal และ closeModal */}
-              <DeckListModal
-                isOpen={isDeckListModalOpen}
-                onClose={() => setIsDeckListModalOpen(false)}
-                userProfile={userProfile}
-                userDecks={userDecks}
-                setUserDecks={setUserDecks}
-                mainDeck={mainDeck}
-                lifeDeck={lifeDeck}
-                setMainDeck={setMainDeck}
-                setLifeDeck={setLifeDeck}
-                showAlert={showAlert}
-                setModal={setModal}          // <--- ✨ เพิ่มตรงนี้
-                closeModal={closeModal}      // <--- ✨ และเพิ่มตรงนี้
-                encodeDeckCode={encodeDeckCode}
-                decodeDeckCode={decodeDeckCode}
-                allCards={cardDb}
-                onShowCards={(deck) => setAnalysisDeck(deck)}
-                key={userProfile?.email || 'guest'}
-              />
+              <DeckListModal isOpen={isDeckListModalOpen} onClose={() => setIsDeckListModalOpen(false)} userProfile={displayUser} userDecks={userDecks} setUserDecks={setUserDecks} mainDeck={mainDeck} lifeDeck={lifeDeck} setMainDeck={setMainDeck} setLifeDeck={setLifeDeck} showAlert={showAlert} setModal={setModal} closeModal={closeModal} encodeDeckCode={encodeDeckCode} decodeDeckCode={decodeDeckCode} allCards={cardDb} onShowCards={(deck) => setAnalysisDeck(deck)} key={userProfile?.email || 'guest'} />
+              
+              {/* [ใหม่] Modals สำหรับ Profile */}
+              <ProfileSetupModal isOpen={isProfileModalOpen} onClose={() => setIsProfileModalOpen(false)} userProfile={userProfile} onSave={handleSaveProfile} />
+              <SettingsDrawer isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} userProfile={displayUser} onEditProfile={() => setIsProfileModalOpen(true)} onLogout={handleLogout} />
             </>
           )}
-          {/* === [สิ้นสุด] ส่วนบังคับ Login === */}
-
         </div>
       </DndStateProvider>
     </DndProvider>
