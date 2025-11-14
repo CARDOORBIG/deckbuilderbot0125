@@ -2,20 +2,24 @@
 @tailwind components;
 @tailwind utilities;
 
-html, body, #root {
-  height: 100%;
-  margin: 0;
-  padding: 0;
-  /* background-color: #1a202c; */
-  color: white;
-  font-family: 'Poppins', sans-serif;
-  overflow: hidden; 
+@layer base {
+  html, body, #root {
+    @apply h-full m-0 p-0 overflow-hidden font-sans;
+  }
 
-  /* === [แก้ไข] ส่วนของพื้นหลัง === */
-  background-image: url('/assets/wallblue.jpg'); /* <--- [แก้ไข] ใช้พาธนี้ */
-  background-size: cover; 
-  background-position: center; 
-  background-repeat: no-repeat; 
-  background-attachment: fixed; 
-  /* === [สิ้นสุดการแก้ไข] === */
+  /* 1. Light Mode (Default) - ธีมสว่าง (ค่าเริ่มต้น) */
+  html {
+    @apply bg-slate-100 text-slate-900;
+  }
+
+  /* 2. Dark Mode (เมื่อ <html> มีคลาส .dark) */
+  html.dark {
+    @apply bg-slate-950 text-slate-200;
+  }
+
+  /* 3. Scrollbar (ใช้ได้ทั้ง 2 โหมด) */
+  ::-webkit-scrollbar { @apply w-2; }
+  ::-webkit-scrollbar-track { @apply bg-slate-300 dark:bg-slate-700/50; }
+  ::-webkit-scrollbar-thumb { @apply bg-slate-500 rounded-full; }
+  ::-webkit-scrollbar-thumb:hover { @apply bg-slate-600 dark:bg-slate-400; }
 }

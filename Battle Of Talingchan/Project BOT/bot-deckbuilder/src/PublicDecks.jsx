@@ -10,15 +10,10 @@ import { Chart as ChartJS, RadialLinearScale, PointElement, LineElement, Filler,
 import { Radar } from 'react-chartjs-2';
 import html2canvas from 'html2canvas';
 
-// ลงทะเบียน ChartJS
 ChartJS.register(RadialLinearScale, PointElement, LineElement, Filler, Tooltip, Legend);
 
 // === Icons ===
-const Svg = ({ p, ...r }) => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...r}>
-    {p}
-  </svg>
-);
+const Svg = ({ p, ...r }) => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...r}>{p}</svg>;
 const ChevronLeftIcon = () => <Svg width="24" height="24" p={<polyline points="15 18 9 12 15 6"></polyline>} />;
 const EyeIcon = () => <Svg p={<><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></>} />;
 const CopyIcon = () => <Svg p={<><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></>} />;
@@ -29,29 +24,19 @@ const PencilIcon = () => <Svg width="12" height="12" p={<path d="M17 3a2.828 2.8
 const ReplyIcon = () => <Svg width="12" height="12" p={<><polyline points="9 17 4 12 9 7"></polyline><path d="M20 18v-2a4 4 0 0 0-4-4H4"></path></>} />;
 const TrashIcon = () => <Svg width="12" height="12" p={<><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></>} />;
 
-// === UI Components ===
-const Button = ({ className = "", children, ...props }) => (
-  <button className={`flex items-center justify-center gap-2 px-4 py-2 rounded-lg shadow-lg border border-amber-400/20 bg-amber-900/30 text-amber-300 hover:bg-amber-700/50 hover:text-white hover:border-amber-400/60 active:scale-[.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-amber-900/30 ${className}`} {...props}>
-    {children}
-  </button>
-);
-
-const CardShell = ({ children, className = "", ...props }) => (
-  <div className={`bg-slate-900/70 backdrop-blur-sm p-4 rounded-xl border border-emerald-500/20 shadow-lg transition-all hover:border-amber-400/50 hover:shadow-amber-500/10 ${className}`} {...props}>
-    {children}
-  </div>
-);
-
+// === UI Components (Refactored for Theme) ===
+const Button = ({ className = "", children, ...props }) => ( <button className={`flex items-center justify-center gap-2 px-4 py-2 rounded-lg shadow-lg border border-amber-400/20 bg-amber-200/20 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 hover:bg-amber-200/50 dark:hover:bg-amber-700/50 dark:hover:text-white hover:border-amber-400/60 active:scale-[.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed ${className}`} {...props} > {children} </button> );
+const CardShell = ({ children, className = "", ...props }) => ( <div className={`bg-white dark:bg-slate-900/70 backdrop-blur-sm p-4 rounded-xl border border-slate-200 dark:border-emerald-500/20 shadow-lg transition-all hover:border-amber-400/50 hover:shadow-amber-500/10 ${className}`} {...props}> {children} </div> );
 const Modal = ({ isOpen, title, children, onClose, onConfirm, confirmText = "Confirm", confirmIcon = <ClearIcon/>, maxWidth = 'max-w-md' }) => { 
   if (!isOpen) return null; 
   return createPortal( 
     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[400] p-4"> 
-      <div className={`bg-slate-800 border border-emerald-500/30 rounded-xl shadow-2xl p-6 w-full m-4 ${maxWidth}`}> 
-        <h2 className="text-xl font-bold text-white mb-4">{title}</h2> 
-        <div className="text-gray-300 mb-6">{children}</div> 
+      <div className={`bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-emerald-500/30 rounded-xl shadow-2xl p-6 w-full m-4 ${maxWidth}`}> 
+        <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4">{title}</h2> 
+        <div className="text-slate-700 dark:text-gray-300 mb-6">{children}</div> 
         <div className="flex justify-end gap-3"> 
-          <Button onClick={onClose} className="bg-slate-700/50 border-slate-600 text-gray-300 hover:bg-slate-600">{onConfirm ? "Cancel" : "Close"}</Button> 
-          {onConfirm && ( <Button onClick={onConfirm} className="bg-red-900/50 border-red-500/30 text-red-300 hover:bg-red-800/50 hover:text-white"> {confirmIcon} {confirmText} </Button> )} 
+          <Button onClick={onClose} className="bg-slate-200 dark:bg-slate-700/50 border-slate-300 dark:border-slate-600 text-slate-700 dark:text-gray-300 hover:bg-slate-300 dark:hover:bg-slate-600">{onConfirm ? "Cancel" : "Close"}</Button> 
+          {onConfirm && ( <Button onClick={onConfirm} className="bg-red-200 dark:bg-red-900/50 border-red-300 dark:border-red-500/30 text-red-700 dark:text-red-300 hover:bg-red-300 dark:hover:bg-red-800/50 dark:hover:text-white"> {confirmIcon} {confirmText} </Button> )} 
         </div> 
       </div> 
     </div>, document.body 
@@ -59,26 +44,14 @@ const Modal = ({ isOpen, title, children, onClose, onConfirm, confirmText = "Con
 };
 
 // === Utils ===
-function useLocalStorage(key, initial) { 
-  const [v, s] = useState(() => { 
-    try { 
-      const raw = localStorage.getItem(key); 
-      return raw ? JSON.parse(raw) : initial; 
-    } catch { return initial; } 
-  }); 
-  useEffect(() => { 
-    try { localStorage.setItem(key, JSON.stringify(v)); } catch {} 
-  }, [key, v]); 
-  return [v, s]; 
-}
-
+function useLocalStorage(key, initial) { const [v, s] = useState(() => { try { const raw = localStorage.getItem(key); return raw ? JSON.parse(raw) : initial; } catch { return initial; } }); useEffect(() => { try { localStorage.setItem(key, JSON.stringify(v)); } catch {} }, [key, v]); return [v, s]; }
 const encodePath = (p) => p ? p.split('/').map(encodeURIComponent).join('/') : '';
 const nameKey = (n) => (n || "").trim().toLowerCase();
 const encodeDeckCode = (mainDeck, lifeDeck) => { try { return btoa(JSON.stringify({ m: mainDeck.map(c=>c.id), l: lifeDeck.map(c=>c.id) })).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, ''); } catch { return ""; } };
 function countBy(arr, keyFn) { return arr.reduce((m, x) => { const k = keyFn(x); m[k] = (m[k] || 0) + 1; return m; }, {}); }
 const avg = (arr) => { const valid = arr.filter(n => typeof n === 'number' && !isNaN(n)); return valid.length ? (valid.reduce((a, b) => a + b, 0) / valid.length).toFixed(2) : '0.00'; };
 
-// === Comment Components ===
+// === Comment Components (Refactored for Theme) ===
 function CommentItem({ comment, replies, userProfile, deckOwnerEmail, onReply, onEdit, onDelete }) {
   const [isEditing, setIsEditing] = useState(false);
   const [editVal, setEditVal] = useState(comment.text);
@@ -102,38 +75,38 @@ function CommentItem({ comment, replies, userProfile, deckOwnerEmail, onReply, o
   return (
     <div className="flex flex-col gap-2 animate-fade-in">
       <div className="flex gap-3">
-        <img src={comment.userPicture} alt={comment.userName} className="w-8 h-8 rounded-full border border-slate-600 mt-1 shrink-0 object-cover" />
+        <img src={comment.userPicture} alt={comment.userName} className="w-8 h-8 rounded-full border border-slate-300 dark:border-slate-600 mt-1 shrink-0 object-cover" />
         <div className="flex flex-col flex-grow min-w-0">
-          <div className="bg-slate-800/80 rounded-2xl rounded-tl-none px-4 py-2 border border-slate-700/50 relative">
+          <div className="bg-slate-200 dark:bg-slate-800/80 rounded-2xl rounded-tl-none px-4 py-2 border border-slate-300 dark:border-slate-700/50 relative">
             <div className="flex items-baseline gap-2 mb-0.5">
-              <span className="font-bold text-sm text-emerald-100">{comment.userName}</span>
-              <span className="text-[10px] text-slate-500">{formatTime(comment.createdAt)}</span>
+              <span className="font-bold text-sm text-emerald-700 dark:text-emerald-100">{comment.userName}</span>
+              <span className="text-[10px] text-slate-500 dark:text-slate-500">{formatTime(comment.createdAt)}</span>
             </div>
             {isEditing ? (
               <div className="mt-1">
-                <input autoFocus className="w-full bg-slate-900 text-white text-sm rounded px-2 py-1 border border-emerald-500 outline-none" value={editVal} onChange={e => setEditVal(e.target.value)} onKeyDown={e => e.key === 'Enter' && (onEdit(comment.id, editVal), setIsEditing(false))} />
-                <div className="flex gap-2 mt-2 text-xs"><span onClick={() => {onEdit(comment.id, editVal); setIsEditing(false)}} className="text-emerald-400 cursor-pointer hover:underline">บันทึก</span><span onClick={() => setIsEditing(false)} className="text-slate-400 cursor-pointer hover:underline">ยกเลิก</span></div>
+                <input autoFocus className="w-full bg-white dark:bg-slate-900 text-slate-900 dark:text-white text-sm rounded px-2 py-1 border border-emerald-500 outline-none" value={editVal} onChange={e => setEditVal(e.target.value)} onKeyDown={e => e.key === 'Enter' && (onEdit(comment.id, editVal), setIsEditing(false))} />
+                <div className="flex gap-2 mt-2 text-xs"><span onClick={() => {onEdit(comment.id, editVal); setIsEditing(false)}} className="text-emerald-600 dark:text-emerald-400 cursor-pointer hover:underline">บันทึก</span><span onClick={() => setIsEditing(false)} className="text-slate-500 dark:text-slate-400 cursor-pointer hover:underline">ยกเลิก</span></div>
               </div>
-            ) : <p className="text-sm text-gray-200 break-words leading-relaxed whitespace-pre-wrap">{comment.text}</p>}
+            ) : <p className="text-sm text-slate-800 dark:text-gray-200 break-words leading-relaxed whitespace-pre-wrap">{comment.text}</p>}
           </div>
-          <div className="flex gap-3 mt-1 ml-2 text-[11px] text-slate-400 select-none">
-            {userProfile && <span onClick={() => setIsReplying(!isReplying)} className="cursor-pointer hover:text-white flex items-center gap-1 transition-colors"><ReplyIcon/> ตอบกลับ</span>}
-            {canEdit && !isEditing && <span onClick={() => setIsEditing(true)} className="cursor-pointer hover:text-amber-300 flex items-center gap-1 transition-colors"><PencilIcon/> แก้ไข</span>}
-            {canDelete && <span onClick={() => onDelete(comment.id)} className="cursor-pointer hover:text-red-400 flex items-center gap-1 transition-colors"><TrashIcon/> ลบ</span>}
+          <div className="flex gap-3 mt-1 ml-2 text-[11px] text-slate-500 dark:text-slate-400 select-none">
+            {userProfile && <span onClick={() => setIsReplying(!isReplying)} className="cursor-pointer hover:text-black dark:hover:text-white flex items-center gap-1 transition-colors"><ReplyIcon/> ตอบกลับ</span>}
+            {canEdit && !isEditing && <span onClick={() => setIsEditing(true)} className="cursor-pointer hover:text-amber-600 dark:hover:text-amber-300 flex items-center gap-1 transition-colors"><PencilIcon/> แก้ไข</span>}
+            {canDelete && <span onClick={() => onDelete(comment.id)} className="cursor-pointer hover:text-red-600 dark:hover:text-red-400 flex items-center gap-1 transition-colors"><TrashIcon/> ลบ</span>}
           </div>
           {isReplying && (
             <form onSubmit={handleSendReply} className="mt-2 flex gap-2 animate-fade-in">
               <img src={userProfile.picture} className="w-6 h-6 rounded-full opacity-50" />
               <div className="flex-grow relative">
-                <input autoFocus placeholder={`ตอบกลับ ${comment.userName}...`} className="w-full bg-slate-900/50 text-white text-sm rounded-full px-3 py-1.5 border border-slate-600 focus:border-emerald-500 outline-none transition-all" value={replyVal} onChange={e => setReplyVal(e.target.value)} />
-                <button type="submit" disabled={!replyVal.trim()} className="absolute right-1 top-1/2 -translate-y-1/2 p-1 text-emerald-400 hover:text-white disabled:opacity-0 transition-opacity"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg></button>
+                <input autoFocus placeholder={`ตอบกลับ ${comment.userName}...`} className="w-full bg-white dark:bg-slate-900/50 text-slate-900 dark:text-white text-sm rounded-full px-3 py-1.5 border border-slate-300 dark:border-slate-600 focus:border-emerald-500 outline-none transition-all" value={replyVal} onChange={e => setReplyVal(e.target.value)} />
+                <button type="submit" disabled={!replyVal.trim()} className="absolute right-1 top-1/2 -translate-y-1/2 p-1 text-emerald-600 dark:text-emerald-400 hover:text-black dark:hover:text-white disabled:opacity-0 transition-opacity"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg></button>
               </div>
             </form>
           )}
         </div>
       </div>
       {replies && replies.length > 0 && (
-        <div className="ml-8 border-l-2 border-slate-700/50 pl-3 flex flex-col gap-2">
+        <div className="ml-8 border-l-2 border-slate-300 dark:border-slate-700/50 pl-3 flex flex-col gap-2">
           {replies.map(r => (
             <CommentItem key={r.id} comment={r} replies={[]} userProfile={userProfile} deckOwnerEmail={deckOwnerEmail} onReply={onReply} onEdit={onEdit} onDelete={onDelete} />
           ))}
@@ -177,9 +150,9 @@ function CommentSection({ deckId, userProfile, showAlert, deckOwnerEmail }) {
   const getReplies = (pid) => comments.filter(c => c.parentId === pid);
 
   return (
-    <div className="flex flex-col h-full border-l border-emerald-500/20 bg-black/40">
-      <div className="p-4 border-b border-emerald-500/20 bg-slate-900/80 backdrop-blur"><h3 className="font-bold text-white flex items-center gap-2"><span className="text-emerald-400">💬</span> ความคิดเห็น ({comments.length})</h3></div>
-      <div className="flex-grow overflow-y-auto p-4 space-y-4 scrollbar-thin scrollbar-thumb-slate-700">
+    <div className="flex flex-col h-full border-l border-slate-200 dark:border-emerald-500/20 bg-slate-100/50 dark:bg-black/40">
+      <div className="p-4 border-b border-slate-200 dark:border-emerald-500/20 bg-white/50 dark:bg-slate-900/80 backdrop-blur"><h3 className="font-bold text-slate-900 dark:text-white flex items-center gap-2"><span className="text-emerald-600 dark:text-emerald-400">💬</span> ความคิดเห็น ({comments.length})</h3></div>
+      <div className="flex-grow overflow-y-auto p-4 space-y-4 scrollbar-thin scrollbar-thumb-slate-400 dark:scrollbar-thumb-slate-700">
         {rootComments.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-40 text-slate-500 gap-2"><span className="text-4xl opacity-30">💭</span><p className="text-sm">ยังไม่มีใครคุยกันเลย...</p></div>
         ) : rootComments.map(c => (
@@ -187,10 +160,10 @@ function CommentSection({ deckId, userProfile, showAlert, deckOwnerEmail }) {
         ))}
         <div ref={endRef} />
       </div>
-      <form onSubmit={(e)=>{e.preventDefault(); handleAdd(newComment)}} className="p-3 border-t border-emerald-500/20 bg-slate-900">
+      <form onSubmit={(e)=>{e.preventDefault(); handleAdd(newComment)}} className="p-3 border-t border-slate-200 dark:border-emerald-500/20 bg-white dark:bg-slate-900">
         <div className="relative flex items-center gap-2">
-          {userProfile ? <img src={userProfile.picture} className="w-8 h-8 rounded-full" /> : <div className="w-8 h-8 rounded-full bg-slate-700" />}
-          <input value={newComment} onChange={e=>setNewComment(e.target.value)} placeholder={userProfile?"แสดงความคิดเห็น...":"กรุณาเข้าสู่ระบบ"} disabled={!userProfile} className="flex-grow bg-slate-800 text-white text-sm rounded-full px-4 py-2.5 border border-slate-600 focus:border-emerald-500 outline-none transition-all" />
+          {userProfile ? <img src={userProfile.picture} className="w-8 h-8 rounded-full" /> : <div className="w-8 h-8 rounded-full bg-slate-300 dark:bg-slate-700" />}
+          <input value={newComment} onChange={e=>setNewComment(e.target.value)} placeholder={userProfile?"แสดงความคิดเห็น...":"กรุณาเข้าสู่ระบบ"} disabled={!userProfile} className="flex-grow bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white text-sm rounded-full px-4 py-2.5 border border-slate-300 dark:border-slate-600 focus:border-emerald-500 outline-none transition-all" />
           <button type="submit" disabled={!newComment.trim()} className="p-2 bg-emerald-600 text-white rounded-full hover:bg-emerald-500 disabled:opacity-50 transition-all shadow-lg active:scale-95">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
           </button>
@@ -200,8 +173,8 @@ function CommentSection({ deckId, userProfile, showAlert, deckOwnerEmail }) {
   );
 }
 
-// === DeckViewModal ===
-function DeckViewModal({ isOpen, onClose, deck, showAlert, isLoading, onTakePhoto, isCapturing, userProfile, onClone}) {
+// === DeckViewModal (Refactored for Theme) ===
+function DeckViewModal({ isOpen, onClose, deck, showAlert, isLoading, onTakePhoto, isCapturing, userProfile, onClone }) {
   const analysis = useMemo(() => {
     if (isLoading || !deck || !deck.main || deck.main.length === 0) return null;
     const main = (deck.main || []).filter(Boolean);
@@ -229,7 +202,7 @@ function DeckViewModal({ isOpen, onClose, deck, showAlert, isLoading, onTakePhot
     const groupedCards = cards.reduce((acc, card) => { const existing = acc.find(item => item.card.id === card.id); if (existing) { existing.count++; } else { acc.push({ card, count: 1 }); } return acc; }, []);
     return (
       <div className="mt-6">
-        <h4 className="text-lg font-semibold text-emerald-300 border-b border-emerald-400/20 pb-1 mb-3">{title} ({cards.length} ใบ)</h4>
+        <h4 className="text-lg font-semibold text-emerald-600 dark:text-emerald-300 border-b border-emerald-500/20 pb-1 mb-3">{title} ({cards.length} ใบ)</h4>
         <div className="grid grid-cols-[repeat(auto-fit,minmax(6rem,1fr))] gap-2 justify-center">
           {groupedCards.map(({ card, count }) => {
             const encodedImagePath = encodePath(card.imagePath);
@@ -238,7 +211,7 @@ function DeckViewModal({ isOpen, onClose, deck, showAlert, isLoading, onTakePhot
             return (
               <div key={card.id} className="relative w-24">
                 <img src={thumbPng} alt={card.name} className="w-full rounded-md shadow" onError={(e) => { e.currentTarget.src = e.currentTarget.src.replace('.png', '.jpg'); }} />
-                {count > 1 && ( <div className="absolute -top-2 -right-2 w-5 h-5 flex items-center justify-center bg-amber-500 text-white text-xs font-bold rounded-full border-2 border-slate-800">{count}</div> )}
+                {count > 1 && ( <div className="absolute -top-3 -right-3 w-8 h-8 bg-amber-500 text-white text-lg font-bold rounded-full border-2 border-white dark:border-slate-800 text-center leading-none pt-0.5">{count}</div> )}
               </div>
             );
           })}
@@ -249,25 +222,26 @@ function DeckViewModal({ isOpen, onClose, deck, showAlert, isLoading, onTakePhot
 
   return createPortal(
     <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-[200] p-4">
-      <div className="bg-slate-900/80 border border-emerald-500/30 rounded-xl shadow-2xl w-full h-full flex flex-col max-w-[95vw] max-h-[90vh]">
-        <header className="flex items-center justify-between p-4 border-b border-emerald-500/20 shrink-0">
-          <h2 className="text-2xl font-bold text-white truncate pr-4">{isLoading ? "กำลังโหลด..." : deck?.deckName}</h2>
+      <div className="bg-white dark:bg-slate-900/80 border border-slate-300 dark:border-emerald-500/30 rounded-xl shadow-2xl w-full h-full flex flex-col max-w-[95vw] max-h-[90vh]">
+        <header className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-emerald-500/20 shrink-0">
+          <h2 className="text-2xl font-bold text-slate-900 dark:text-white truncate pr-4">{isLoading ? "กำลังโหลด..." : deck?.deckName}</h2>
           <div className="flex items-center gap-3 shrink-0">
-            <Button onClick={()=>onTakePhoto(deck, analysis)} disabled={isLoading||!analysis||isCapturing} className="bg-blue-600/30 border-blue-500/30 text-blue-300 hover:bg-blue-500/50 hover:text-white"><CameraIcon /> {isCapturing?"ถ่ายรูป...":"ถ่ายรูป"}</Button>
+            <Button onClick={()=>onTakePhoto(deck, analysis)} disabled={isLoading||!analysis||isCapturing} className="bg-blue-200 dark:bg-blue-600/30 border-blue-300 dark:border-blue-500/30 text-blue-800 dark:text-blue-300"><CameraIcon /> {isCapturing?"ถ่ายรูป...":"ถ่ายรูป"}</Button>
+            {onClone && <Button onClick={() => onClone(deck)} disabled={isLoading||!analysis} className="bg-emerald-200 dark:bg-emerald-600/30 border-emerald-300 dark:border-emerald-500/30 text-emerald-800 dark:text-emerald-300"><ImportIcon /> Clone</Button>}
             <Button onClick={handleCopyCode} disabled={isLoading||!analysis}><CopyIcon /> คัดลอกรหัสเด็ค</Button>
             <Button onClick={onClose} disabled={isCapturing}>Close</Button>
           </div>
         </header>
         {isLoading || !analysis ? (
-          <div className="flex-grow flex items-center justify-center"><p className="text-xl text-slate-300">กำลังโหลดรายละเอียดเด็ค...</p></div>
+          <div className="flex-grow flex items-center justify-center"><p className="text-xl text-slate-500 dark:text-slate-300">กำลังโหลดรายละเอียดเด็ค...</p></div>
         ) : (
-          <div className="flex-grow overflow-hidden grid grid-cols-1 lg:grid-cols-12 bg-slate-900/80">
-            <div className="lg:col-span-3 flex flex-col gap-6 overflow-y-auto p-6 pr-2 border-r border-emerald-500/20">
-              <div><h3 className="text-xl font-semibold text-amber-300 border-b border-amber-400/20 pb-1 mb-3">สถิติเด็ค</h3><div className="grid grid-cols-3 gap-2 text-center"><div><span className="text-xs text-gray-400">Cost</span><p className="text-xl font-bold text-emerald-400">{analysis.avgCost}</p></div><div><span className="text-xs text-gray-400">Power</span><p className="text-xl font-bold text-red-400">{analysis.avgPower}</p></div><div><span className="text-xs text-gray-400">Gem</span><p className="text-xl font-bold text-amber-400">{analysis.avgGem}</p></div></div></div>
-              <div><h3 className="text-xl font-semibold text-amber-300 border-b border-amber-400/20 pb-1 mb-3">ประเภทการ์ด</h3><ul className="space-y-1 text-sm">{analysis.cardTypes.map(([t, c]) => <li key={t} className="flex justify-between text-gray-300"><span>{t}</span><span className="text-white font-bold">{c}</span></li>)}</ul></div>
+          <div className="flex-grow overflow-hidden grid grid-cols-1 lg:grid-cols-12 bg-white dark:bg-slate-900/80">
+            <div className="lg:col-span-3 flex flex-col gap-6 overflow-y-auto p-6 pr-2 border-r border-slate-200 dark:border-emerald-500/20">
+              <div><h3 className="text-xl font-semibold text-amber-600 dark:text-amber-300 border-b border-amber-500/20 pb-1 mb-3">สถิติเด็ค</h3><div className="grid grid-cols-3 gap-2 text-center"><div><span className="text-xs text-gray-500 dark:text-gray-400">Cost</span><p className="text-xl font-bold text-emerald-600 dark:text-emerald-400">{analysis.avgCost}</p></div><div><span className="text-xs text-gray-500 dark:text-gray-400">Power</span><p className="text-xl font-bold text-red-600 dark:text-red-400">{analysis.avgPower}</p></div><div><span className="text-xs text-gray-500 dark:text-gray-400">Gem</span><p className="text-xl font-bold text-amber-600 dark:text-amber-400">{analysis.avgGem}</p></div></div></div>
+              <div><h3 className="text-xl font-semibold text-amber-600 dark:text-amber-300 border-b border-amber-500/20 pb-1 mb-3">ประเภทการ์ด</h3><ul className="space-y-1 text-sm">{analysis.cardTypes.map(([t, c]) => <li key={t} className="flex justify-between text-slate-700 dark:text-gray-300"><span>{t}</span><span className="text-slate-900 dark:text-white font-bold">{c}</span></li>)}</ul></div>
             </div>
-            <div className="lg:col-span-6 overflow-y-auto p-6 border-r border-emerald-500/20 bg-black/20">
-              {analysis.only1 && <div className="mb-6 flex flex-col items-center"><h4 className="text-lg font-semibold text-emerald-300 mb-3">Only #1</h4><div className="relative w-40"><img src={`/cards/${encodePath(analysis.only1.imagePath)}/${encodeURIComponent(analysis.only1.id.replace(' - Only#1', ''))}.png`} className="w-full rounded-md shadow" onError={(e) => { e.currentTarget.src = e.currentTarget.src.replace('.png', '.jpg'); }} /></div></div>}
+            <div className="lg:col-span-6 overflow-y-auto p-6 border-r border-slate-200 dark:border-emerald-500/20 bg-slate-50 dark:bg-black/20">
+              {analysis.only1 && <div className="mb-6 flex flex-col items-center"><h4 className="text-lg font-semibold text-emerald-700 dark:text-emerald-300 mb-3">Only #1</h4><div className="relative w-40"><img src={`/cards/${encodePath(analysis.only1.imagePath)}/${encodeURIComponent(analysis.only1.id.replace(' - Only#1', ''))}.png`} className="w-full rounded-md shadow" onError={(e) => { e.currentTarget.src = e.currentTarget.src.replace('.png', '.jpg'); }} /></div></div>}
               {renderCardSection("Avatar Cards", analysis.avatars)}
               {renderCardSection("Magic Cards", analysis.magics)}
               {renderCardSection("Construct Cards", analysis.constructs)}
@@ -282,7 +256,7 @@ function DeckViewModal({ isOpen, onClose, deck, showAlert, isLoading, onTakePhot
   );
 }
 
-// === Screenshot Template ===
+// === Screenshot Template (Hidden) ===
 const DeckImageTemplate = React.forwardRef(({ deck, analysis }, ref) => {
   const renderGrid = (title, cards) => {
     if (!cards?.length) return null;
@@ -319,26 +293,26 @@ function DeckCard({ deck, onViewDeck, userProfile, onDeleteDeck, isDetailLoading
     <CardShell className="flex flex-col">
       <div className="flex justify-between items-start mb-3">
         <div className="flex items-center gap-3">
-          <img src={deck.user.picture} alt={deck.user.name} className="w-10 h-10 rounded-full bg-slate-700 object-cover" loading="lazy" />
-          <div><p className="font-semibold text-white">{deck.user.name}</p><p className="text-xs text-gray-400">{deck.sharedAt?.toDate().toLocaleString('th-TH')}</p></div>
+          <img src={deck.user.picture} alt={deck.user.name} className="w-10 h-10 rounded-full bg-slate-200 dark:bg-slate-700 object-cover" loading="lazy" />
+          <div><p className="font-semibold text-slate-900 dark:text-white">{deck.user.name}</p><p className="text-xs text-gray-500 dark:text-gray-400">{deck.sharedAt?.toDate().toLocaleString('th-TH')}</p></div>
         </div>
       </div>
-      <h3 className="text-xl font-bold text-amber-300 mb-3 line-clamp-2">{deck.deckName}</h3>
-      <div className="aspect-[5/7] w-full rounded-lg mb-4 overflow-hidden bg-slate-800"><img src={mainCardImg} className="w-full h-full object-cover" loading="lazy"/></div>
+      <h3 className="text-xl font-bold text-amber-600 dark:text-amber-300 mb-3 line-clamp-2">{deck.deckName}</h3>
+      <div className="aspect-[5/7] w-full rounded-lg mb-4 overflow-hidden bg-slate-200 dark:bg-slate-800"><img src={mainCardImg} className="w-full h-full object-cover" loading="lazy"/></div>
       <div className="flex items-center gap-3 mb-3">
-        <Button onClick={() => onLikeDeck(deck)} disabled={!userProfile || isLiking} className={`px-3 ${isLiked ? 'bg-red-600/30 border-red-500/30 text-red-300 hover:bg-red-500/50 hover:text-white' : ''}`}><HeartIcon filled={isLiked} /></Button>
-        <span className="text-gray-400 text-sm">{deck.likeCount || 0} Likes</span>
-        <span className="ml-auto text-gray-500 text-sm flex items-center gap-1.5"><EyeIcon /> {deck.viewCount || 0}</span>
+        <Button onClick={() => onLikeDeck(deck)} disabled={!userProfile || isLiking} className={`px-3 ${isLiked ? 'bg-red-200 dark:bg-red-600/30 border-red-300 dark:border-red-500/50 text-red-700 dark:text-red-300' : ''}`}><HeartIcon filled={isLiked} /></Button>
+        <span className="text-gray-600 dark:text-gray-400 text-sm">{deck.likeCount || 0} Likes</span>
+        <span className="ml-auto text-gray-500 dark:text-gray-500 text-sm flex items-center gap-1.5"><EyeIcon /> {deck.viewCount || 0}</span>
       </div>
       <div className="flex flex-col gap-2 mt-auto">
-        <Button onClick={() => onViewDeck(deck)} className="w-full bg-blue-600/30 border-blue-500/30 text-blue-300 hover:bg-blue-500/50 hover:text-white" disabled={isDetailLoading}><EyeIcon /> {isDetailLoading ? "Loading..." : "View Detail"}</Button>
-        {isOwner && <Button onClick={() => onDeleteDeck(deck)} className="w-full bg-red-900/50 border-red-500/30 text-red-300 hover:bg-red-800/50 hover:text-white"><ClearIcon /> Un-share</Button>}
+        <Button onClick={() => onViewDeck(deck)} className="w-full bg-blue-200 dark:bg-blue-600/30 border-blue-300 dark:border-blue-500/30 text-blue-800 dark:text-blue-300" disabled={isDetailLoading}><EyeIcon /> {isDetailLoading ? "Loading..." : "View Detail"}</Button>
+        {isOwner && <Button onClick={() => onDeleteDeck(deck)} className="w-full bg-red-200 dark:bg-red-900/50 border-red-300 dark:border-red-500/30 text-red-700 dark:text-red-300"><ClearIcon /> Un-share</Button>}
       </div>
     </CardShell>
   );
 }
 
-function DeckCardSkeleton() { return (<CardShell className="flex flex-col animate-pulse"><div className="flex justify-between mb-3"><div className="w-10 h-10 rounded-full bg-slate-700"></div><div className="h-4 w-24 bg-slate-700 rounded"></div></div><div className="h-6 w-3/4 bg-slate-700 rounded mb-3"></div><div className="aspect-[5/7] w-full rounded-lg mb-4 bg-slate-700"></div><div className="h-10 w-full bg-slate-700 rounded-lg"></div></CardShell>); }
+function DeckCardSkeleton() { return (<CardShell className="flex flex-col animate-pulse"><div className="flex justify-between mb-3"><div className="w-10 h-10 rounded-full bg-slate-300 dark:bg-slate-700"></div><div className="h-4 w-24 bg-slate-300 dark:bg-slate-700 rounded"></div></div><div className="h-6 w-3/4 bg-slate-300 dark:bg-slate-700 rounded mb-3"></div><div className="aspect-[5/7] w-full rounded-lg mb-4 bg-slate-300 dark:bg-slate-700"></div><div className="h-10 w-full bg-slate-300 dark:bg-slate-700 rounded-lg"></div></CardShell>); }
 
 // === Main Component ===
 export default function PublicDecks() {
@@ -359,6 +333,7 @@ export default function PublicDecks() {
   const [imageDeck, setImageDeck] = useState(null);
   const imageTemplateRef = useRef(null);
   const DECKS_PER_PAGE = 12;
+  const [userDecks, setUserDecks] = useLocalStorage("bot-userDecks-v1", {}); // [ใหม่] สำหรับ Clone
 
   // [ใหม่] State และ Logic สำหรับ Custom Profile
   const [customProfile, setCustomProfile] = useState(null);
@@ -450,25 +425,52 @@ export default function PublicDecks() {
       }).finally(() => { setIsCapturing(false); setImageDeck(null); });
     }
   }, [imageDeck]);
+  
+  // [ใหม่] เพิ่มฟังก์ชัน Clone
+  const handleCloneDeck = (targetDeck) => {
+    if (!userProfile) return showAlert("Login", "กรุณาเข้าสู่ระบบก่อน Clone เด็คครับ");
+    const email = userProfile.email;
+    const userData = userDecks[email] || { slots: [{ name: "Slot 1", main: [], life: [] }, { name: "Slot 2", main: [], life: [] }] };
+    const slots = userData.slots;
+    setModal({
+      isOpen: true, title: "Clone Deck", message: (
+        <div className="flex flex-col gap-4">
+          <p>เลือก Slot ที่ต้องการบันทึกเด็ค "{targetDeck.deckName}" ลงไป:</p>
+          {slots.map((slot, index) => (
+            <button key={index} onClick={() => {
+              if (!viewingDeck || viewingDeck.id !== targetDeck.id) return showAlert("Error", "กรุณากด View Details ก่อน Clone");
+              const newSlots = [...slots];
+              newSlots[index] = { name: targetDeck.deckName, main: viewingDeck.main, life: viewingDeck.life };
+              setUserDecks(prev => ({ ...prev, [email]: { ...prev[email], slots: newSlots } }));
+              closeModal();
+              showAlert("Success", `บันทึกเด็คลงใน ${slot.name} เรียบร้อย!`);
+            }} className="p-3 bg-slate-200 dark:bg-slate-800 border border-emerald-500/30 rounded-lg hover:bg-emerald-100 dark:hover:bg-emerald-900/30 text-left flex justify-between items-center group">
+              <span className="font-bold text-emerald-700 dark:text-emerald-400">{slot.name}</span>
+              <span className="text-xs text-gray-500 group-hover:text-emerald-500">{slot.main.length > 0 ? "(จะถูกเขียนทับ)" : "(ว่าง)"}</span>
+            </button>
+          ))}
+        </div>), confirmText: null
+    });
+  };
 
   return (
-    <div className="h-screen flex flex-col text-gray-200 bg-black">
+    <div className="h-screen flex flex-col text-slate-900 dark:text-gray-200 bg-slate-100 dark:bg-black">
       <style>{`::-webkit-scrollbar{width:8px}::-webkit-scrollbar-track{background:#0f172a}::-webkit-scrollbar-thumb{background:#1e293b;border-radius:4px}::-webkit-scrollbar-thumb:hover{background:#334155}.image-render-target{position:fixed;top:-9999px;left:0;width:1280px;height:auto;background:#1e293b;padding:24px;box-shadow:0 0 30px rgba(0,0,0,0.5);display:flex;gap:24px;flex-shrink:0;flex-grow:0;}`}</style>
-      <header className="px-4 lg:px-6 py-2 border-b border-emerald-700/30 bg-black/60 backdrop-blur-sm shrink-0 z-40">
+      <header className="px-4 lg:px-6 py-2 border-b border-slate-200 dark:border-emerald-700/30 bg-white/80 dark:bg-black/60 backdrop-blur-sm shrink-0 z-40">
          <div className="flex items-center justify-between gap-4">
-          <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight bg-gradient-to-r from-amber-300 to-emerald-400 bg-clip-text text-transparent">Battle Of Talingchan</h1>
-          <Link to="/"><Button className="bg-emerald-600/30 border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/50 hover:text-white"><ChevronLeftIcon /> Back to Deck Builder</Button></Link>
+          <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight bg-gradient-to-r from-amber-500 to-emerald-600 dark:from-amber-300 dark:to-emerald-400 bg-clip-text text-transparent">Battle Of Talingchan</h1>
+          <Link to="/"><Button className="bg-emerald-200 dark:bg-emerald-600/30 border-emerald-300 dark:border-emerald-500/30 text-emerald-800 dark:text-emerald-300"><ChevronLeftIcon /> Back to Deck Builder</Button></Link>
         </div>
       </header>
       <main className="flex-1 overflow-y-auto p-4 md:p-8 lg:p-12">
-        <h2 className="text-3xl font-bold text-white mb-6">Public Shared Decks</h2>
-        <div className="mb-8 p-4 bg-slate-900/70 rounded-xl border border-emerald-500/20">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4"><input type="search" placeholder="Search decks..." className="w-full px-4 py-2 border border-emerald-500/30 rounded-lg bg-slate-700/50 text-white" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} /></div>
-          <div className="flex flex-wrap items-center gap-2 mt-4"><span className="text-gray-400 text-sm mr-2">Sort by:</span>
-            <Button onClick={() => setSortOrder({ field: "sharedAt", direction: "desc" })} className={`text-sm ${sortOrder.field==='sharedAt'&&sortOrder.direction==='desc'?'bg-amber-500/50 border-amber-400':''}`}>Latest</Button>
-            <Button onClick={() => setSortOrder({ field: "likeCount", direction: "desc" })} className={`text-sm ${sortOrder.field==='likeCount'?'bg-amber-500/50 border-amber-400':''}`}>Popular</Button>
-            <Button onClick={() => setSortOrder({ field: "viewCount", direction: "desc" })} className={`text-sm ${sortOrder.field==='viewCount'?'bg-amber-500/50 border-amber-400':''}`}>Most Views</Button>
-            <Button onClick={() => setSortOrder({ field: "sharedAt", direction: "asc" })} className={`text-sm ${sortOrder.field==='sharedAt'&&sortOrder.direction==='asc'?'bg-amber-500/50 border-amber-400':''}`}>Oldest</Button>
+        <h2 className="text-3xl font-bold text-slate-900 dark:text-white mb-6">Public Shared Decks</h2>
+        <div className="mb-8 p-4 bg-white dark:bg-slate-900/70 rounded-xl border border-slate-200 dark:border-emerald-500/20">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4"><input type="search" placeholder="Search decks..." className="w-full px-4 py-2 border border-slate-300 dark:border-emerald-500/30 rounded-lg bg-white dark:bg-slate-700/50 text-slate-900 dark:text-white" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} /></div>
+          <div className="flex flex-wrap items-center gap-2 mt-4"><span className="text-gray-500 dark:text-gray-400 text-sm mr-2">Sort by:</span>
+            <Button onClick={() => setSortOrder({ field: "sharedAt", direction: "desc" })} className={`text-sm ${sortOrder.field==='sharedAt'&&sortOrder.direction==='desc'?'bg-amber-400/50 border-amber-500':'bg-slate-200 dark:bg-slate-800 border-slate-300 dark:border-slate-600'}`}>Latest</Button>
+            <Button onClick={() => setSortOrder({ field: "likeCount", direction: "desc" })} className={`text-sm ${sortOrder.field==='likeCount'?'bg-amber-400/50 border-amber-500':'bg-slate-200 dark:bg-slate-800 border-slate-300 dark:border-slate-600'}`}>Popular</Button>
+            <Button onClick={() => setSortOrder({ field: "viewCount", direction: "desc" })} className={`text-sm ${sortOrder.field==='viewCount'?'bg-amber-400/50 border-amber-500':'bg-slate-200 dark:bg-slate-800 border-slate-300 dark:border-slate-600'}`}>Most Views</Button>
+            <Button onClick={() => setSortOrder({ field: "sharedAt", direction: "asc" })} className={`text-sm ${sortOrder.field==='sharedAt'&&sortOrder.direction==='asc'?'bg-amber-400/50 border-amber-500':'bg-slate-200 dark:bg-slate-800 border-slate-300 dark:border-slate-600'}`}>Oldest</Button>
           </div>
         </div>
         {isLoading && <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">{Array.from({ length: 12 }).map((_, i) => <DeckCardSkeleton key={i} />)}</div>}
@@ -482,7 +484,7 @@ export default function PublicDecks() {
         <div className="mt-12 text-center">{hasMore && !isLoading && sharedDecks.length > 0 && <Button onClick={() => fetchDecks(false)} disabled={isLoadingMore}>{isLoadingMore ? "Loading..." : "Load More"}</Button>}</div>
       </main>
       <Modal isOpen={modal.isOpen} title={modal.title} onClose={closeModal} onConfirm={modal.onConfirm} confirmText={modal.onConfirm ? modal.confirmText || "Confirm" : undefined} confirmIcon={modal.onConfirm ? modal.confirmIcon || <ClearIcon /> : undefined}>{modal.message}</Modal>
-      <DeckViewModal isOpen={viewingDeck !== null} onClose={() => setViewingDeck(null)} deck={viewingDeck} showAlert={showAlert} isLoading={isDetailLoading} isCapturing={isCapturing} onTakePhoto={handlePhoto} userProfile={displayUser} />
+      <DeckViewModal isOpen={viewingDeck !== null} onClose={() => setViewingDeck(null)} deck={viewingDeck} showAlert={showAlert} isLoading={isDetailLoading} isCapturing={isCapturing} onTakePhoto={handlePhoto} userProfile={displayUser} onClone={handleCloneDeck} />
       {imageDeck && <DeckImageTemplate ref={imageTemplateRef} deck={imageDeck} analysis={imageDeck.analysis} />}
     </div>
   );

@@ -34,6 +34,8 @@ const UploadIcon = () => <Svg p={<><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2
 const MenuIcon = () => <Svg width="24" height="24" p={<><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></>} />;
 const UserCogIcon = () => <Svg width="24" height="24" p={<><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle><circle cx="12" cy="12" r="3"></circle></>} />;
 const ImageIcon = () => <Svg p={<><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></>} />;
+const SunIcon = () => <Svg p={<><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></>} />;
+const MoonIcon = () => <Svg p={<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>} />;
 const ClearIcon = TrashIcon;
 
 // === UI helpers ===
@@ -174,7 +176,7 @@ const ProfileSetupModal = ({ isOpen, onClose, userProfile, onSave }) => {
 };
 
 // === Settings Sidebar ===
-const SettingsDrawer = ({ isOpen, onClose, userProfile, onEditProfile, onLogout }) => {
+const SettingsDrawer = ({ isOpen, onClose, userProfile, onEditProfile, onLogout, theme, setTheme }) => {
   return (
     <>
       <div 
@@ -203,6 +205,25 @@ const SettingsDrawer = ({ isOpen, onClose, userProfile, onEditProfile, onLogout 
           <Button onClick={() => { onEditProfile(); onClose(); }} className="w-full mt-4 bg-slate-800 border-slate-600 text-emerald-400 hover:bg-slate-700">
             แก้ไขโปรไฟล์
           </Button>
+          {/* === [เพิ่ม] ส่วนสลับ Theme === */}
+          <div className="mt-4 w-full">
+            <label className="text-sm font-semibold text-gray-400">เลือกธีม</label>
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              <Button
+                onClick={() => setTheme('light')}
+                className={`text-sm ${theme === 'light' ? 'bg-amber-500/50 border-amber-400' : 'bg-slate-800 border-slate-600'}`}
+              >
+                <SunIcon /> สว่าง
+              </Button>
+              <Button
+                onClick={() => setTheme('dark')}
+                className={`text-sm ${theme === 'dark' ? 'bg-amber-500/50 border-amber-400' : 'bg-slate-800 border-slate-600'}`}
+              >
+                <MoonIcon /> มืด
+              </Button>
+            </div>
+          </div>
+          {/* === [สิ้นสุด] === */}
         </div>
 
         <div className="mt-auto p-6 border-t border-emerald-700/20">
@@ -591,6 +612,7 @@ const getMagicSubType = (card) => { if (card.type !== 'Magic') { return null; } 
 
 // === Main App ===
 export default function App() {
+  const [theme, setTheme] = useLocalStorage('bot-theme', 'dark'); // <--- [เพิ่ม] State สำหรับธีม
   const [mainDeck, setMainDeck] = useLocalStorage("bot-mainDeck-v32-final", []); 
   const [lifeDeck, setLifeDeck] = useLocalStorage("bot-lifeDeck-v32-final", []); 
   const [cardDb, setCardDb] = useLocalStorage("bot-cardDb-v32-final", []);
@@ -735,10 +757,16 @@ export default function App() {
       showAlert("Error", "บันทึกไม่สำเร็จ"); 
     }
   };
-
+  useEffect(() => {
+    const root = document.documentElement; // (แท็ก <html>)
+    if (theme === 'dark') {
+      root.classList.add('dark');
+    } else {
+      root.classList.remove('dark');
+    }
+  }, [theme]);
   useEffect(() => { if (cardDb.length === 0) { handleReloadFromTxt(); } }, []);
   useEffect(() => { setCurrentPage(1); }, [searchTerm, filterTypes, filterMagicType, filterColors, filterRarities, selectedSets, statFilters]);
-  
   useEffect(() => {
     if (userProfile?.email) fetchUserProfile(userProfile.email);
   }, []);
@@ -867,7 +895,7 @@ export default function App() {
               
               {/* [ใหม่] Modals สำหรับ Profile */}
               <ProfileSetupModal isOpen={isProfileModalOpen} onClose={() => setIsProfileModalOpen(false)} userProfile={userProfile} onSave={handleSaveProfile} />
-              <SettingsDrawer isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} userProfile={displayUser} onEditProfile={() => setIsProfileModalOpen(true)} onLogout={handleLogout} />
+              <SettingsDrawer isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} userProfile={displayUser} onEditProfile={() => setIsProfileModalOpen(true)} onLogout={handleLogout}theme={theme}setTheme={setTheme}/>
             </>
           )}
         </div>
