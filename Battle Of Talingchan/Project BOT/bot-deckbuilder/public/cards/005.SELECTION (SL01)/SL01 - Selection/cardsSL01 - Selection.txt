@@ -1,7 +1,7 @@
 [
   {
     "id": "SL01-001 (AVATAR) - (USEC)",
-    "name": "นางมนโท",
+    "name": "นางมณโท",
     "type": "Avatar",
     "faction": "มนุษย์",
     "rarity": "USEC",

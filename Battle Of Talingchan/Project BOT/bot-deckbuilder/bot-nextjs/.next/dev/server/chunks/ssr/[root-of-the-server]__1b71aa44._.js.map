@@ -1,6 +1,0 @@
-{
-  "version": 3,
-  "sources": [],
-  "sections": [
-    {"offset": {"line": 10, "column": 0}, "map": {"version":3,"sources":["file:///D:/deckbuilderbot0125/Battle%20Of%20Talingchan/Project%20BOT/bot-deckbuilder/bot-nextjs/src/app/providers.jsx"],"sourcesContent":["\"use client\"; // <--- บอก Next.js ว่านี่คือ Client Component\r\n\r\nimport React from 'react';\r\nimport { GoogleOAuthProvider } from \"@react-oauth/google\";\r\nimport { DndProvider } from \"react-dnd\";\r\nimport { HTML5Backend } from \"react-dnd-html5-backend\";\r\n\r\n// 🛑 [สำคัญมาก]\r\n// ใส่ Client ID ของคุณที่นี่ (อันเดียวกับใน main.jsx เก่า)\r\nconst GOOGLE_CLIENT_ID = \"618176300223-rfano65abopbddenjppd972m57hhgstn.apps.googleusercontent.com\";\r\n\r\nexport function Providers({ children }) {\r\n  return (\r\n    <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>\r\n      <DndProvider backend={HTML5Backend}>\r\n        {children}\r\n      </DndProvider>\r\n    </GoogleOAuthProvider>\r\n  );\r\n}"],"names":[],"mappings":";;;;;AAEA;AACA;AACA;AACA;AALA,cAAc,8CAA8C;;;;;;AAO5D,gBAAgB;AAChB,2DAA2D;AAC3D,MAAM,mBAAmB;AAElB,SAAS,UAAU,EAAE,QAAQ,EAAE;IACpC,qBACE,+PAAC,0MAAmB;QAAC,UAAU;kBAC7B,cAAA,+PAAC,2LAAW;YAAC,SAAS,kNAAY;sBAC/B;;;;;;;;;;;AAIT","debugId":null}}]
-}
