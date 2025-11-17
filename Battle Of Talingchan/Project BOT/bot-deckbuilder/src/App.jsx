@@ -13,6 +13,9 @@ import {
   query, where, getDocs 
 } from 'firebase/firestore';
 
+// === 📍 [แก้ไข] 1. Path หลัก (ถูกต้อง) ===
+const CARD_BASE_URL = "/cards";
+
 ChartJS.register(RadialLinearScale, PointElement, LineElement, Filler, Tooltip, Legend);
 
 // === Icons ===
@@ -456,14 +459,20 @@ const decodeDeckCode = (code, allCards) => { const trimmedCode = (code || "").tr
 
 // === Drag & Drop and Animation Components ===
 const DND_TYPES = { CARD: "CARD" };
-const encodePath = (p) => p.split('/').map(encodeURIComponent).join('/');
+const encodePath = (p) => (p || "").split('/').map(encodeURIComponent).join('/'); // [แก้ไข] เพิ่มการตรวจสอบ p
 const DndStateContext = createContext({ isDragging: false });
 const DndStateProvider = ({ children }) => { const { isDragging } = useDragLayer((monitor) => ({ isDragging: monitor.isDragging() })); return <DndStateContext.Provider value={{ isDragging }}>{children}</DndStateContext.Provider>; };
 const useIsDragging = () => useContext(DndStateContext);
-function CustomDragLayer() { const { isDragging, item, currentOffset } = useDragLayer((monitor) => ({ item: monitor.getItem(), isDragging: monitor.isDragging(), currentOffset: monitor.getSourceClientOffset(), })); if (!isDragging || !currentOffset) return null; const { card } = item; const encodedImagePath = encodePath(card.imagePath); const fileId = card.id.replace(' - Only#1', ''); const imgPng = `/cards/${encodedImagePath}/${encodeURIComponent(fileId)}.png`; return ( <div style={{ position: 'fixed', pointerEvents: 'none', zIndex: 1000, left: 0, top: 0, transform: `translate(${currentOffset.x}px, ${currentOffset.y}px)` }}> <img src={imgPng} alt={card.name} className="w-40 h-auto rounded-lg shadow-2xl" /> </div> ); }
-function FlyingCard({ card, startRect, endRect, onComplete }) { const [isAnimating, setIsAnimating] = useState(false); const hasCompleted = useRef(false); useEffect(() => { const timeoutId = setTimeout(() => setIsAnimating(true), 10); return () => clearTimeout(timeoutId); }, []); if (!card || !startRect || !endRect) return null; const handleTransitionEnd = () => { if (!hasCompleted.current) { hasCompleted.current = true; onComplete(); } }; const style = { position: 'fixed', zIndex: 1000, top: `${startRect.top}px`, left: `${startRect.left}px`, width: `${startRect.width}px`, height: `${startRect.height}px`, transition: 'all 0.5s ease-in-out' }; if (isAnimating) { style.top = `${endRect.top + endRect.height / 2 - 35}px`; style.left = `${endRect.left + endRect.width / 2 - 25}px`; style.width = '50px'; style.height = '70px'; style.opacity = 0; style.transform = 'rotate(15deg)'; } const encodedImagePath = encodePath(card.imagePath); const fileId = card.id.replace(' - Only#1', ''); const imgSrc = `/cards/${encodedImagePath}/${encodeURIComponent(fileId)}.png`; return ( <div style={style} onTransitionEnd={handleTransitionEnd}> <img src={imgSrc} alt={card.name} className="w-full h-full rounded-lg shadow-2xl" /> </div> ); }
+function CustomDragLayer() { const { isDragging, item, currentOffset } = useDragLayer((monitor) => ({ item: monitor.getItem(), isDragging: monitor.isDragging(), currentOffset: monitor.getSourceClientOffset(), })); if (!isDragging || !currentOffset || !item.card) return null; // [แก้ไข] เพิ่ม !item.card
+  const { card } = item; const encodedImagePath = encodePath(card.imagePath); const fileId = card.id.replace(' - Only#1', ''); 
+  // === 📍 [แก้ไข] ใช้ CARD_BASE_URL ===
+  const imgPng = `${CARD_BASE_URL}/${encodedImagePath}/${encodeURIComponent(fileId)}.png`; 
+  return ( <div style={{ position: 'fixed', pointerEvents: 'none', zIndex: 1000, left: 0, top: 0, transform: `translate(${currentOffset.x}px, ${currentOffset.y}px)` }}> <img src={imgPng} alt={card.name} className="w-40 h-auto rounded-lg shadow-2xl" /> </div> ); }
+function FlyingCard({ card, startRect, endRect, onComplete }) { const [isAnimating, setIsAnimating] = useState(false); const hasCompleted = useRef(false); useEffect(() => { const timeoutId = setTimeout(() => setIsAnimating(true), 10); return () => clearTimeout(timeoutId); }, []); if (!card || !startRect || !endRect) return null; const handleTransitionEnd = () => { if (!hasCompleted.current) { hasCompleted.current = true; onComplete(); } }; const style = { position: 'fixed', zIndex: 1000, top: `${startRect.top}px`, left: `${startRect.left}px`, width: `${startRect.width}px`, height: `${startRect.height}px`, transition: 'all 0.5s ease-in-out' }; if (isAnimating) { style.top = `${endRect.top + endRect.height / 2 - 35}px`; style.left = `${endRect.left + endRect.width / 2 - 25}px`; style.width = '50px'; style.height = '70px'; style.opacity = 0; style.transform = 'rotate(15deg)'; } const encodedImagePath = encodePath(card.imagePath); const fileId = card.id.replace(' - Only#1', ''); 
+  // === 📍 [แก้ไข] ใช้ CARD_BASE_URL ===
+  const imgSrc = `${CARD_BASE_URL}/${encodedImagePath}/${encodeURIComponent(fileId)}.png`; 
+  return ( <div style={style} onTransitionEnd={handleTransitionEnd}> <img src={imgSrc} alt={card.name} className="w-full h-full rounded-lg shadow-2xl" /> </div> ); }
 
-// === Card component (draggable) ===
 // === Card component (draggable) ===
 const CardItem = forwardRef(function CardItem({ card, onDoubleClick, onViewDetails, onAddCard }, ref) { 
     const cardItemRef = useRef(null); 
@@ -471,12 +480,10 @@ const CardItem = forwardRef(function CardItem({ card, onDoubleClick, onViewDetai
     const [{ isDragging }, dragRef] = useDrag({ type: DND_TYPES.CARD, item: { card }, collect: (m) => ({ isDragging: m.isDragging() }) }); 
     const encodedImagePath = encodePath(card.imagePath); 
     const fileId = card.id.replace(' - Only#1', ''); 
-    const imgPng = `/cards/${encodedImagePath}/${encodeURIComponent(fileId)}.png`; 
-    const imgJpg = `/cards/${encodedImagePath}/${encodeURIComponent(fileId)}.jpg`; 
+    // === 📍 [แก้ไข] ใช้ CARD_BASE_URL ===
+    const imgPng = `${CARD_BASE_URL}/${encodedImagePath}/${encodeURIComponent(fileId)}.png`; 
+    const imgJpg = `${CARD_BASE_URL}/${encodedImagePath}/${encodeURIComponent(fileId)}.jpg`; 
     
-    // 📍
-    // 📍 === [แก้ไข] เปลี่ยน z-50 เป็น z-[80] ตรงนี้ครับ ===
-    // 📍
     const hoverClasses = !isAnythingDragging ? 'hover:scale-[1.25] hover:z-[80]' : ''; 
     
     return ( 
@@ -601,7 +608,8 @@ const DeckTray = forwardRef(function DeckTray(
               {groupedDeck.map(({ card, count }, index) => {
                 const encodedImagePath = encodePath(card.imagePath);
                 const fileId = card.id.replace(" - Only#1", "");
-                const thumbPng = `/cards/${encodedImagePath}/${encodeURIComponent(
+                // === 📍 [แก้ไข] ใช้ CARD_BASE_URL ===
+                const thumbPng = `${CARD_BASE_URL}/${encodedImagePath}/${encodeURIComponent(
                   fileId
                 )}.png`;
                 const rowIndex = Math.floor(index / cardsPerRow);
@@ -649,10 +657,17 @@ const DeckTray = forwardRef(function DeckTray(
 });
 
 // === CardDetailModal ===
-function CardDetailModal({ card, onClose }) { if (!card) return null; const encodedImagePath = encodePath(card.imagePath); const fileId = card.id.replace(' - Only#1', ''); const imgPng = `/cards/${encodedImagePath}/${encodeURIComponent(fileId)}.png`; const imgJpg = `/cards/${encodedImagePath}/${encodeURIComponent(fileId)}.jpg`; return createPortal( <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-[300] p-4" onClick={onClose}> <img src={imgPng} alt={card.name} className="max-w-full max-h-full h-auto w-auto object-contain rounded-xl shadow-2xl" onClick={(e) => e.stopPropagation()} onError={(e) => { if (!e.currentTarget.src.endsWith('.jpg')) { e.currentTarget.src = imgJpg; } }} /> <button onClick={onClose} className="absolute top-4 right-4 text-white bg-slate-800/50 rounded-full p-2 hover:bg-slate-700"> <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg> </button> </div>, document.body ); }
+function CardDetailModal({ card, onClose }) { if (!card) return null; const encodedImagePath = encodePath(card.imagePath); const fileId = card.id.replace(' - Only#1', ''); 
+  // === 📍 [แก้ไข] ใช้ CARD_BASE_URL ===
+  const imgPng = `${CARD_BASE_URL}/${encodedImagePath}/${encodeURIComponent(fileId)}.png`; 
+  const imgJpg = `${CARD_BASE_URL}/${encodedImagePath}/${encodeURIComponent(fileId)}.jpg`; 
+  return createPortal( <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-[300] p-4" onClick={onClose}> <img src={imgPng} alt={card.name} className="max-w-full max-h-full h-auto w-auto object-contain rounded-xl shadow-2xl" onClick={(e) => e.stopPropagation()} onError={(e) => { if (!e.currentTarget.src.endsWith('.jpg')) { e.currentTarget.src = imgJpg; } }} /> <button onClick={onClose} className="absolute top-4 right-4 text-white bg-slate-800/50 rounded-full p-2 hover:bg-slate-700"> <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg> </button> </div>, document.body ); }
 
 // === DeckViewModal ===
-function DeckViewModal({ isOpen, onClose, deck, rules, onAddCard, onRemoveCard, title }) { const groupedDeck = useMemo(() => { if (!deck) return []; return Object.values(deck.reduce((m, card) => { const key = nameKey(card.name); if (!m[key]) m[key] = { card, count: 0 }; m[key].count++; return m; }, {})).sort((a, b) => a.card.name.localeCompare(b.card.name, 'th')); }, [deck]); if (!isOpen) return null; return createPortal( <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-[400] p-4"> <div className="bg-slate-100 dark:bg-slate-900/70 border border-slate-300 dark:border-emerald-500/30 rounded-xl shadow-2xl w-full h-full flex flex-col"> <header className="flex items-center justify-between p-4 border-b border-slate-300 dark:border-emerald-500/20 shrink-0"> <h2 className="text-2xl font-bold text-slate-900 dark:text-white">{title} ({deck.length} / {rules.size})</h2> <Button onClick={onClose}>Close</Button> </header> <div className="flex-grow overflow-y-auto p-4"> {groupedDeck.length === 0 ? ( <div className="flex items-center justify-center h-full"><p className="text-slate-500 dark:text-slate-400">เด็คนี้ว่างเปล่า</p></div> ) : ( <div className="flex flex-wrap justify-center gap-4"> {groupedDeck.map(({ card, count }) => { const encodedImagePath = encodePath(card.imagePath); const fileId = card.id.replace(' - Only#1', ''); const thumbPng = `/cards/${encodedImagePath}/${encodeURIComponent(fileId)}.png`; const isAtMaxCopies = rules.maxCopiesPerName && count >= rules.maxCopiesPerName; return ( <div key={card.id} className="w-40 flex flex-col items-center"> <img src={thumbPng} alt={card.name} className="w-full rounded-lg shadow-md mb-2" /> <div className="w-full flex items-center justify-around gap-2 bg-slate-200 dark:bg-slate-800/50 p-1 rounded-md"> <button onClick={() => onRemoveCard(card)} className="flex items-center justify-center w-7 h-7 bg-red-700/70 dark:bg-red-800/70 rounded-full hover:bg-red-600 dark:hover:bg-red-700 transition active:scale-95 text-white font-bold text-xl">-</button> <span className="font-bold text-lg text-slate-900 dark:text-white w-6 text-center">{count}</span> <button onClick={() => onAddCard(card)} disabled={isAtMaxCopies} className="flex items-center justify-center w-7 h-7 bg-emerald-700/70 dark:bg-emerald-800/70 rounded-full hover:bg-emerald-600 dark:hover:bg-emerald-700 transition active:scale-95 text-white font-bold text-xl disabled:bg-slate-400 dark:disabled:bg-slate-600 disabled:cursor-not-allowed">+</button> </div> </div> ); })} </div> )} </div> </div> </div>, document.body ); }
+function DeckViewModal({ isOpen, onClose, deck, rules, onAddCard, onRemoveCard, title }) { const groupedDeck = useMemo(() => { if (!deck) return []; return Object.values(deck.reduce((m, card) => { const key = nameKey(card.name); if (!m[key]) m[key] = { card, count: 0 }; m[key].count++; return m; }, {})).sort((a, b) => a.card.name.localeCompare(b.card.name, 'th')); }, [deck]); if (!isOpen) return null; return createPortal( <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-[400] p-4"> <div className="bg-slate-100 dark:bg-slate-900/70 border border-slate-300 dark:border-emerald-500/30 rounded-xl shadow-2xl w-full h-full flex flex-col"> <header className="flex items-center justify-between p-4 border-b border-slate-300 dark:border-emerald-500/20 shrink-0"> <h2 className="text-2xl font-bold text-slate-900 dark:text-white">{title} ({deck.length} / {rules.size})</h2> <Button onClick={onClose}>Close</Button> </header> <div className="flex-grow overflow-y-auto p-4"> {groupedDeck.length === 0 ? ( <div className="flex items-center justify-center h-full"><p className="text-slate-500 dark:text-slate-400">เด็คนี้ว่างเปล่า</p></div> ) : ( <div className="flex flex-wrap justify-center gap-4"> {groupedDeck.map(({ card, count }) => { const encodedImagePath = encodePath(card.imagePath); const fileId = card.id.replace(' - Only#1', ''); 
+  // === 📍 [แก้ไข] ใช้ CARD_BASE_URL ===
+  const thumbPng = `${CARD_BASE_URL}/${encodedImagePath}/${encodeURIComponent(fileId)}.png`; 
+  const isAtMaxCopies = rules.maxCopiesPerName && count >= rules.maxCopiesPerName; return ( <div key={card.id} className="w-40 flex flex-col items-center"> <img src={thumbPng} alt={card.name} className="w-full rounded-lg shadow-md mb-2" /> <div className="w-full flex items-center justify-around gap-2 bg-slate-200 dark:bg-slate-800/50 p-1 rounded-md"> <button onClick={() => onRemoveCard(card)} className="flex items-center justify-center w-7 h-7 bg-red-700/70 dark:bg-red-800/70 rounded-full hover:bg-red-600 dark:hover:bg-red-700 transition active:scale-95 text-white font-bold text-xl">-</button> <span className="font-bold text-lg text-slate-900 dark:text-white w-6 text-center">{count}</span> <button onClick={() => onAddCard(card)} disabled={isAtMaxCopies} className="flex items-center justify-center w-7 h-7 bg-emerald-700/70 dark:bg-emerald-800/70 rounded-full hover:bg-emerald-600 dark:hover:bg-emerald-700 transition active:scale-95 text-white font-bold text-xl disabled:bg-slate-400 dark:disabled:bg-slate-600 disabled:cursor-not-allowed">+</button> </div> </div> ); })} </div> )} </div> </div> </div>, document.body ); }
 
 // =================================================================
 // === 📍 [1] แก้ไข DeckAnalysisModal ให้รับ `showChart`
@@ -673,11 +688,8 @@ function DeckAnalysisModal({ isOpen, onClose, mainDeck, lifeDeck, showAlert, the
         
         const radarData = { labels, datasets: [{ label: 'ศักยภาพเด็ค', data: [earlyGameScore, midGameScore, lateGameScore, offenseScore, defenseScore, utilityScore].map(v => Math.round(Math.min(100, Math.max(0, v || 0)))), backgroundColor: 'rgba(52, 211, 153, 0.2)', borderColor: 'rgb(52, 211, 153)', pointBackgroundColor: 'rgb(52, 211, 153)', pointBorderColor: '#000000ff', pointHoverBackgroundColor: '#000000ff', pointHoverBorderColor: 'rgb(52, 211, 153)' }]};
         
-        // 🛑 [ลบ] radarOptions (Static) ที่เคยอยู่ตรงนี้
-        
         const deckCode = encodeDeckCode(mainDeck, lifeDeck);
         
-        // 🛑 [ลบ] radarOptions ออกจาก return นี้
         return { avgCost, avgPower, avgGem, cardTypes, radarData, deckCode, only1Card, avatars, magics, constructs, otherCards };
     
     }, [mainDeck, lifeDeck, theme]);
@@ -715,7 +727,7 @@ function DeckAnalysisModal({ isOpen, onClose, mainDeck, lifeDeck, showAlert, the
         scales: {
             r: {
                 angleLines: { color: angleLineColor }, // <-- ใช้ตัวแปร
-                grid: { color: gridColor },       // <-- ใช้ตัวแปร
+                grid: { color: gridColor },      // <-- ใช้ตัวแปร
                 pointLabels: { color: labelColor, font: { size: 12 } }, // <-- ใช้ตัวแปร
                 ticks: {
                     color: tickColor,            // <-- ใช้ตัวแปร
@@ -738,7 +750,10 @@ function DeckAnalysisModal({ isOpen, onClose, mainDeck, lifeDeck, showAlert, the
     
     if (!isOpen || !analysis) return null;
 
-    const renderCardSection = (title, cards) => { if (!cards || cards.length === 0) return null; const groupedCards = cards.reduce((acc, card) => { const existing = acc.find(item => item.card.id === card.id); if (existing) { existing.count++; } else { acc.push({ card, count: 1 }); } return acc; }, []); return ( <div className="mt-6"> <h4 className="text-lg font-semibold text-emerald-600 dark:text-emerald-300 border-b border-emerald-500/20 pb-1 mb-3">{title} ({cards.length} ใบ)</h4> <div className="grid grid-cols-[repeat(auto-fit,minmax(6rem,1fr))] gap-2 justify-center"> {groupedCards.map(({ card, count }) => { const encodedImagePath = encodePath(card.imagePath); const fileId = card.id.replace(' - Only#1', ''); const thumbPng = `/cards/${encodedImagePath}/${encodeURIComponent(fileId)}.png`; return ( <div key={card.id} className="relative w-24"> <img src={thumbPng} alt={card.name} className="w-full rounded-md shadow" onError={(e) => { e.currentTarget.src = e.currentTarget.src.replace('.png', '.jpg'); }} /> {count > 1 && ( <div className="absolute -top-2 -right-2 w-5 h-5 flex items-center justify-center bg-amber-500 text-white text-xs font-bold rounded-full border-2 border-white dark:border-slate-800">{count}</div> )} </div> ); })} </div> </div> ); }
+    const renderCardSection = (title, cards) => { if (!cards || cards.length === 0) return null; const groupedCards = cards.reduce((acc, card) => { const existing = acc.find(item => item.card.id === card.id); if (existing) { existing.count++; } else { acc.push({ card, count: 1 }); } return acc; }, []); return ( <div className="mt-6"> <h4 className="text-lg font-semibold text-emerald-600 dark:text-emerald-300 border-b border-emerald-500/20 pb-1 mb-3">{title} ({cards.length} ใบ)</h4> <div className="grid grid-cols-[repeat(auto-fit,minmax(6rem,1fr))] gap-2 justify-center"> {groupedCards.map(({ card, count }) => { const encodedImagePath = encodePath(card.imagePath); const fileId = card.id.replace(' - Only#1', ''); 
+    // === 📍 [แก้ไข] ใช้ CARD_BASE_URL ===
+    const thumbPng = `${CARD_BASE_URL}/${encodedImagePath}/${encodeURIComponent(fileId)}.png`; 
+    return ( <div key={card.id} className="relative w-24"> <img src={thumbPng} alt={card.name} className="w-full rounded-md shadow" onError={(e) => { e.currentTarget.src = e.currentTarget.src.replace('.png', '.jpg'); }} /> {count > 1 && ( <div className="absolute -top-2 -right-2 w-5 h-5 flex items-center justify-center bg-amber-500 text-white text-xs font-bold rounded-full border-2 border-white dark:border-slate-800">{count}</div> )} </div> ); })} </div> </div> ); }
 
     return createPortal( <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-[250] p-4"> <div className="bg-slate-100 dark:bg-slate-900/80 border border-slate-300 dark:border-emerald-500/30 rounded-xl shadow-2xl w-full h-full flex flex-col max-w-7xl max-h-[90vh]"> <header className="flex items-center justify-between p-4 border-b border-slate-300 dark:border-emerald-500/20 shrink-0"> <h2 className="text-2xl font-bold text-slate-900 dark:text-white">ผลลัพธ์การสร้างเด็ค</h2> <Button onClick={onClose}>Close</Button> </header> <div className="flex-grow overflow-hidden grid grid-cols-1 md:grid-cols-3 gap-6 p-6"> <div className="md:col-span-1 flex flex-col gap-6 overflow-y-auto pr-2"> <div> <h3 className="text-xl font-semibold text-amber-600 dark:text-amber-300 border-b border-amber-500/20 pb-1 mb-3">สถิติเด็ค</h3> <div className="grid grid-cols-3 gap-4 text-center"> <div><span className="text-sm text-gray-500 dark:text-gray-400">Avg Cost</span><p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{analysis.avgCost}</p></div> <div><span className="text-sm text-gray-500 dark:text-gray-400">Avg Power</span><p className="text-2xl font-bold text-red-600 dark:text-red-400">{analysis.avgPower}</p></div> <div><span className="text-sm text-gray-500 dark:text-gray-400">Avg Gem</span><p className="text-2xl font-bold text-amber-600 dark:text-amber-400">{analysis.avgGem}</p></div> </div> </div>
         
@@ -751,7 +766,10 @@ function DeckAnalysisModal({ isOpen, onClose, mainDeck, lifeDeck, showAlert, the
           </div>
         )}
 
-    <div> <h3 className="text-xl font-semibold text-amber-600 dark:text-amber-300 border-b border-amber-500/20 pb-1 mb-3">ประเภทการ์ด</h3> <ul className="space-y-1 text-sm text-slate-700 dark:text-gray-300"> {analysis.cardTypes.map(([type, count]) => ( <li key={type} className="flex justify-between"> <span>{type}</span> <span className="text-slate-900 dark:text-white font-semibold">{count} ใบ</span> </li> ))} </ul> </div> <div> <h3 className="text-xl font-semibold text-amber-600 dark:text-amber-300 border-b border-amber-500/20 pb-1 mb-3">รหัส Export</h3> <Button onClick={handleCopyCode} className="w-full"> <CopyIcon /> คัดลอกรหัสเด็ค </Button> </div> </div> <div className="md:col-span-2 overflow-y-auto pr-2 border-l border-slate-300 dark:border-emerald-500/20 pl-6"> <h3 className="text-xl font-semibold text-amber-600 dark:text-amber-300 border-b border-amber-500/20 pb-1 mb-4">การ์ดในเด็ค ({mainDeck.length} ใบ)</h3> {analysis.only1Card && ( <div className="mb-6 flex flex-col items-center"> <h4 className="text-lg font-semibold text-emerald-600 dark:text-emerald-300 mb-3">Only #1</h4> <div className="relative w-36 mx-auto"> <img src={`/cards/${encodePath(analysis.only1Card.imagePath)}/${encodeURIComponent(analysis.only1Card.id.replace(' - Only#1', ''))}.png`} alt={analysis.only1Card.name} className="w-full rounded-md shadow" onError={(e) => { e.currentTarget.src = e.currentTarget.src.replace('.png', '.jpg'); }} /> </div> </div> )} {renderCardSection("Avatar Cards", analysis.avatars)} {renderCardSection("Magic Cards", analysis.magics)} {renderCardSection("Construct Cards", analysis.constructs)} {analysis.otherCards.length > 0 && renderCardSection("Other Cards", analysis.otherCards)} </div> </div> </div> </div>, document.body ); }
+    <div> <h3 className="text-xl font-semibold text-amber-600 dark:text-amber-300 border-b border-amber-500/20 pb-1 mb-3">ประเภทการ์ด</h3> <ul className="space-y-1 text-sm text-slate-700 dark:text-gray-300"> {analysis.cardTypes.map(([type, count]) => ( <li key={type} className="flex justify-between"> <span>{type}</span> <span className="text-slate-900 dark:text-white font-semibold">{count} ใบ</span> </li> ))} </ul> </div> <div> <h3 className="text-xl font-semibold text-amber-600 dark:text-amber-300 border-b border-amber-500/20 pb-1 mb-3">รหัส Export</h3> <Button onClick={handleCopyCode} className="w-full"> <CopyIcon /> คัดลอกรหัสเด็ค </Button> </div> </div> <div className="md:col-span-2 overflow-y-auto pr-2 border-l border-slate-300 dark:border-emerald-500/20 pl-6"> <h3 className="text-xl font-semibold text-amber-600 dark:text-amber-300 border-b border-amber-500/20 pb-1 mb-4">การ์ดในเด็ค ({mainDeck.length} ใบ)</h3> {analysis.only1Card && ( <div className="mb-6 flex flex-col items-center"> <h4 className="text-lg font-semibold text-emerald-600 dark:text-emerald-300 mb-3">Only #1</h4> <div className="relative w-36 mx-auto"> 
+    {/* === 📍 [แก้ไข] ใช้ CARD_BASE_URL === */}
+    <img src={`${CARD_BASE_URL}/${encodePath(analysis.only1Card.imagePath)}/${encodeURIComponent(analysis.only1Card.id.replace(' - Only#1', ''))}.png`} alt={analysis.only1Card.name} className="w-full rounded-md shadow" onError={(e) => { e.currentTarget.src = e.currentTarget.src.replace('.png', '.jpg'); }} /> 
+    </div> </div> )} {renderCardSection("Avatar Cards", analysis.avatars)} {renderCardSection("Magic Cards", analysis.magics)} {renderCardSection("Construct Cards", analysis.constructs)} {analysis.otherCards.length > 0 && renderCardSection("Other Cards", analysis.otherCards)} </div> </div> </div> </div>, document.body ); }
 
 // === Deck List Modal ===
 function DeckListModal({
@@ -1355,9 +1373,75 @@ function CardGrid({ cards, onDoubleClick, onViewDetails, onAddCard }) {
   );
 }
 
-// === Data loading from TXT ===
-async function fetchAllTxt() { let allCards = []; console.log("📦 Reloading cards from TXT..."); for (const pathString of CARD_PATHS) { const encodedPath = encodePath(pathString); const pathParts = typeof pathString === 'string' ? pathString.split('/') : []; const deckName = pathParts[1] || ''; const filename = `cards${deckName}.txt`; const url = `/cards/${encodedPath}/${encodeURIComponent(filename)}`; try { const res = await fetch(url); if (!res.ok) { console.warn(`Could not fetch ${url}. Status: ${res.status}`); continue; } const txt = await res.text(); const data = JSON.parse(txt); if (Array.isArray(data)) { const withPath = data.map(card => ({ ...card, imagePath: pathString, onlyRank: card.id.includes('- Only#1') ? 1 : card.onlyRank })); allCards = allCards.concat(withPath); console.log(`  ✔ ${data.length} from ${pathString}`); } } catch (e) { console.error(`load fail ${url}`, e); } } console.log(`✅ โหลดการ์ดทั้งหมด ${allCards.length} ใบ`); return allCards; }
-const getMagicSubType = (card) => { if (card.type !== 'Magic') { return null; } return card.magicType || 'Normal'; };
+// === 📍 [1] ตัวแปร Config หลัก ===
+// นี่คือ Config ที่ถูกต้องตามโครงสร้างโฟลเดอร์ของคุณ
+// 'imagePath' คือที่อยู่ของ "โฟลเดอร์รูปภาพ"
+// 'dataFile' คือ "ชื่อไฟล์ .txt"
+const CARD_PATHS_CONFIG = [
+  { imagePath: "002.STARTER DECK (SD01 - SD07)/SD01 - ตัวตึงไกรลาส", dataFile: "cardsSD01 - ตัวตึงไกรลาส.txt" },
+  { imagePath: "002.STARTER DECK (SD01 - SD07)/SD02 - วีรบุรุษปากซอย", dataFile: "cardsSD02 - วีรบุรุษปากซอย.txt" },
+  { imagePath: "002.STARTER DECK (SD01 - SD07)/SD03 - นรกก็แค่น้ำพริก", dataFile: "cardsSD03 - นรกก็แค่น้ำพริก.txt" },
+  { imagePath: "002.STARTER DECK (SD01 - SD07)/SD04 - ทหารไก่ชนเขา", dataFile: "cardsSD04 - ทหารไก่ชนเขา.txt" },
+  { imagePath: "002.STARTER DECK (SD01 - SD07)/SD05 - กำเนิดจากน้ำ", dataFile: "cardsSD05 - กำเนิดจากน้ำ.txt" },
+  { imagePath: "002.STARTER DECK (SD01 - SD07)/SD06 - ๖ ประจัญบาน", dataFile: "cardsSD06 - ๖ ประจัญบาน.txt" },
+  { imagePath: "002.STARTER DECK (SD01 - SD07)/SD07 - VS 18 หัวเมือง", dataFile: "cardsSD07 - VS 18 หัวเมือง.txt" },
+
+  { imagePath: "003.BOOSTER (BT01 - BT07)/BT01 - Welcome ตลิ่งชัน", dataFile: "cardsBT01 - Welcome ตลิ่งชัน.txt" },
+  { imagePath: "003.BOOSTER (BT01 - BT07)/BT02 - Attack on เพื่อนบ้าน", dataFile: "cardsBT02 - Attack on เพื่อนบ้าน.txt" },
+  { imagePath: "003.BOOSTER (BT01 - BT07)/BT03 - อมนุษย์ Invasion", dataFile: "cardsBT03 - อมนุษย์ Invasion.txt" },
+  { imagePath: "003.BOOSTER (BT01 - BT07)/BT04 - ความจริง Today", dataFile: "cardsBT04 - ความจริง Today.txt" },
+  { imagePath: "003.BOOSTER (BT01 - BT07)/BT05 - Culture ช๊อต", dataFile: "cardsBT05 - Culture ช๊อต.txt" },
+  { imagePath: "003.BOOSTER (BT01 - BT07)/BT06 - โลกา Amagedon", dataFile: "cardsBT06 - โลกา Amagedon.txt" },
+  { imagePath: "003.BOOSTER (BT01 - BT07)/BT07 - Life of หน่วง", dataFile: "cardsBT07 - Life of หน่วง.txt" },
+
+  { imagePath: "004.COMMUNITY COLLECTION (CC01)/CC01 - Community Collection", dataFile: "cardsCC01 - Community Collection.txt" },
+  { imagePath: "005.SELECTION (SL01)/SL01 - Selection", dataFile: "cardsSL01 - Selection.txt" },
+  { imagePath: "006.ODENYA (ODY1) - REPRINT/ODY1 - Odenya", dataFile: "cardsODY1 - Odenya.txt" }
+];
+
+// === 📍 [2] ฟังก์ชันโหลดข้อมูลที่แก้ไขแล้ว ===
+// ฟังก์ชันนี้จะไปดึงไฟล์ .txt ทั้งหมดจากโฟลเดอร์ "003.BOOSTER..."
+// (ตามที่คุณแจ้งผมในคำสั่งล่าสุด)
+async function fetchAllTxt() { 
+  let allCards = []; 
+  console.log("📦 Reloading cards from TXT..."); 
+
+  // โฟลเดอร์หลักที่เก็บ .txt *ทั้งหมด*
+  const dataFolder = "003.BOOSTER (BT01 - BT07)";
+
+  for (const { imagePath, dataFile } of CARD_PATHS_CONFIG) { 
+
+    // สร้าง Path ไปยังไฟล์ .txt ที่ถูกต้อง (e.g., /cards/003.BOOSTER.../cardsSD01....txt)
+    const url = `${CARD_BASE_URL}/${encodePath(dataFolder)}/${encodeURIComponent(dataFile)}`; 
+
+    try { 
+      const res = await fetch(url); 
+      if (!res.ok) { 
+        console.warn(`Could not fetch ${url}. Status: ${res.status}`); 
+        continue; 
+      } 
+      const txt = await res.text(); 
+      const data = JSON.parse(txt);
+      if (Array.isArray(data)) { 
+        // 'imagePath' คือที่อยู่ของรูปภาพ (ถูกต้องแล้ว)
+        const withPath = data.map(card => ({ ...card, imagePath: imagePath, onlyRank: card.id.includes('- Only#1') ? 1 : card.onlyRank }));
+        allCards = allCards.concat(withPath); 
+        console.log(`  ✔ ${data.length} from ${dataFile} (Image Path: ${imagePath})`); 
+      } 
+    } catch (e) { 
+      console.error(`load fail ${url}`, e); 
+    } 
+  } 
+  console.log(`✅ โหลดการ์ดทั้งหมด ${allCards.length} ใบ`); 
+  return allCards; 
+}
+
+const getMagicSubType = (card) => { 
+  if (card.type !== 'Magic') { 
+    return null; 
+  } 
+  return card.magicType || 'Normal'; 
+};
 
 // === Main App ===
 export default function App() {
@@ -1392,8 +1476,7 @@ export default function App() {
   const allCardTypes = useMemo(() => Array.from(new Set(cardDb.map(c => c.type).filter(Boolean))).sort(), [cardDb]); 
   const allColorTypes = useMemo(() => Array.from(new Set(cardDb.map(c => c.colorType).filter(Boolean))).sort(), [cardDb]); 
   const allRarities = useMemo(() => Array.from(new Set(cardDb.map(c => c.rarity).filter(Boolean))).sort(), [cardDb]); 
-  const allSets = useMemo(() => Array.from(new Set(cardDb.map(c => c.imagePath).filter(Boolean))).sort(), [cardDb]);
-  const [currentPage, setCurrentPage] = useState(1); 
+  const allSets = useMemo(() => Array.from(new Set(CARD_PATHS_CONFIG.map(c => c.imagePath).filter(Boolean))).sort(), []);const [currentPage, setCurrentPage] = useState(1); 
   const PAGE_SIZE = 30;
   const [isSidebarOpen, setIsSidebarOpen] = useState(true); 
   const toggleSidebar = () => setIsSidebarOpen(prev => !prev);
@@ -1569,8 +1652,9 @@ export default function App() {
           {!userProfile ? (
             <div className="flex-1 flex flex-row items-stretch overflow-hidden">
               <div className="w-full max-w-md md:w-96 shrink-0 flex flex-col items-center justify-start p-8 gap-6 bg-white/80 dark:bg-black/80 backdrop-blur-lg overflow-y-auto h-full border-r border-slate-300 dark:border-emerald-700/30">
+                {/* === 📍 [แก้ไข] ใช้ CARD_BASE_URL === */}
                 <img
-                  src="/cards/LOGOBOT.png"
+                  src={`${CARD_BASE_URL}/LOGOBOT.png`}
                   alt="Logo"
                   className="w-32 h-32 object-contain shrink-0"
                   onError={(e) => {
@@ -1756,8 +1840,9 @@ export default function App() {
                       ></div>{" "}
                       <div className="relative z-10 flex flex-col items-center justify-center">
                         {" "}
+                        {/* === 📍 [แก้ไข] ใช้ CARD_BASE_URL === */}
                         <img
-                          src="/cards/LOGOBOT.png"
+                          src={`${CARD_BASE_URL}/LOGOBOT.png`}
                           alt="Battle Of Talingchan Logo"
                           className="w-24 h-24 md:w-28 md:h-28 mb-2 object-contain drop-shadow-lg"
                           onError={(e) => {
