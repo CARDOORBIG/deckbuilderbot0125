@@ -583,7 +583,7 @@ const CardItem = forwardRef(function CardItem({ card, onDoubleClick, onViewDetai
     const imgJpg = `/cards/${encodedImagePath}/${encodeURIComponent(fileId)}.jpg`; 
     
     // 📍
-    // 📍 === [แก้ไข] เปลี่ยน z-50 เป็น z-[80] ตรงนี้ครับ ===
+    // 📍 === [แก้ไข] เปลี่ยน z-50 เป็น z-[80] ตรงนี้ครับ ==
     // 📍
     const hoverClasses = !isAnythingDragging ? 'hover:scale-[1.25] hover:z-[80]' : ''; 
     
