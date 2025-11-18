@@ -12,7 +12,6 @@ import {
   collection, doc, writeBatch, serverTimestamp, getDoc, setDoc,
   query, where, getDocs 
 } from 'firebase/firestore';
-const CARD_BASE_URL = "/cards";
 
 ChartJS.register(RadialLinearScale, PointElement, LineElement, Filler, Tooltip, Legend);
 
@@ -1431,46 +1430,6 @@ function CardGrid({ cards, onDoubleClick, onViewDetails, onAddCard }) {
   );
 }
 
-// === 📍 [1] ตัวแปร Config หลัก ===
-// นี่คือ Config ที่ถูกต้องตามโครงสร้างโฟลเดอร์ของคุณ
-// 'imagePath' คือที่อยู่ของ "โฟลเดอร์รูปภาพ"
-// 'dataFile' คือ "ชื่อไฟล์ .txt"
-const CARD_PATHS_CONFIG = [
-  { imagePath: "002.STARTER DECK (SD01 - SD07)/SD01 - ตัวตึงไกรลาส", dataFile: "cardsSD01 - ตัวตึงไกรลาส.txt" },
-  { imagePath: "002.STARTER DECK (SD01 - SD07)/SD02 - วีรบุรุษปากซอย", dataFile: "cardsSD02 - วีรบุรุษปากซอย.txt" },
-  { imagePath: "002.STARTER DECK (SD01 - SD07)/SD03 - นรกก็แค่น้ำพริก", dataFile: "cardsSD03 - นรกก็แค่น้ำพริก.txt" },
-  { imagePath: "002.STARTER DECK (SD01 - SD07)/SD04 - ทหารไก่ชนเขา", dataFile: "cardsSD04 - ทหารไก่ชนเขา.txt" },
-  { imagePath: "002.STARTER DECK (SD01 - SD07)/SD05 - กำเนิดจากน้ำ", dataFile: "cardsSD05 - กำเนิดจากน้ำ.txt" },
-  { imagePath: "002.STARTER DECK (SD01 - SD07)/SD06 - ๖ ประจัญบาน", dataFile: "cardsSD06 - ๖ ประจัญบาน.txt" },
-  { imagePath: "002.STARTER DECK (SD01 - SD07)/SD07 - VS 18 หัวเมือง", dataFile: "cardsSD07 - VS 18 หัวเมือง.txt" },
-
-  { imagePath: "003.BOOSTER (BT01 - BT07)/BT01 - Welcome ตลิ่งชัน", dataFile: "cardsBT01 - Welcome ตลิ่งชัน.txt" },
-  { imagePath: "003.BOOSTER (BT01 - BT07)/BT02 - Attack on เพื่อนบ้าน", dataFile: "cardsBT02 - Attack on เพื่อนบ้าน.txt" },
-  { imagePath: "003.BOOSTER (BT01 - BT07)/BT03 - อมนุษย์ Invasion", dataFile: "cardsBT03 - อมนุษย์ Invasion.txt" },
-  { imagePath: "003.BOOSTER (BT01 - BT07)/BT04 - ความจริง Today", dataFile: "cardsBT04 - ความจริง Today.txt" },
-  { imagePath: "003.BOOSTER (BT01 - BT07)/BT05 - Culture ช๊อต", dataFile: "cardsBT05 - Culture ช๊อต.txt" },
-  { imagePath: "003.BOOSTER (BT01 - BT07)/BT06 - โลกา Amagedon", dataFile: "cardsBT06 - โลกา Amagedon.txt" },
-  { imagePath: "003.BOOSTER (BT01 - BT07)/BT07 - Life of หน่วง", dataFile: "cardsBT07 - Life of หน่วง.txt" },
-
-  { imagePath: "004.COMMUNITY COLLECTION (CC01)/CC01 - Community Collection", dataFile: "cardsCC01 - Community Collection.txt" },
-  { imagePath: "005.SELECTION (SL01)/SL01 - Selection", dataFile: "cardsSL01 - Selection.txt" },
-  { imagePath: "006.ODENYA (ODY1) - REPRINT/ODY1 - Odenya", dataFile: "cardsODY1 - Odenya.txt" }
-];
-
-// === 📍 [2] ฟังก์ชันโหลดข้อมูลที่แก้ไขแล้ว ===
-// ฟังก์ชันนี้จะไปดึงไฟล์ .txt ทั้งหมดจากโฟลเดอร์ "003.BOOSTER..."
-// (ตามที่คุณแจ้งผมในคำสั่งล่าสุด)
-async function fetchAllTxt() { 
-  let allCards = []; 
-  console.log("📦 Reloading cards from TXT..."); 
-
-  // โฟลเดอร์หลักที่เก็บ .txt *ทั้งหมด*
-  const dataFolder = "003.BOOSTER (BT01 - BT07)";
-
-  for (const { imagePath, dataFile } of CARD_PATHS_CONFIG) { 
-
-    // สร้าง Path ไปยังไฟล์ .txt ที่ถูกต้อง (e.g., /cards/003.BOOSTER.../cardsSD01....txt)
-    const url = `${CARD_BASE_URL}/${encodePath(dataFolder)}/${encodeURIComponent(dataFile)}`; 
 // 📍 [แก้ไข] วางทับตัวแปร CARD_PATHS เดิม
 
 const CARD_PATHS = [
@@ -1564,21 +1523,13 @@ async function fetchAllTxt() {
         continue; 
       } 
       const txt = await res.text(); 
-
-      const data = JSON.parse(txt);
-      if (Array.isArray(data)) { 
-        // 'imagePath' คือที่อยู่ของรูปภาพ (ถูกต้องแล้ว)
-        const withPath = data.map(card => ({ ...card, imagePath: imagePath, onlyRank: card.id.includes('- Only#1') ? 1 : card.onlyRank }));
-        allCards = allCards.concat(withPath); 
-        console.log(`  ✔ ${data.length} from ${dataFile} (Image Path: ${imagePath})`); 
-
       const data = JSON.parse(txt); //
       if (Array.isArray(data)) { 
         // นี่คือส่วนที่กำหนด Path ของ "รูปภาพ"
         const withPath = data.map(card => ({ ...card, imagePath: pathString, onlyRank: card.id.includes('- Only#1') ? 1 : card.onlyRank })); //
         allCards = allCards.concat(withPath); 
         console.log(`  ✔ ${data.length} from ${pathString} (File: ${filename})`); 
-    } 
+      } 
     } catch (e) { 
       console.error(`load fail ${url}`, e); 
     } 
@@ -1627,7 +1578,8 @@ export default function App() {
   const allCardTypes = useMemo(() => Array.from(new Set(cardDb.map(c => c.type).filter(Boolean))).sort(), [cardDb]); 
   const allColorTypes = useMemo(() => Array.from(new Set(cardDb.map(c => c.colorType).filter(Boolean))).sort(), [cardDb]); 
   const allRarities = useMemo(() => Array.from(new Set(cardDb.map(c => c.rarity).filter(Boolean))).sort(), [cardDb]); 
-  const allSets = useMemo(() => Array.from(new Set(CARD_PATHS_CONFIG.map(c => c.imagePath).filter(Boolean))).sort(), []);const [currentPage, setCurrentPage] = useState(1); 
+  const allSets = useMemo(() => Array.from(new Set(cardDb.map(c => c.imagePath).filter(Boolean))).sort(), [cardDb]);
+  const [currentPage, setCurrentPage] = useState(1); 
   const PAGE_SIZE = 30;
   const [isSidebarOpen, setIsSidebarOpen] = useState(true); 
   const toggleSidebar = () => setIsSidebarOpen(prev => !prev);
@@ -2154,7 +2106,7 @@ export default function App() {
                 onClose={() => setIsSettingsOpen(false)}
                 userProfile={displayUser}
                 onEditProfile={() => setIsProfileModalOpen(true)}
-                onLogout={handleLogout}
+                onLogout={handleLogout}ง
                 theme={theme}
                 setTheme={setTheme}
               />
