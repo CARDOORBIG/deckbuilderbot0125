@@ -986,7 +986,7 @@
     "lifeEligible": false
   },
   {
-    "id": "CC01-045 (MAGIC) - (SR) - 2 Copies Max.jpg",
+    "id": "CC01-045 (MAGIC) - (SR) - 2 Copies Max",
     "name": "กฏร้าน",
     "type": "Magic",
     "magicType": "React",
@@ -994,7 +994,7 @@
     "rarity": "SR",
     "gem": 2,
     "text": "เมื่อทั้ง 2 ฝ่าย ควบคุม Avatar บน Avatar Zone : แสดงการ์ดใบล่างสุดของ Deck แต่ละฝ่าย ให้นำ Cost ของ Avatar ที่แสดงมาเทียบกัน ถ้าไม่ใช่การ์ด Avatar จะถือว่าค่า Cost เป็น 0 ฝ่ายไหนที่มี Cost เยอะกว่า ได้สิทธิ์ เลือกปฏิบัติ :\n1) สั่ง Avatar 1 ใบ บน Avatar Zone ฝ่ายตรงข้าม ลงนรก\n2) นำ Avatar 1 ใบ บนสนามกลับเข้า Deck เจ้าของ แล้วสับ หากเท่ากันจะไม่มีผลใดเกิดขึ้น",
-    "image": "CC01-045 (MAGIC) - (SR) - 2 Copies Max.jpg",
+    "image": "CC01-045 (MAGIC) - (SR) - 2 Copies Max",
     "lifeEligible": false
   },
   {
@@ -1022,7 +1022,7 @@
     "lifeEligible": false
   },
   {
-    "id": "CC01-048 (MAGIC) - (SCR) - 1 Copies Max.jpg",
+    "id": "CC01-048 (MAGIC) - (SCR) - 1 Copies Max",
     "name": "น้ำซุปชาบู",
     "type": "Magic",
     "magicType": "Modification",
@@ -1030,11 +1030,11 @@
     "rarity": "SCR",
     "gem": 2,
     "text": "Avatar ที่สวมใส่การ์ดใบนี้ POWER +3\nเมื่อ Avatar ที่สวมใส่การ์ดใบนี้โจมตี หลังจากโจมตี จนกว่าจะจบ End Phase ถัดไปของเราจะไม่เปลี่ยนเป็นสภาพตื่นทุกกรณี",
-    "image": "CC01-048 (MAGIC) - (SCR) - 1 Copies Max.jpg",
+    "image": "CC01-048 (MAGIC) - (SCR) - 1 Copies Max",
     "lifeEligible": false
   },
   {
-    "id": "CC01-048 (MAGIC) - (SR) - 1 Copies Max.jpg",
+    "id": "CC01-048 (MAGIC) - (SR) - 1 Copies Max",
     "name": "น้ำซุปชาบู",
     "type": "Magic",
     "magicType": "Modification",
@@ -1042,11 +1042,11 @@
     "rarity": "SR",
     "gem": 2,
     "text": "Avatar ที่สวมใส่การ์ดใบนี้ POWER +3\nเมื่อ Avatar ที่สวมใส่การ์ดใบนี้โจมตี หลังจากโจมตี จนกว่าจะจบ End Phase ถัดไปของเราจะไม่เปลี่ยนเป็นสภาพตื่นทุกกรณี",
-    "image": "CC01-048 (MAGIC) - (SR) - 1 Copies Max.jpg",
+    "image": "CC01-048 (MAGIC) - (SR) - 1 Copies Max",
     "lifeEligible": false
   },
   {
-    "id": "CC01-049 (MAGIC) - (SR) - 1 Copies Max.jpg",
+    "id": "CC01-049 (MAGIC) - (SR) - 1 Copies Max",
     "name": "Micro Plaza สะพานพลาสติก",
     "type": "Magic",
     "magicType": "Land",
@@ -1054,11 +1054,11 @@
     "rarity": "SR",
     "gem": 1,
     "text": "เทิร์นละครั้งใน Main Phase : สามารถ ทิ้งการ์ดจากบนมือ 1 ใบ นำ Modification Magic 1 ใบ จากใน Deck ฝ่ายเราขึ้นมือ จากนั้นสับ Deck",
-    "image": "CC01-049 (MAGIC) - (SR) - 1 Copies Max.jpg",
+    "image": "CC01-049 (MAGIC) - (SR) - 1 Copies Max",
     "lifeEligible": false
   },
   {
-    "id": "CC01-050 (MAGIC) - (SR) - 1 Copies Max.jpg",
+    "id": "CC01-050 (MAGIC) - (SR) - 1 Copies Max",
     "name": "SD Plaza สายเหนือเก่า",
     "type": "Magic",
     "magicType": "Land",
@@ -1066,11 +1066,11 @@
     "rarity": "SR",
     "gem": 1,
     "text": "เทิร์นละครั้ง เลือกปฏิบัติ\n1) ทิ้งการ์ดจากบนมือเรา 1 ใบ : สอดแนม Deck ฝ่ายเรา 3 ใบ เลือก Avatar 1 ใบ จากการ์ดที่ สอดแนม มาวางไว้ที่ Magic Zone ฝ่ายเราในสภาพตื่น การ์ดที่เหลือไว้ใต้ Deck\n2) เลือก Avatar ใน Magic Zone ฝ่ายเรา 1 ใบ : อัญเชิญการ์ดใบนั้น มาบน Avatar Zone ฝ่ายเราในสภาพตื่น",
-    "image": "CC01-050 (MAGIC) - (SR) - 1 Copies Max.jpg",
+    "image": "CC01-050 (MAGIC) - (SR) - 1 Copies Max",
     "lifeEligible": false
   },
   {
-    "id": "CC01-051 (MAGIC) - (UR) - 1 Copies Max.jpg",
+    "id": "CC01-051 (MAGIC) - (UR) - 1 Copies Max",
     "name": "สมชายห้องเช่าพันล้าน",
     "type": "Magic",
     "magicType": "Land",
@@ -1078,7 +1078,7 @@
     "rarity": "UR",
     "gem": 2,
     "text": "เทิร์นละครั้งใน Main Phase สามารถทิ้งการ์ดจากมือ 1 ใบ :\nสามารถอัญเชิญ Avatar \"เสาพงศล\" 1 ใบ จากใน Deck ลง Avatar Zone จากนั้นสับ Deck\nก่อนเริ่ม Main Phase จั่วการ์ดตามจำนวนการ์ด \"เสาพงศล\" ที่อยู่บนสนามของเราใบละ 1 ใบ",
-    "image": "CC01-051 (MAGIC) - (UR) - 1 Copies Max.jpg",
+    "image": "CC01-051 (MAGIC) - (UR) - 1 Copies Max",
     "lifeEligible": false
   },
   {
@@ -1094,7 +1094,7 @@
     "lifeEligible": false
   },
   {
-    "id": "CC01-053 (MAGIC) - (SR) - 2 Copies Max.jpg",
+    "id": "CC01-053 (MAGIC) - (SR) - 2 Copies Max",
     "name": "ไม้เกาหลัง",
     "type": "Magic",
     "magicType": "Modification",
@@ -1142,7 +1142,7 @@
     "lifeEligible": false
   },
   {
-    "id": "CC01-056 (MAGIC) - (UR) - 2 Copies Max.jpg",
+    "id": "CC01-056 (MAGIC) - (UR) - 2 Copies Max",
     "name": "ความเจริญ",
     "type": "Magic",
     "magicType": "Normal",
@@ -1180,7 +1180,7 @@
     "lifeEligible": false
   },
   {
-    "id": "CC01-058 (MAGIC) - (SCR) - 1 Copies Max.jpg",
+    "id": "CC01-058 (MAGIC) - (SCR) - 1 Copies Max",
     "name": "ริกกี้ นักปลอมแปลง",
     "type": "Magic",
     "magicType": "React",
@@ -1192,7 +1192,7 @@
     "lifeEligible": false
   },
   {
-    "id": "CC01-058 (MAGIC) - (SR) - 1 Copies Max.jpg",
+    "id": "CC01-058 (MAGIC) - (SR) - 1 Copies Max",
     "name": "ริกกี้ นักปลอมแปลง",
     "type": "Magic",
     "magicType": "React",
