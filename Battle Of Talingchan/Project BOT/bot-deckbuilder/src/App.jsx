@@ -10,7 +10,7 @@ import { Link } from 'react-router-dom';
 import { db } from './firebase';
 import { 
   collection, doc, writeBatch, serverTimestamp, getDoc, setDoc,
-  query, where, getDocs 
+  query, where, getDocs, addDoc // <--- เพิ่มตัวนี้
 } from 'firebase/firestore';
 const CARD_BASE_URL = "/cards";
 
@@ -38,7 +38,7 @@ const ImageIcon = () => <Svg p={<><rect x="3" y="3" width="18" height="18" rx="2
 const SunIcon = () => <Svg p={<><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></>} />;
 const MoonIcon = () => <Svg p={<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>} />;
 const ClearIcon = TrashIcon;
-
+const MessageIcon = () => <Svg p={<><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></>} />;
 // === UI helpers ===
 const Button = ({ className = "", children, ...props }) => (
   <button
@@ -200,7 +200,96 @@ const ProfileSetupModal = ({ isOpen, onClose, userProfile, onSave }) => {
   const [avatarUrl, setAvatarUrl] = useState(userProfile?.picture || "");
   const [useGoogleAvatar, setUseGoogleAvatar] = useState(true);
   const fileInputRef = useRef(null);
+  // 🟢 [เพิ่ม] FeedbackModal Component
+  const FeedbackModal = ({ isOpen, onClose, userProfile, showAlert }) => {
+  const [text, setText] = useState("");
+  const [type, setType] = useState("suggestion");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
+  if (!isOpen) return null;
+
+  const handleSubmit = async () => {
+    if (!text.trim()) return showAlert("ข้อความว่างเปล่า", "กรุณากรอกข้อความก่อนส่งครับ");
+    
+    setIsSubmitting(true);
+    try {
+      await addDoc(collection(db, "feedbacks"), {
+        text: text.trim(),
+        type: type,
+        user: userProfile ? { 
+          name: userProfile.name, 
+          email: userProfile.email, 
+          uid: userProfile.email 
+        } : "Anonymous",
+        createdAt: serverTimestamp(),
+        status: "new",
+        version: "1.0"
+      });
+      
+      showAlert("ขอบคุณครับ! 🙏", "เราได้รับข้อมูลของท่านแล้ว ทีมงานจะนำไปปรับปรุงให้ดียิ่งขึ้น");
+      setText("");
+      onClose();
+    } catch (e) {
+      console.error("Feedback error: ", e);
+      showAlert("เกิดข้อผิดพลาด", "ไม่สามารถส่งข้อมูลได้ โปรดลองใหม่ภายหลัง");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return createPortal(
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-[650] p-4">
+      <div className="bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-emerald-500/30 rounded-xl shadow-2xl p-6 w-full max-w-md">
+        <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+          <MessageIcon /> ติดต่อผู้พัฒนา / แจ้งปัญหา
+        </h2>
+        
+        <div className="space-y-4">
+          <div>
+            <label className="text-sm text-slate-600 dark:text-gray-400 mb-1 block">หัวข้อเรื่อง</label>
+            <select 
+              value={type} 
+              onChange={(e) => setType(e.target.value)}
+              className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 outline-none"
+            >
+              <option value="suggestion">💡 เสนอแนะ / ฟีดแบค</option>
+              <option value="bug">🐛 แจ้งบั๊ก / ปัญหาการใช้งาน</option>
+              <option value="other">💬 อื่นๆ</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="text-sm text-slate-600 dark:text-gray-400 mb-1 block">รายละเอียด</label>
+            <textarea
+              rows="4"
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              placeholder="เล่าให้เราฟังหน่อยครับ..."
+              className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-emerald-500 outline-none resize-none"
+            />
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-3 mt-6">
+          <Button 
+            onClick={onClose} 
+            className="bg-slate-200 dark:bg-slate-800 border-slate-300 dark:border-slate-600 text-slate-600 dark:text-gray-400 hover:bg-slate-300 dark:hover:bg-slate-700"
+          >
+            ยกเลิก
+          </Button>
+          <Button 
+            onClick={handleSubmit} 
+            disabled={isSubmitting}
+            className="bg-emerald-600 text-white hover:bg-emerald-500 border-none shadow-lg"
+          >
+            {isSubmitting ? "กำลังส่ง..." : "ส่งข้อความ"}
+          </Button>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+};
   useEffect(() => {
     if (isOpen) {
       setNickname(userProfile?.name || "");
@@ -337,6 +426,7 @@ const SettingsDrawer = ({
   onLogout,
   theme,
   setTheme,
+  onOpenFeedback, // <--- 🟢 [4.1] เพิ่มบรรทัดนี้ในวงเล็บรับค่า
 }) => {
   return (
     <>
@@ -415,9 +505,19 @@ const SettingsDrawer = ({
               </Button>
             </div>
           </div>
-          {/* === [สิ้นสุด] === */}
+          {/* จบส่วนธีม */}
         </div>
-
+                <div className="w-full pt-4 mt-4 border-t border-slate-200 dark:border-emerald-700/20">
+            <Button
+                onClick={() => {
+                    onOpenFeedback();
+                    onClose();
+                }}
+                className="w-full bg-amber-100 dark:bg-amber-900/20 border-amber-300 dark:border-amber-500/30 text-amber-800 dark:text-amber-400 hover:bg-amber-200 dark:hover:bg-amber-800/30"
+            >
+                <MessageIcon /> ติดต่อ / แจ้งปัญหา
+            </Button>
+          </div>
         <div className="mt-auto p-6 border-t border-slate-200 dark:border-emerald-700/20">
           <Button
             onClick={onLogout}
@@ -657,9 +757,98 @@ const DeckTray = forwardRef(function DeckTray(
   );
 });
 
+const FeedbackModal = ({ isOpen, onClose, userProfile, showAlert }) => {
+  const [text, setText] = useState("");
+  const [type, setType] = useState("suggestion"); // suggestion, bug, other
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  if (!isOpen) return null;
+
+  const handleSubmit = async () => {
+    if (!text.trim()) return showAlert("ข้อความว่างเปล่า", "กรุณากรอกข้อความก่อนส่งครับ");
+    
+    setIsSubmitting(true);
+    try {
+      await addDoc(collection(db, "feedbacks"), {
+        text: text.trim(),
+        type: type,
+        user: userProfile ? { 
+          name: userProfile.name, 
+          email: userProfile.email, 
+          uid: userProfile.email // ใช้อีเมลแทน ID ชั่วคราวตามโครงสร้างเดิม
+        } : "Anonymous",
+        createdAt: serverTimestamp(),
+        status: "new", // สถานะสำหรับ Admin (new, read, fixed)
+        version: "1.0" // ใส่เลขเวอร์ชันแอปเผื่อไว้ดูว่าบั๊กมาจากเวอร์ชันไหน
+      });
+      
+      showAlert("ขอบคุณครับ! 🙏", "เราได้รับข้อมูลของท่านแล้ว ทีมงานจะนำไปปรับปรุงให้ดียิ่งขึ้น");
+      setText("");
+      onClose();
+    } catch (e) {
+      console.error("Feedback error: ", e);
+      showAlert("เกิดข้อผิดพลาด", "ไม่สามารถส่งข้อมูลได้ โปรดลองใหม่ภายหลัง");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return createPortal(
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-[650] p-4">
+      <div className="bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-emerald-500/30 rounded-xl shadow-2xl p-6 w-full max-w-md">
+        <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+          <MessageIcon /> ติดต่อผู้พัฒนา / แจ้งปัญหา
+        </h2>
+        
+        <div className="space-y-4">
+          <div>
+            <label className="text-sm text-slate-600 dark:text-gray-400 mb-1 block">หัวข้อเรื่อง</label>
+            <select 
+              value={type} 
+              onChange={(e) => setType(e.target.value)}
+              className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 outline-none"
+            >
+              <option value="suggestion">💡 เสนอแนะ / ฟีดแบค</option>
+              <option value="bug">🐛 แจ้งบั๊ก / ปัญหาการใช้งาน</option>
+              <option value="other">💬 อื่นๆ</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="text-sm text-slate-600 dark:text-gray-400 mb-1 block">รายละเอียด</label>
+            <textarea
+              rows="4"
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              placeholder="เล่าให้เราฟังหน่อยครับ..."
+              className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-emerald-500 outline-none resize-none"
+            />
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-3 mt-6">
+          <Button 
+            onClick={onClose} 
+            className="bg-slate-200 dark:bg-slate-800 border-slate-300 dark:border-slate-600 text-slate-600 dark:text-gray-400 hover:bg-slate-300 dark:hover:bg-slate-700"
+          >
+            ยกเลิก
+          </Button>
+          <Button 
+            onClick={handleSubmit} 
+            disabled={isSubmitting}
+            className="bg-emerald-600 text-white hover:bg-emerald-500 border-none shadow-lg"
+          >
+            {isSubmitting ? "กำลังส่ง..." : "ส่งข้อความ"}
+          </Button>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+};
+
 // === CardDetailModal ===
 function CardDetailModal({ card, onClose }) { if (!card) return null; const encodedImagePath = encodePath(card.imagePath); const fileId = card.id.replace(' - Only#1', ''); const imgPng = `/cards/${encodedImagePath}/${encodeURIComponent(fileId)}.png`; const imgJpg = `/cards/${encodedImagePath}/${encodeURIComponent(fileId)}.jpg`; return createPortal( <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-[300] p-4" onClick={onClose}> <img src={imgPng} alt={card.name} className="max-w-full max-h-full h-auto w-auto object-contain rounded-xl shadow-2xl" onClick={(e) => e.stopPropagation()} onError={(e) => { if (!e.currentTarget.src.endsWith('.jpg')) { e.currentTarget.src = imgJpg; } }} /> <button onClick={onClose} className="absolute top-4 right-4 text-white bg-slate-800/50 rounded-full p-2 hover:bg-slate-700"> <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg> </button> </div>, document.body ); }
-
 // === DeckViewModal ===
 function DeckViewModal({ isOpen, onClose, deck, rules, onAddCard, onRemoveCard, title }) {
   const groupedDeck = useMemo(() => {
@@ -829,7 +1018,12 @@ function DeckAnalysisModal({ isOpen, onClose, mainDeck, lifeDeck, showAlert, the
 
     <div> <h3 className="text-xl font-semibold text-amber-600 dark:text-amber-300 border-b border-amber-500/20 pb-1 mb-3">ประเภทการ์ด</h3> <ul className="space-y-1 text-sm text-slate-700 dark:text-gray-300"> {analysis.cardTypes.map(([type, count]) => ( <li key={type} className="flex justify-between"> <span>{type}</span> <span className="text-slate-900 dark:text-white font-semibold">{count} ใบ</span> </li> ))} </ul> </div> <div> <h3 className="text-xl font-semibold text-amber-600 dark:text-amber-300 border-b border-amber-500/20 pb-1 mb-3">รหัส Export</h3> <Button onClick={handleCopyCode} className="w-full"> <CopyIcon /> คัดลอกรหัสเด็ค </Button> </div> </div> <div className="md:col-span-2 overflow-y-auto pr-2 border-l border-slate-300 dark:border-emerald-500/20 pl-6"> <h3 className="text-xl font-semibold text-amber-600 dark:text-amber-300 border-b border-amber-500/20 pb-1 mb-4">การ์ดในเด็ค ({mainDeck.length} ใบ)</h3> {analysis.only1Card && ( <div className="mb-6 flex flex-col items-center"> <h4 className="text-lg font-semibold text-emerald-600 dark:text-emerald-300 mb-3">Only #1</h4> <div className="relative w-36 mx-auto"> <img src={`/cards/${encodePath(analysis.only1Card.imagePath)}/${encodeURIComponent(analysis.only1Card.id.replace(' - Only#1', ''))}.png`} alt={analysis.only1Card.name} className="w-full rounded-md shadow" onError={(e) => { e.currentTarget.src = e.currentTarget.src.replace('.png', '.jpg'); }} /> </div> </div> )} {renderCardSection("Avatar Cards", analysis.avatars)} {renderCardSection("Magic Cards", analysis.magics)} {renderCardSection("Construct Cards", analysis.constructs)} {analysis.otherCards.length > 0 && renderCardSection("Other Cards", analysis.otherCards)} </div> </div> </div> </div>, document.body ); }
 
-// === Deck List Modal ===
+// ... (ส่วน import ด้านบนไฟล์ App.jsx คงเดิม)
+
+// ---------------------------------------------------------
+// ค้นหา function DeckListModal ในไฟล์ App.jsx แล้วแทนที่ด้วยโค้ดนี้
+// ---------------------------------------------------------
+
 function DeckListModal({
   isOpen,
   onClose,
@@ -936,7 +1130,6 @@ function DeckListModal({
     setImportingSlot(null);
   };
 
-  // [แก้ไข] เพิ่มฟังก์ชัน handleClearSlot เพื่อลบเด็คใน Slot
   const handleClearSlot = (index) => {
     setModal({
         title: "Clear Slot",
@@ -953,74 +1146,124 @@ function DeckListModal({
     });
   };
 
-const handleShareDeck = async (index) => {
-  const slot = slots[index];
-  const only1Card = slot.main.find(c => c.onlyRank === 1);
-  if (!only1Card) {
-    showAlert("ไม่สามารถแชร์ได้", "เด็คของคุณต้องมี 'Only #1' Card (การ์ดหลัก) ก่อนจึงจะแชร์ได้ค่ะ");
-    return;
-  }
+  const performShare = async (slot, only1Card, targetDeckId = null) => {
+    closeModal(); 
+    try {
+      const batch = writeBatch(db);
+      const newDeckRef = targetDeckId 
+        ? doc(db, "publicDecks", targetDeckId) 
+        : doc(collection(db, "publicDecks"));
+        
+      const deckId = newDeckRef.id;
+      const allCardsInDeck = [...slot.main, ...slot.life];
+      const factions = [...new Set(allCardsInDeck.map(c => c.faction).filter(Boolean))];
 
-  setModal({ 
-    isOpen: true,
-    title: "Confirm Share Deck",
-    message: `คุณต้องการแชร์เด็ค "${slot.name}" สู่สาธารณะใช่หรือไม่? (ชื่อและรูปโปรไฟล์ Google ของคุณจะถูกแสดง)`,
-    onConfirm: async () => {
-      closeModal(); 
-      try {
-        const batch = writeBatch(db);
-        const newDeckRef = doc(collection(db, "publicDecks")); 
-        const deckId = newDeckRef.id;
-        const allCardsInDeck = [...slot.main, ...slot.life];
-        const factions = [...new Set(allCardsInDeck.map(c => c.faction).filter(Boolean))];
+      const listData = {
+        deckName: slot.name,
+        only1CardData: {
+          id: only1Card.id,
+          name: only1Card.name,
+          imagePath: only1Card.imagePath,
+        },
+        user: {
+          name: userProfile.name,
+          picture: userProfile.picture,
+          email: userProfile.email,
+        },
+        sharedAt: serverTimestamp(),
+        likeCount: 0,
+        likedBy: [],
+        factions: factions,
+        viewCount: 0
+      };
 
-        const listData = {
-          deckName: slot.name,
-          only1CardData: {
-            id: only1Card.id,
-            name: only1Card.name,
-            imagePath: only1Card.imagePath,
-          },
-          user: {
-            name: userProfile.name,
-            picture: userProfile.picture,
-            email: userProfile.email,
-          },
-          sharedAt: serverTimestamp(),
-          likeCount: 0,
-          likedBy: [],
-          factions: factions,
-          viewCount: 0
-        };
+      const detailData = {
+        mainDeck: slot.main.map(c => c.id),
+        lifeDeck: slot.life.map(c => c.id),
+      };
 
-        const detailData = {
-          mainDeck: slot.main.map(c => c.id),
-          lifeDeck: slot.life.map(c => c.id),
-        };
-
-        batch.set(newDeckRef, listData); 
-        const detailRef = doc(db, "publicDeckDetails", deckId);
-        batch.set(detailRef, detailData);
-        await batch.commit();
-
-        console.log("Deck shared with ID: ", deckId);
-        showAlert("แชร์สำเร็จ!", `เด็ค "${slot.name}" ของคุณถูกแชร์สู่สาธารณะแล้ว!`);
-
-      } catch (e) {
-        console.error("Error adding document: ", e);
-        showAlert("เกิดข้อผิดพลาด", "ไม่สามารถแชร์เด็คได้ โปรดลองอีกครั้ง");
-      }
+      batch.set(newDeckRef, listData); 
+      const detailRef = doc(db, "publicDeckDetails", deckId);
+      batch.set(detailRef, detailData);
       
-    },
-    confirmText: "Confirm Share",
-    confirmIcon: <UploadIcon />
-  });
-};
+      await batch.commit();
+
+      const actionText = targetDeckId ? "เขียนทับเด็คเรียบร้อย!" : "แชร์เด็คสำเร็จ!";
+      showAlert(actionText, `เด็ค "${slot.name}" ของคุณถูกแชร์สู่สาธารณะแล้ว!`);
+
+    } catch (e) {
+      console.error("Error sharing deck: ", e);
+      showAlert("เกิดข้อผิดพลาด", "ไม่สามารถแชร์เด็คได้ โปรดลองอีกครั้ง");
+    }
+  };
+
+  const handleShareDeck = async (index) => {
+    const slot = slots[index];
+    const only1Card = slot.main.find(c => c.onlyRank === 1);
+    
+    if (!only1Card) {
+      showAlert("ไม่สามารถแชร์ได้", "เด็คของคุณต้องมี 'Only #1' Card (การ์ดหลัก) ก่อนจึงจะแชร์ได้ค่ะ");
+      return;
+    }
+
+    try {
+      const q = query(collection(db, "publicDecks"), where("user.email", "==", userProfile.email));
+      const querySnapshot = await getDocs(q);
+      const existingDecks = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+      if (existingDecks.length >= 2) {
+        setModal({
+          isOpen: true,
+          title: "โควตาเต็ม (Max 2 Decks)",
+          message: (
+            <div className="flex flex-col gap-3">
+              <p className="text-slate-700 dark:text-gray-300">
+                คุณแชร์เด็คสาธารณะครบ 2 เด็คแล้ว <br/>
+                กรุณาเลือกเด็คที่ต้องการ <b>เขียนทับ</b>:
+              </p>
+              <div className="flex flex-col gap-2 mt-2">
+                {existingDecks.map(deck => (
+                  <button
+                    key={deck.id}
+                    onClick={() => performShare(slot, only1Card, deck.id)}
+                    className="flex flex-col items-start p-3 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 hover:bg-red-50 dark:hover:bg-red-900/20 hover:border-red-400 transition-all group"
+                  >
+                    <span className="font-bold text-slate-900 dark:text-white group-hover:text-red-600 dark:group-hover:text-red-400">
+                      {deck.deckName}
+                    </span>
+                    <span className="text-xs text-slate-500">
+                      แชร์เมื่อ: {deck.sharedAt?.toDate().toLocaleString('th-TH')}
+                    </span>
+                  </button>
+                ))}
+              </div>
+              <button onClick={closeModal} className="mt-2 text-sm text-slate-500 hover:underline self-center">ยกเลิก</button>
+            </div>
+          ),
+          confirmText: null,
+          onConfirm: null
+        });
+      } else {
+        setModal({ 
+          isOpen: true,
+          title: "Confirm Share Deck",
+          message: `คุณต้องการแชร์เด็ค "${slot.name}" สู่สาธารณะใช่หรือไม่? (ชื่อและรูปโปรไฟล์ Google ของคุณจะถูกแสดง)`,
+          onConfirm: () => performShare(slot, only1Card, null),
+          confirmText: "Confirm Share",
+          confirmIcon: <UploadIcon />
+        });
+      }
+
+    } catch (e) {
+      console.error("Error checking existing decks:", e);
+      showAlert("Error", "ไม่สามารถตรวจสอบข้อมูลเด็คได้");
+    }
+  };
 
   return createPortal(
     <>
       <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-[220] p-4">
-        <div className="bg-slate-100 dark:bg-slate-900/80 border border-slate-300 dark:border-emerald-500/30 rounded-xl shadow-2xl w-full max-w-4xl max-h-[80vh] flex flex-col">
+        <div className="bg-slate-100 dark:bg-slate-900/80 border border-slate-300 dark:border-emerald-500/30 rounded-xl shadow-2xl w-full max-w-4xl max-h-[85vh] flex flex-col">
           <header className="flex items-center justify-between p-4 border-b border-slate-300 dark:border-emerald-500/20 shrink-0">
             <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Deck List Manager</h2>
             <Button onClick={onClose}>Close</Button>
@@ -1034,19 +1277,51 @@ const handleShareDeck = async (index) => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {slots.map((slot, index) => {
                 const deckSize = slot.main.length + slot.life.length;
+
+                // -----------------------------------------------------
+                // ✨ ส่วนที่เพิ่ม: ค้นหาการ์ด Only #1 เพื่อนำมาแสดงรูป
+                // -----------------------------------------------------
+                const only1Card = slot.main.find(c => c.onlyRank === 1);
+                let coverImage = null;
+                if (only1Card) {
+                  const encodedImagePath = encodePath(only1Card.imagePath);
+                  const fileId = only1Card.id.replace(' - Only#1', '');
+                  coverImage = `/cards/${encodedImagePath}/${encodeURIComponent(fileId)}.png`;
+                }
+                // -----------------------------------------------------
+
                 return (
-                  <CardShell key={index} className="flex flex-col gap-4">
+                  <CardShell key={index} className="flex flex-col gap-4 relative overflow-hidden">
+                    
+                    {/* แสดงรูปภาพหน้าปกเด็ค */}
+                    <div className="w-full h-48 bg-slate-200 dark:bg-slate-800 rounded-lg overflow-hidden flex items-center justify-center mb-1 shadow-inner relative group">
+                      {coverImage ? (
+                        <img 
+                          src={coverImage} 
+                          alt="Deck Cover" 
+                          className="h-full w-full object-contain p-2 transition-transform duration-500 group-hover:scale-105"
+                          onError={(e) => e.currentTarget.style.display = 'none'}
+                        />
+                      ) : (
+                        <div className="flex flex-col items-center text-slate-400 dark:text-slate-600">
+                          <span className="text-4xl mb-2">🃏</span>
+                          <span className="text-sm font-medium">No "Only #1" Card</span>
+                        </div>
+                      )}
+                      
+                      {/* Badge จำนวนการ์ด */}
+                      <div className="absolute top-2 right-2 bg-black/60 backdrop-blur-sm text-white text-xs px-2 py-1 rounded-full">
+                        {deckSize} Cards
+                      </div>
+                    </div>
+
                     <input
                       type="text"
                       value={slot.name}
                       onChange={(e) => handleNameChange(index, e.target.value)}
-                      className="w-full px-3 py-2 border border-slate-300 dark:border-emerald-500/30 rounded-lg focus:ring-2 focus:ring-amber-500 focus:outline-none transition bg-white/50 dark:bg-slate-700/50 placeholder-gray-500 dark:placeholder-gray-400 text-slate-900 dark:text-white text-lg font-bold"
+                      className="w-full px-3 py-2 border border-slate-300 dark:border-emerald-500/30 rounded-lg focus:ring-2 focus:ring-amber-500 focus:outline-none transition bg-white/50 dark:bg-slate-700/50 placeholder-gray-500 dark:placeholder-gray-400 text-slate-900 dark:text-white text-lg font-bold text-center"
                     />
                     
-                    <p className="text-sm text-slate-500 dark:text-slate-400">
-                      {deckSize > 0 ? `มี ${slot.main.length} (Main) / ${slot.life.length} (Life) ใบ` : "Slot ว่าง"}
-                    </p>
-
                     <div className="grid grid-cols-2 gap-2">
                       <Button onClick={() => handleLoad(index)} disabled={deckSize === 0} className="bg-emerald-200 dark:bg-emerald-600/30 border-emerald-300 dark:border-emerald-500/30 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-300 dark:hover:bg-emerald-500/50 dark:hover:text-white">
                         Load
@@ -1065,18 +1340,18 @@ const handleShareDeck = async (index) => {
                     </Button>
 
                     <div className="grid grid-cols-3 gap-2">
-                      <Button onClick={() => handleImport(index)}>
-                        <ImportIcon /> Import
+                      <Button onClick={() => handleImport(index)} className="px-2">
+                        <ImportIcon /> <span className="hidden sm:inline">Import</span>
                       </Button>
-                      <Button onClick={() => handleExport(index)} disabled={deckSize === 0}>
-                        <ExportIcon /> Export
+                      <Button onClick={() => handleExport(index)} disabled={deckSize === 0} className="px-2">
+                        <ExportIcon /> <span className="hidden sm:inline">Export</span>
                       </Button>
                       <Button 
                         onClick={() => handleShareDeck(index)} 
                         disabled={deckSize === 0}
-                        className="bg-blue-200 dark:bg-blue-600/30 border-blue-300 dark:border-blue-500/30 text-blue-700 dark:text-blue-300 hover:bg-blue-300 dark:hover:bg-blue-500/50 dark:hover:text-white"
+                        className="bg-blue-200 dark:bg-blue-600/30 border-blue-300 dark:border-blue-500/30 text-blue-700 dark:text-blue-300 hover:bg-blue-300 dark:hover:bg-blue-500/50 dark:hover:text-white px-2"
                       >
-                        <UploadIcon /> Share
+                        <UploadIcon /> <span className="hidden sm:inline">Share</span>
                       </Button>
                     </div>
                     
@@ -1510,32 +1785,40 @@ const CARD_PATHS = [
   // --- [ใหม่] Booster Set (BT01 - BT07) ---
   // (ผมอิงจากรูปและ Path ที่คุณส่งมานะครับ)
   { 
-    path: "003.BOOSTER (BT01 - BT07)/BT01 - Welcome ตลิ่งชัน", 
+    path: "003.BOOSTER (BT01 - BT08)/BT01 - Welcome ตลิ่งชัน", 
     file: "cardsBT01 - Welcome ตลิ่งชัน.txt" // (❗️ ต้องแน่ใจว่าชื่อไฟล์ .txt ตรงกัน)
   },
   { 
-    path: "003.BOOSTER (BT01 - BT07)/BT02 - Attack on เพื่อนบ้าน", 
+    path: "003.BOOSTER (BT01 - BT08)/BT02 - Attack on เพื่อนบ้าน", 
     file: "cardsBT02 - Attack on เพื่อนบ้าน.txt" // (❗️ ต้องแน่ใจว่าชื่อไฟล์ .txt ตรงกัน)
   },
   { 
-    path: "003.BOOSTER (BT01 - BT07)/BT03 - อมนุษย์ Invasion", 
+    path: "003.BOOSTER (BT01 - BT08)/BT03 - อมนุษย์ Invasion", 
     file: "cardsBT03 - อมนุษย์ Invasion.txt" // (❗️ ต้องแน่ใจว่าชื่อไฟล์ .txt ตรงกัน)
   },
   { 
-    path: "003.BOOSTER (BT01 - BT07)/BT04 - ความจริง Today", 
+    path: "003.BOOSTER (BT01 - BT08)/BT04 - ความจริง Today", 
     file: "cardsBT04 - ความจริง Today.txt" // (❗️ ต้องแน่ใจว่าชื่อไฟล์ .txt ตรงกัน)
   },
   { 
-    path: "003.BOOSTER (BT01 - BT07)/BT05 - Culture ช๊อค",
+    path: "003.BOOSTER (BT01 - BT08)/BT05 - Culture ช๊อค",
     file: "cardsBT05 - Culture ช๊อค.txt"  // (❗️ ต้องแน่ใจว่าชื่อไฟล์ .txt ตรงกัน)
   },
   { 
-    path: "003.BOOSTER (BT01 - BT07)/BT06 - โลกา Amagedon", 
+    path: "003.BOOSTER (BT01 - BT08)/BT06 - โลกา Amagedon", 
     file: "cardsBT06 - โลกา Amagedon.txt" // (❗️ ต้องแน่ใจว่าชื่อไฟล์ .txt ตรงกัน)
   },
   { 
-    path: "003.BOOSTER (BT01 - BT07)/BT07 - Life of หน่วง", 
+    path: "003.BOOSTER (BT01 - BT08)/BT07 - Life of หน่วง", 
     file: "cardsBT07 - Life of หน่วง.txt" // (❗️ ต้องแน่ใจว่าชื่อไฟล์ .txt ตรงกัน)
+  },
+  { 
+    path: "003.BOOSTER (BT01 - BT08)/BT08 - เพราะ Warrior is นักรบ", 
+    file: "cardsBT08 - เพราะ Warrior is นักรบ.txt" // (❗️ ต้องแน่ใจว่าชื่อไฟล์ .txt ตรงกัน)
+  },
+  {
+    path: "001.PROMO CARD (PRM0)/PRM0",
+    file: "cardsPRM0.txt"
   },
   {
     path: "005.SELECTION (SL01)/SL01 - Selection",
@@ -1605,7 +1888,7 @@ export default function App() {
   const [mainDeck, setMainDeck] = useLocalStorage("bot-mainDeck-v32-final", []); 
   const [lifeDeck, setLifeDeck] = useLocalStorage("bot-lifeDeck-v32-final", []); 
   const [cardDb, setCardDb] = useLocalStorage("bot-cardDb-v32-final", []);
-  
+  const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
   const [userDecks, setUserDecks] = useLocalStorage("bot-userDecks-v1", {});
   const [isDeckListModalOpen, setIsDeckListModalOpen] = useState(false);
 
@@ -1647,7 +1930,7 @@ export default function App() {
   const [customProfile, setCustomProfile] = useState(null);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-
+  
   const displayUser = useMemo(() => {
     if (!userProfile) return null;
     if (!customProfile) return userProfile;
@@ -2162,7 +2445,15 @@ export default function App() {
                 onLogout={handleLogout}
                 theme={theme}
                 setTheme={setTheme}
+                onOpenFeedback={() => setIsFeedbackOpen(true)} // <--- เพิ่มบรรทัดนี้
               />
+              <FeedbackModal 
+                isOpen={isFeedbackOpen}
+                onClose={() => setIsFeedbackOpen(false)}
+                userProfile={displayUser}
+                showAlert={showAlert}
+              />
+
             </>
           )}
         </div>
