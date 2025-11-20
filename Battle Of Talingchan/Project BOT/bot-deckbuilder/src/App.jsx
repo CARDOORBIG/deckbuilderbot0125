@@ -656,18 +656,22 @@ const CardItem = forwardRef(function CardItem({ card, onDoubleClick, onViewDetai
                     {card.onlyRank === 1 && <Pill className="mt-2 ml-1 bg-amber-500/10 text-amber-600 dark:text-amber-300 border border-amber-500/20">Only #1</Pill>} 
                 </div> 
             </div> 
-            <div className="absolute top-full mt-1 left-0 right-0 z-[60] p-4 bg-white dark:bg-slate-900 rounded-lg shadow-2xl border border-amber-500/50 space-y-2 opacity-0 group-hover:opacity-100 transition-all duration-300 ease-in-out pointer-events-none group-hover:pointer-events-auto max-h-96 overflow-y-auto"> 
-                <div className="grid grid-cols-3 gap-2 text-center"> 
-                    <div><span className="text-base text-emerald-600 dark:text-emerald-400">Cost</span><p className="font-bold text-2xl text-slate-900 dark:text-white">{card.cost ?? '-'}</p></div> 
-                    <div><span className="text-base text-red-600 dark:text-red-400">Power</span><p className="font-bold text-2xl text-slate-900 dark:text-white">{card.power ?? '-'}</p></div> 
-                    <div><span className="text-base text-amber-600 dark:text-amber-400">Gem</span><p className="font-bold text-2xl text-slate-900 dark:text-white">{card.gem ?? '-'}</p></div> 
-                </div> 
-                <div className="pt-2"> 
-                    <p className="text-base text-slate-500 dark:text-gray-400">ฝ่าย: <span className="font-semibold text-slate-700 dark:text-gray-200">{card.faction ?? 'ไม่มี'}</span></p> 
-                    <p className="text-base text-slate-700 dark:text-gray-300 font-light mt-1 break-words">{card.text || 'ไม่มีเอฟเฟ็ค'}</p> 
-                    {card.flavor && ( 
-                        <p className="text-sm text-amber-700/70 dark:text-amber-200/70 italic mt-2 font-light break-words">"{card.flavor}"</p> 
-                    )} 
+            <div 
+                className="hidden lg:block absolute top-full mt-1 left-0 right-0 z-[60] p-4 bg-white dark:bg-slate-900 rounded-lg shadow-2xl border border-amber-500/50 space-y-2 opacity-0 group-hover:opacity-100 transition-all duration-300 ease-in-out pointer-events-none group-hover:pointer-events-auto max-h-96 overflow-y-auto"
+            >
+              <div className="grid grid-cols-3 gap-2 text-center"> 
+                    <div><span className="text-sm text-emerald-600 dark:text-emerald-400">Cost</span><p className="font-bold text-xl text-slate-900 dark:text-white">{card.cost ?? '-'}</p></div> 
+                    <div><span className="text-sm text-red-600 dark:text-red-400">Power</span><p className="font-bold text-xl text-slate-900 dark:text-white">{card.power ?? '-'}</p></div> 
+                    <div><span className="text-sm text-amber-600 dark:text-amber-400">Gem</span><p className="font-bold text-xl text-slate-900 dark:text-white">{card.gem ?? '-'}</p></div> 
+                </div> 
+                
+                {/* 📍 [ปรับ] ลดขนาดฟอนต์สำหรับข้อความหลัก */}
+                <div className="pt-2"> 
+                    <p className="text-sm text-slate-500 dark:text-gray-400">ฝ่าย: <span className="font-semibold text-slate-700 dark:text-gray-200">{card.faction ?? 'ไม่มี'}</span></p> 
+                    <p className="text-sm text-slate-700 dark:text-gray-300 font-light mt-1 break-words">{card.text || 'ไม่มีเอฟเฟ็ค'}</p> 
+                    {card.flavor && ( 
+                        <p className="text-xs text-amber-700/70 dark:text-amber-200/70 italic mt-2 font-light break-words">"{card.flavor}"</p> 
+                    )} 
                 </div> 
             </div> 
         </CardShell> 
@@ -1798,11 +1802,12 @@ function CardGrid({ cards, onDoubleClick, onViewDetails, onAddCard }) {
 
   // แสดงผล grid ของการ์ด
   return (
-    <div className="grid grid-cols-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 2xl:grid-cols-5 gap-x-4 gap-y-8">
-      {cards.map((card, index) => ( // <-- [1] เพิ่ม index
+    // 📍 [แก้ไข Layout]: เริ่มที่ grid-cols-2 และลดช่องว่าง (gap) เพื่อเพิ่มขนาดการ์ด
+    <div className="grid grid-cols-2 gap-x-3 gap-y-6 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 lg:gap-x-4 lg:gap-y-8">
+      {cards.map((card, index) => (
         <CardItem
-          // key ที่รวม id และ index เพื่อให้แน่ใจว่า key ไม่ซ้ำกัน (แม้ว่า card.id ควรจะ unique อยู่แล้ว)
-          key={`${card.id}-${index}`} // <-- [2] แก้ไข key
+          // key ที่รวม id และ index เพื่อให้แน่ใจว่า key ไม่ซ้ำกัน
+          key={`${card.id}-${index}`} 
           card={card}
           onDoubleClick={onDoubleClick}
           onViewDetails={onViewDetails}
@@ -2129,8 +2134,33 @@ export default function App() {
   const removeFromMain = (card) => { const idx = mainDeck.findLastIndex(c => nameKey(c.name) === nameKey(card.name)); if (idx > -1) setMainDeck(prev => prev.filter((_, i) => i !== idx)); };
   const addToLife = (card) => { if (!card.lifeEligible) { showAlert("Invalid Card", `การ์ด "${card.name}" ไม่สามารถใส่ใน Life Deck ได้`); return; }; if (lifeDeck.length >= RULES.life.size) { showAlert("Deck Full", `Life Deck เต็มแล้ว (ใส่ได้ ${RULES.life.size} ใบ)`); return; }; if (!lifeDeck.some(c => nameKey(c.name) === nameKey(card.name))) { setLifeDeck(prev => [...prev, card]); } else { showAlert("Duplicate Card", `การ์ดชื่อ "${card.name}" มีใน Life Deck แล้ว (ชื่อห้ามซ้ำ)`); } };
   const removeFromLife = (card) => { const idx = lifeDeck.findIndex(c => c.id === card.id); if (idx > -1) setLifeDeck(prev => prev.filter((_, i) => i !== idx)); };
-  const handleCardDoubleClick = (card, cardElement) => { if (isAnimating || !cardElement || !mainDeckRef.current) return; if (card.lifeEligible) { showAlert("ไม่สามารถเพิ่มได้", `การ์ด "${card.name}" เป็นการ์ดสำหรับ Life Deck เท่านั้น โปรดลากไปวางใน Life Deck`); return; } setIsAnimating(true); const startRect = cardElement.getBoundingClientRect(); const endRect = mainDeckRef.current.getBoundingClientRect(); setFlyingCard({ card, startRect, endRect }); };
-  const handleAnimationComplete = () => { if (flyingCard) { addToMain(flyingCard.card); setFlyingCard(null); setIsAnimating(false); } };
+  // ใน App.jsx (ประมาณบรรทัดที่ 490)
+// ...
+  const handleCardDoubleClick = (card, cardElement) => { 
+    if (!cardElement || !mainDeckRef.current) return;
+    
+    // 🛑 [ใหม่] Logic: หากมีการ์ดกำลังบินอยู่ และเป็นการ์ดใบเดียวกัน ให้ยุบ/ยกเลิก
+    if (isAnimating && flyingCard?.card?.id === card.id) {
+        setFlyingCard(null); // หยุด Animation / ยุบการ์ด
+        setIsAnimating(false);
+        return; 
+    }
+    
+    if (card.lifeEligible) { 
+      showAlert("ไม่สามารถเพิ่มได้", `การ์ด "${card.name}" เป็นการ์ดสำหรับ Life Deck เท่านั้น โปรดลากไปวางใน Life Deck`); 
+      return; 
+    } 
+    
+    if (card.onlyRank === 1 && mainDeck.some(c => c.onlyRank === 1)) { showAlert("Rule Violation", "You can only have one 'Only #1' card in your Main Deck."); return; } 
+    if (mainDeck.filter(c => nameKey(c.name) === nameKey(card.name)).length >= RULES.main.maxCopiesPerName) { showAlert("Rule Violation", `You cannot have more than ${RULES.main.maxCopiesPerName} copies of "${card.name}".`); return; } 
+    if (mainDeck.length >= RULES.main.size) { showAlert("Deck Full", "Your Main Deck has reached the 50-card limit."); return; } 
+    
+    setIsAnimating(true); 
+    const startRect = cardElement.getBoundingClientRect(); 
+    const endRect = mainDeckRef.current.getBoundingClientRect(); 
+    setFlyingCard({ card, startRect, endRect }); 
+  };
+// ...const handleAnimationComplete = () => { if (flyingCard) { addToMain(flyingCard.card); setFlyingCard(null); setIsAnimating(false); } };
   const handleExportCode = () => { if (mainDeck.length === 0 && lifeDeck.length === 0) { showAlert("Empty Deck", "เด็คของคุณว่างเปล่า ไม่มีอะไรให้ Export"); return; } const code = encodeDeckCode(mainDeck, lifeDeck); navigator.clipboard.writeText(code) .then(() => showAlert("Success!", `✅ คัดลอกรหัสเด็คลง Clipboard แล้ว!`)) .catch(err => { console.error('Failed to copy code: ', err); showAlert("Error", "ไม่สามารถคัดลอกรหัสเด็คได้"); }); };
   const handleImport = () => { setIsImportModalOpen(true); };
   const confirmImport = (code) => { closeImportModal(); if (!code) { return; } const decoded = decodeDeckCode(code, cardDb); if (decoded) { setMainDeck(decoded.main); setLifeDeck(decoded.life); showAlert("Import Success", "นำเข้าเด็คสำเร็จ!"); } else { showAlert("Import Error", "รหัสเด็คไม่ถูกต้อง หรือไม่พบการ์ดบางใบในฐานข้อมูลปัจจุบัน"); } };
@@ -2208,20 +2238,37 @@ export default function App() {
           ) : (
             <>
               <header className="px-4 lg:px-6 py-2 border-b border-slate-300 dark:border-emerald-700/30 bg-white/60 dark:bg-black/60 backdrop-blur-sm shrink-0 z-40">
-                <div className="flex items-center justify-between gap-4">
-                  <div className="flex items-center gap-3">
-                    <button
-                      onClick={() => setIsSettingsOpen(true)}
-                      className="p-2 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-full text-slate-800 dark:text-white transition-colors"
-                    >
-                      <MenuIcon />
-                    </button>
-                    <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight bg-gradient-to-r from-amber-500 to-emerald-600 dark:from-amber-300 dark:to-emerald-400 bg-clip-text text-transparent">
-                      Battle Of Talingchan
-                    </h1>
-                  </div>
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    {/* ปุ่ม MenuIcon ยังอยู่ */}
+                    <button
+                      onClick={() => setIsSettingsOpen(true)}
+                      className="p-2 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-full text-slate-800 dark:text-white transition-colors"
+                    >
+                      <MenuIcon />
+                    </button>
+                    <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight bg-gradient-to-r from-amber-500 to-emerald-600 dark:from-amber-300 dark:to-emerald-400 bg-clip-text text-transparent">
+                      Battle Of Talingchan
+                    </h1>
+                  </div>
 
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3">
+
+                  <div className="md:hidden flex items-center gap-2">
+                        <Button 
+                          onClick={() => setActiveView('cards')} 
+                          className={`px-3 py-1 text-sm ${activeView === 'cards' ? 'bg-emerald-600 text-white' : 'bg-slate-200 dark:bg-slate-700/50 text-slate-700 dark:text-gray-300'}`}
+                        >
+                          <CardsIcon />
+                        </Button>
+                        <Button 
+                          onClick={() => setActiveView('deck')} 
+                          className={`px-3 py-1 text-sm ${activeView === 'deck' ? 'bg-emerald-600 text-white' : 'bg-slate-200 dark:bg-slate-700/50 text-slate-700 dark:text-gray-300'}`}
+                        >
+                          <DeckIcon />
+                        </Button>
+                    </div>
+
                     <Link to="/public-decks">
                       <Button
                         as="span"
