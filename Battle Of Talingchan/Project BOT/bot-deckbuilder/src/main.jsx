@@ -1,8 +1,11 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App.jsx'
-import PublicDecks from './PublicDecks.jsx' // 1. Import หน้าใหม่
+import PublicDecks from './PublicDecks.jsx' // 1. Import Component PublicDecks
 import './index.css'
+
+// 🛑 [แก้ไข] เพิ่ม OpenBrowser เข้ามา (บรรทัดที่ 7)
+import OpenBrowser from './OpenBrowser.jsx' 
 
 import { GoogleOAuthProvider } from "@react-oauth/google";
 import { createBrowserRouter, RouterProvider } from "react-router-dom"; // 2. Import router
@@ -18,6 +21,11 @@ const router = createBrowserRouter([
   {
     path: "/public-decks", // หน้า Public Decks
     element: <PublicDecks />,
+  },
+  // 🟢 [เพิ่ม Route สำหรับ In-App Browser]
+  {
+    path: "/open-browser", 
+    element: <OpenBrowser />,
   },
 ]);
 
