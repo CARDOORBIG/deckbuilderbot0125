@@ -1,53 +1,59 @@
 export default function OpenBrowser() {
-  const ua = navigator.userAgent.toLowerCase();
-  // ใช้ regex เพื่อตรวจหา iOS อย่างแม่นยำขึ้น
-  const isIOS = /iphone|ipad|ipod/.test(ua); 
-  const isAndroid = /android/.test(ua);
+  const ua = navigator.userAgent.toLowerCase();
+  const isIOS = /iphone|ipad|ipod/.test(ua); 
+  const isAndroid = /android/.test(ua);
 
-  // ใช้ window.location.origin เพื่อให้ URL ไม่ซ้ำซ้อน
-  const currentUrl = window.location.origin + window.location.pathname; // เพิ่ม pathname เพื่อให้กลับมาหน้าเดิมได้
+  const currentUrl = window.location.origin + window.location.pathname;
 
-  const handleOpenBrowser = () => {
-    // โค้ดนี้ใช้สำหรับพยายาม Deep Link ไปที่เบราว์เซอร์จริง
-    if (isIOS) {
-      // open Safari
-      // ในบาง IAB การตั้งค่า location.href ใหม่อาจช่วยเปิด Safari ได้
-      window.location.href = currentUrl;
-    } else if (isAndroid) {
-      // open Chrome
-      // ใช้ googlechrome:// เพื่อบังคับเปิดใน Chrome (Deep Link)
-      const targetUrl = currentUrl.replace(/^https?:\/\//, "");
-      window.location.href = `googlechrome://${targetUrl}`;
-    }
-  };
+  const handleOpenBrowser = () => {
+    const targetUrl = currentUrl; // URL ที่ต้องการเปิด
 
-  return (
-    <div style={{ padding: 20, textAlign: "center" }} className="bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-200 h-screen flex flex-col items-center justify-center">
-      <h2 className="text-xl font-bold mb-4">⚠️ โปรดเปิดผ่านเบราว์เซอร์ภายนอก</h2>
-      <p className="text-base mb-6">เพื่อใช้งาน **Google Login** ได้อย่างถูกต้อง</p>
+    if (isIOS) {
+      // 1. iOS: พยายามใช้ window.location.href (พยายามครั้งที่ 1)
+      window.location.href = targetUrl;
 
-      <button
-        onClick={handleOpenBrowser}
-        className="text-white font-semibold transition duration-200 hover:opacity-80"
-        style={{
-          marginTop: 20,
-          padding: "12px 20px",
-          background: "#4285F4", // Google Blue
-          color: "white",
-          borderRadius: 8,
-          fontSize: 16,
-        }}
-      >
-        เปิดในเบราว์เซอร์จริง
-      </button>
+      // เนื่องจาก iOS ปลอดภัยมาก อาจไม่สามารถเปิด Safari ได้เสมอ
+      // เราจึงต้องพึ่งพาคำแนะนำสำรองบนหน้าจอ (ให้ผู้ใช้กดเมนู '...' เอง)
+    } else if (isAndroid) {
+      // 2. Android: ใช้ Intent Scheme เพื่อบังคับเปิดใน Chrome
+      const intentUrl = 
+        "intent://" + 
+        targetUrl.replace(/^https?:\/\//, "") + 
+        "#Intent;scheme=https;package=com.android.chrome;end";
+      
+      window.location.href = intentUrl;
+    }
 
-      <p className="mt-8 text-sm text-slate-500 dark:text-slate-400 max-w-sm">
-        หากเปิดไม่ได้ ให้ลองทำตามขั้นตอนต่อไปนี้:
-        <br/>
-        กด **⋮** หรือ **…** แล้วเลือก 
-        <br/>
-        <b>“Open in Chrome / Safari”</b>
-      </p>
-    </div>
-  );
+    // Fallback: หากยังไม่เด้งไปไหน ให้แสดงคำแนะนำ (ซึ่งมีอยู่แล้วใน UI)
+  };
+
+  return (
+    <div style={{ padding: 20, textAlign: "center" }} className="bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-200 h-screen flex flex-col items-center justify-center">
+      <h2 className="text-xl font-bold mb-4">⚠️ โปรดเปิดผ่านเบราว์เซอร์ภายนอก</h2>
+      <p className="text-base mb-6">เพื่อใช้งาน **Google Login** ได้อย่างถูกต้อง</p>
+
+      <button
+        onClick={handleOpenBrowser}
+        className="text-white font-semibold transition duration-200 hover:opacity-80"
+        style={{
+          marginTop: 20,
+          padding: "12px 20px",
+          background: "#4285F4", // Google Blue
+          color: "white",
+          borderRadius: 8,
+          fontSize: 16,
+        }}
+      >
+        เปิดในเบราว์เซอร์จริง
+      </button>
+
+      <p className="mt-8 text-sm text-slate-500 dark:text-slate-400 max-w-sm">
+        หากเปิดไม่ได้ ให้ลองทำตามขั้นตอนต่อไปนี้:
+        <br/>
+        กด **⋮** หรือ **…** แล้วเลือก 
+        <br/>
+        <b>“Open in Chrome / Safari”</b>
+      </p>
+    </div>
+  );
 }
