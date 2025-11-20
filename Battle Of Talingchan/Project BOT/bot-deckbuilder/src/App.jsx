@@ -709,28 +709,34 @@ const DeckTray = forwardRef(function DeckTray(
       } transition-colors bg-slate-100 dark:bg-slate-900/50`}
     >
       <div ref={dropRef}>
-        <div className="flex items-center justify-between mb-2 gap-2">
-          <h3 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider shrink-0">
-            {title}
-          </h3>
-          {onViewDeck && deck.length > 0 && (
-            <button
-              onClick={onViewDeck}
-              className="text-xs text-amber-600 dark:text-amber-400 hover:text-amber-500 dark:hover:text-amber-200 hover:underline transition"
-            >
-              ดูเด็ค
-            </button>
-          )}
-          <div className="flex-grow text-right">
-            {typeof capacity === "number" && (
-              <span className="text-xs text-slate-600 dark:text-slate-300">
-                {deck.length}
-                {capacity ? ` / ${capacity}` : ""}
-              </span>
-            )}
-          </div>
-        </div>
-        <div className="relative w-full transition-all" style={{ height: `${containerHeight}px` }}>
+  {/* 📍 [แก้ไข] ใช้ justify-between และจัดโครงสร้างใหม่ */}
+  <div className="flex items-center justify-between shrink-0 border-b border-slate-300 dark:border-emerald-700/30 bg-white/40 dark:bg-black/40 p-1 mb-1">
+    <div className="flex items-center gap-2"> {/* 👈 [ใหม่] Group ชื่อและปุ่ม */}
+      <h3 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider shrink-0">
+        {title}
+      </h3>
+      {onViewDeck && deck.length > 0 && (
+        <button
+          onClick={onViewDeck}
+          className="text-xs text-amber-600 dark:text-amber-400 hover:text-amber-500 dark:hover:text-amber-200 hover:underline transition"
+        >
+          ดูเด็ค
+        </button>
+      )}
+    </div>
+    
+    {/* 📍 [ปรับ] ส่วนแสดงจำนวนอยู่ทางขวา */}
+    <div>
+      {typeof capacity === "number" && (
+        <span className="text-xs text-slate-600 dark:text-slate-300">
+          {deck.length}
+          {capacity ? ` / ${capacity}` : ""}
+        </span>
+      )}
+    </div>
+  </div>
+  <div className="relative w-full transition-all" style={{ height: `${containerHeight}px` }}>
+
           {groupedDeck.length === 0 ? (
             <div className="absolute inset-0 flex items-center justify-center text-slate-400 dark:text-slate-500 text-xs">
               ลากการ์ดมาวางที่นี่
@@ -912,9 +918,10 @@ function DeckViewModal({ isOpen, onClose, deck, rules, onAddCard, onRemoveCard, 
           ) : (
             <div className="flex flex-wrap justify-center gap-4">
               {groupedDeck.map(({ card, count }, index) => { // <-- [เพิ่ม] index
-                const encodedImagePath = encodePath(card.imagePath);
-                const fileId = card.id.replace(' - Only#1', '');
-                const thumbPng = `${CARD_BASE_URL}/${encodedImagePath}/${encodeURIComponent(fileId)}.png`;
+                const encodedImagePath = encodePath(card.imagePath);
+                const fileId = card.id.replace(' - Only#1', '');
+                // 📍 [แก้ไข] ใช้ Path สัมบูรณ์แทน CARD_BASE_URL
+                const thumbPng = `/cards/${encodedImagePath}/${encodeURIComponent(fileId)}.png`;
                 const isAtMaxCopies = rules.maxCopiesPerName && count >= rules.maxCopiesPerName;
                 return (
                   <div key={`${card.id}-${index}`} className="w-40 flex flex-col items-center"> {/* <-- [แก้ไข] key */}
@@ -935,6 +942,56 @@ function DeckViewModal({ isOpen, onClose, deck, rules, onAddCard, onRemoveCard, 
     document.body
   );
 }
+
+// 📍 [ใหม่] ฟังก์ชัน Helper: สำหรับแสดงผลส่วนย่อยของการ์ดใน DeckAnalysisModal
+const renderCardSection = (title, cards) => {
+  if (cards.length === 0) return null;
+
+  // ฟังก์ชัน helper สำหรับสร้าง URL รูปภาพ (ใช้ logic เดียวกับ CardItem/DeckTray)
+  const getCardImageURL = (card) => {
+    const encodedImagePath = encodePath(card.imagePath);
+    // ใช้ logic การลบ ' - Only#1' ตามที่คุณได้กำหนดไว้
+    const fileId = card.id.replace(' - Only#1', ''); 
+    // ใช้ Path สัมบูรณ์ /cards/ แทน CARD_BASE_URL
+    return `/cards/${encodedImagePath}/${encodeURIComponent(fileId)}.png`;
+  };
+
+  return (
+    <div className="mb-6">
+      <h4 className="text-lg font-semibold text-emerald-600 dark:text-emerald-300 mb-3 border-b border-dashed border-slate-300 dark:border-slate-700 pb-1">
+        {title} ({cards.length} ใบ)
+      </h4>
+      <div className="flex flex-wrap gap-x-4 gap-y-3">
+        {cards.map((card, index) => (
+          <div key={`${card.id}-${index}`} className="flex items-center gap-2 w-full md:w-[calc(50%-8px)] lg:w-[calc(33.33%-12px)]">
+            
+            {/* รูปย่อของการ์ด */}
+            <img 
+              src={getCardImageURL(card)} 
+              alt={card.name} 
+              className="w-10 h-auto rounded-sm shadow shrink-0" 
+              onError={(e) => { e.currentTarget.src = e.currentTarget.src.replace('.png', '.jpg'); }}
+            />
+
+            {/* รายละเอียด */}
+            <div className="flex flex-col min-w-0">
+              <span className="text-sm font-medium text-slate-900 dark:text-white truncate" title={card.name}>
+                {card.name}
+              </span>
+              <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-gray-400">
+                <span className="font-semibold text-emerald-600 dark:text-emerald-400">C:{card.cost ?? '-'}</span>
+                <span className="font-semibold text-red-600 dark:text-red-400">P:{card.power ?? '-'}</span>
+                <span className="font-semibold text-amber-600 dark:text-amber-400">G:{card.gem ?? '-'}</span>
+                {card.colorType && <ColorPip color={card.colorType} />}
+              </div>
+            </div>
+            
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
 
 // =================================================================
 // === 📍 [1] แก้ไข DeckAnalysisModal ให้รับ `showChart`
@@ -1728,6 +1785,7 @@ function LeftSidebar({
 
 // === Card grid (right) ===
 function CardGrid({ cards, onDoubleClick, onViewDetails, onAddCard }) {
+  // ตรวจสอบว่ามี cards หรือไม่
   if (cards.length === 0) {
     return (
       <CardShell>
@@ -1737,10 +1795,13 @@ function CardGrid({ cards, onDoubleClick, onViewDetails, onAddCard }) {
       </CardShell>
     );
   }
+
+  // แสดงผล grid ของการ์ด
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-x-4 gap-y-8">
+    <div className="grid grid-cols-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 2xl:grid-cols-5 gap-x-4 gap-y-8">
       {cards.map((card, index) => ( // <-- [1] เพิ่ม index
         <CardItem
+          // key ที่รวม id และ index เพื่อให้แน่ใจว่า key ไม่ซ้ำกัน (แม้ว่า card.id ควรจะ unique อยู่แล้ว)
           key={`${card.id}-${index}`} // <-- [2] แก้ไข key
           card={card}
           onDoubleClick={onDoubleClick}
@@ -2191,7 +2252,7 @@ export default function App() {
                 </div>
               </header>
 
-              <main className="flex-1 flex flex-col md:flex-row overflow-hidden">
+              <main className="flex-1 flex flex-col md:flex-row overflow-x-hidden">
                 <div
                   className={` ${
                     activeView === "deck" ? "block" : "hidden"
