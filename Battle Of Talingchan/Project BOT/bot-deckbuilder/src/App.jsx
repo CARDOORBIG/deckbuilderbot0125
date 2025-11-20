@@ -572,6 +572,42 @@ function FlyingCard({ card, startRect, endRect, onComplete }) { const [isAnimati
   return (
     <div style={style} onTransitionEnd={handleTransitionEnd}> <img src={imgSrc} alt={card.name} className="w-full h-full rounded-lg shadow-2xl" /> </div> ); }
 
+// 🟢 [ใหม่] Component ลูกไฟวิ่ง (Effect 1 วินาที)
+const FlyingLight = ({ startRect, endRect, onComplete }) => {
+  const [style, setStyle] = useState({
+    position: 'fixed',
+    top: startRect.top + startRect.height / 2,
+    left: startRect.left + startRect.width / 2,
+    opacity: 1,
+    transform: 'translate(-50%, -50%) scale(1)',
+  });
+
+  useEffect(() => {
+    // เริ่ม Animation ในเฟรมถัดไป
+    requestAnimationFrame(() => {
+      setStyle({
+        position: 'fixed',
+        top: endRect.top + endRect.height / 2,   // วิ่งไปกลางปุ่มเป้าหมาย
+        left: endRect.left + endRect.width / 2, // วิ่งไปกลางปุ่มเป้าหมาย
+        opacity: 0,                             // ค่อยๆ จางหาย
+        transform: 'translate(-50%, -50%) scale(0.2)', // หดเล็กลง
+        transition: 'all 1s cubic-bezier(0.25, 0.46, 0.45, 0.94)' // ⏳ กินเวลา 1 วินาที (ช้าๆ ตามขอ)
+      });
+    });
+
+    // ลบตัวเองเมื่อจบ
+    const timer = setTimeout(onComplete, 1000);
+    return () => clearTimeout(timer);
+  }, []);
+
+  return (
+    <div 
+      className="z-[9999] w-6 h-6 rounded-full bg-amber-400 shadow-[0_0_15px_4px_rgba(251,191,36,0.8)] pointer-events-none"
+      style={style}
+    />
+  );
+};
+
 // === Card component (draggable) ===
 // 🟢 รับ props เพิ่ม: isMobileZoomed และ onMobileClick
 const CardItem = forwardRef(function CardItem({ card, onDoubleClick, onViewDetails, onAddCard, isMobileZoomed, onMobileClick }, ref) { 
@@ -590,7 +626,7 @@ const CardItem = forwardRef(function CardItem({ card, onDoubleClick, onViewDetai
     const hoverClasses = !isAnythingDragging ? 'lg:hover:scale-[1.25] lg:hover:z-[80]' : ''; 
 
     // Logic สำหรับ Mobile Zoom (รับค่าจาก props isMobileZoomed)
-    const mobileZoomClasses = isMobileZoomed ? 'scale-[1.15] z-[100] shadow-2xl border-amber-500/50' : '';
+    const mobileZoomClasses = isMobileZoomed ? 'scale-[1.15] z-[10] shadow-2xl border-amber-500/50' : '';
     
     const handleClick = () => {
         // เช็คว่าเป็นมือถือ/แท็บเล็ตไหม
@@ -622,7 +658,8 @@ const CardItem = forwardRef(function CardItem({ card, onDoubleClick, onViewDetai
                     <EyeIcon /> 
                 </button> 
                 <button 
-                    onClick={(e) => { e.stopPropagation(); onAddCard(card); }} 
+                    // 🟢 แก้ไข: ส่ง e.currentTarget (ตัวปุ่มเอง) กลับไปให้ addToMain
+                    onClick={(e) => { e.stopPropagation(); onAddCard(card, e.currentTarget); }} 
                     className="p-1 lg:p-1.5 bg-emerald-600/80 rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-emerald-500 active:scale-95" title="เพิ่มลงเด็ค"
                 > 
                     <PlusIcon /> 
@@ -943,7 +980,7 @@ function DeckViewModal({ isOpen, onClose, deck, rules, onAddCard, onRemoveCard, 
 }
 
 // =================================================================
-// === 📍 [1] แก้ไข DeckAnalysisModal ให้รับ `showChart`
+// === 📍 [Fixed] DeckAnalysisModal (Full Screen on Mobile) ===
 // =================================================================
 function DeckAnalysisModal({ isOpen, onClose, mainDeck, lifeDeck, showAlert, theme, showChart }) { 
     const analysis = useMemo(() => {
@@ -954,107 +991,193 @@ function DeckAnalysisModal({ isOpen, onClose, mainDeck, lifeDeck, showAlert, the
         const magics = mainDeck.filter(c => c.type === 'Magic').sort((a, b) => a.name.localeCompare(b.name, 'th'));
         const constructs = mainDeck.filter(c => c.type === 'Construction').sort((a, b) => a.name.localeCompare(b.name, 'th'));
         const otherCards = mainDeck.filter(c => c.onlyRank !== 1 && !['Avatar', 'Magic', 'Construction'].includes(c.type)).sort((a, b) => (typeOrder[a.type] || 99) - (typeOrder[b.type] || 99) || a.name.localeCompare(b.name, 'th'));
-        const avgCost = avg(mainDeck.map(c => c.cost)); const avgPower = avg(mainDeck.map(c => c.power)); const avgGem = avg(mainDeck.map(c => c.gem));
-        const typeCounts = countBy(mainDeck, c => c.type); const cardTypes = Object.entries(typeCounts).sort(([a], [b]) => (typeOrder[a] || 99) - (typeOrder[b] || 99));
-        const labels = ['ความไวต้นเกม', 'กลางเกม', 'ท้ายเกม', 'พลังโจมตี', 'การป้องกัน', 'การสนับสนุน']; const maxStatValue = 100;
-        const earlyGameScore = (mainDeck.filter(c => (c.cost ?? 0) <= 2).length / (mainDeck.length * 0.5)) * maxStatValue; const midGameScore = (mainDeck.filter(c => (c.cost ?? 0) >= 3 && (c.cost ?? 0) <= 5).length / (mainDeck.length * 0.4)) * maxStatValue; const lateGameScore = (mainDeck.filter(c => (c.cost ?? 0) >= 6).length / (mainDeck.length * 0.2)) * maxStatValue; const offenseScore = (parseFloat(avgPower) / 6) * maxStatValue; const defenseScore = (mainDeck.filter(c => c.type !== 'Magic').length / 40) * maxStatValue; const utilityScore = ((typeCounts['Magic'] || 0) / 15) * maxStatValue; 
-        const radarData = { labels, datasets: [{ label: 'ศักยภาพเด็ค', data: [earlyGameScore, midGameScore, lateGameScore, offenseScore, defenseScore, utilityScore].map(v => Math.round(Math.min(100, Math.max(0, v || 0)))), backgroundColor: 'rgba(52, 211, 153, 0.2)', borderColor: 'rgb(52, 211, 153)', pointBackgroundColor: 'rgb(52, 211, 153)', pointBorderColor: '#000000ff', pointHoverBackgroundColor: '#000000ff', pointHoverBorderColor: 'rgb(52, 211, 153)' }]};
         
-        // 🛑 [ลบ] radarOptions (Static) ที่เคยอยู่ตรงนี้
+        const avgCost = avg(mainDeck.map(c => c.cost)); 
+        const avgPower = avg(mainDeck.map(c => c.power)); 
+        const avgGem = avg(mainDeck.map(c => c.gem));
+        const typeCounts = countBy(mainDeck, c => c.type); 
+        const cardTypes = Object.entries(typeCounts).sort(([a], [b]) => (typeOrder[a] || 99) - (typeOrder[b] || 99));
+        
+        const maxStatValue = 100;
+        const earlyGameScore = (mainDeck.filter(c => (c.cost ?? 0) <= 2).length / (mainDeck.length * 0.5)) * maxStatValue; 
+        const midGameScore = (mainDeck.filter(c => (c.cost ?? 0) >= 3 && (c.cost ?? 0) <= 5).length / (mainDeck.length * 0.4)) * maxStatValue; 
+        const lateGameScore = (mainDeck.filter(c => (c.cost ?? 0) >= 6).length / (mainDeck.length * 0.2)) * maxStatValue; 
+        const offenseScore = (parseFloat(avgPower) / 6) * maxStatValue; 
+        const defenseScore = (mainDeck.filter(c => c.type !== 'Magic').length / 40) * maxStatValue; 
+        const utilityScore = ((typeCounts['Magic'] || 0) / 15) * maxStatValue; 
+        
+        const radarData = { 
+            labels: ['ความไวต้นเกม', 'กลางเกม', 'ท้ายเกม', 'พลังโจมตี', 'การป้องกัน', 'การสนับสนุน'], 
+            datasets: [{ 
+                label: 'ศักยภาพเด็ค', 
+                data: [earlyGameScore, midGameScore, lateGameScore, offenseScore, defenseScore, utilityScore].map(v => Math.round(Math.min(100, Math.max(0, v || 0)))), 
+                backgroundColor: 'rgba(52, 211, 153, 0.2)', 
+                borderColor: 'rgb(52, 211, 153)', 
+                pointBackgroundColor: 'rgb(52, 211, 153)', 
+                pointBorderColor: '#000000ff', 
+                pointHoverBackgroundColor: '#000000ff', 
+                pointHoverBorderColor: 'rgb(52, 211, 153)' 
+            }]
+        };
         
         const deckCode = encodeDeckCode(mainDeck, lifeDeck);
         
-        // 🛑 [ลบ] radarOptions ออกจาก return นี้
         return { avgCost, avgPower, avgGem, cardTypes, radarData, deckCode, only1Card, avatars, magics, constructs, otherCards };
     
     }, [mainDeck, lifeDeck, theme]);
 
-    // 📍 [สำคัญ] เราสร้าง "สวิตช์" ตรงนี้
     const isDark = theme === 'dark';
 
-    // -----------------------------------------------------------------
-    //  👇 ชุดสีสำหรับธีมมืด (ค่าแรก) และธีมสว่าง (ค่าสอง)
-    // -----------------------------------------------------------------
-    const gridColor = isDark 
-        ? 'rgba(255, 255, 255, 0.2)' // ธีมมืด: เส้นตาราง (ขาว โปร่ง 20%)
-        : 'rgba(0, 0, 0, 0.2)';       // 👈 (ธีมสว่าง: ดำ โปร่ง 20%)
-
-    const angleLineColor = isDark 
-        ? 'rgba(255, 255, 255, 0.2)' // ธีมมืด: เส้นแกน (ขาว โปร่ง 20%)
-        : 'rgba(0, 0, 0, 0.2)';       // 👈 (ธีมสว่าง: ดำ โปร่ง 20%)
-
-    const labelColor = isDark 
-        ? 'rgb(209, 213, 219)'       // ธีมมืด: ตัวอักษร (เทาอ่อน)
-        : 'rgb(30, 41, 59)';         // 👈 (ธีมสว่าง: เทาเข้ม)
-
-    const tickColor = isDark 
-        ? 'rgb(156, 163, 175)'       // ธีมมืด: ตัวเลข (เทา)
-        : 'rgb(100, 116, 139)';      // 👈 (ธีมสว่าง: เทาเข้ม)
-
-    const tickBackdrop = isDark 
-        ? 'rgba(0, 0, 0, 0.5)'       // ธีมมืด: พื้นหลังตัวเลข (ดำ โปร่ง 50%)
-        : 'rgba(255, 255, 255, 0.75)';// 👈 (ธีมสว่าง: ขาว โปร่ง 75%)
-
-    // -----------------------------------------------------------------
-
-    // 📍 [สำคัญ] สร้าง radarOptions โดยใช้ "ตัวแปรสี"
     const radarOptions = {
         scales: {
             r: {
-                angleLines: { color: angleLineColor }, // <-- ใช้ตัวแปร
-                grid: { color: gridColor },       // <-- ใช้ตัวแปร
-                pointLabels: { color: labelColor, font: { size: 12 } }, // <-- ใช้ตัวแปร
+                angleLines: { color: isDark ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.2)' },
+                grid: { color: isDark ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.2)' },
+                pointLabels: { color: isDark ? 'rgb(209, 213, 219)' : 'rgb(30, 41, 59)', font: { size: 12 } },
                 ticks: {
-                    color: tickColor,            // <-- ใช้ตัวแปร
-                    backdropColor: tickBackdrop, // <-- ใช้ตัวแปร
+                    color: isDark ? 'rgb(156, 163, 175)' : 'rgb(100, 116, 139)',
+                    backdropColor: isDark ? 'rgba(0, 0, 0, 0.5)' : 'rgba(255, 255, 255, 0.75)',
                     stepSize: 20,
                     maxTicksLimit: 6,
                 },
-                min: 0,
-                max: 100,
+                min: 0, max: 100,
             },
         },
-        plugins: {
-            legend: { display: false },
-            tooltip: { enabled: true }
-        },
+        plugins: { legend: { display: false }, tooltip: { enabled: true } },
         maintainAspectRatio: false
     };
 
-    const handleCopyCode = () => { if (analysis?.deckCode) { navigator.clipboard.writeText(analysis.deckCode) .then(() => showAlert("Success!", `✅ คัดลอกรหัสเด็คลง Clipboard แล้ว!`)) .catch(err => { console.error('Failed to copy code: ', err); showAlert("Error", "ไม่สามารถคัดลอกรหัสเด็คได้"); }); } };
+    const handleCopyCode = () => { 
+        if (analysis?.deckCode) { 
+            navigator.clipboard.writeText(analysis.deckCode)
+            .then(() => showAlert("Success!", `✅ คัดลอกรหัสเด็คลง Clipboard แล้ว!`))
+            .catch(err => { console.error('Failed to copy code: ', err); showAlert("Error", "ไม่สามารถคัดลอกรหัสเด็คได้"); }); 
+        } 
+    };
     
+    const renderCardSection = (title, cards) => {
+        if (!cards || cards.length === 0) return null;
+        
+        const groupedCards = Object.values(
+            cards.reduce((m, card) => {
+                const key = card.id; 
+                if (!m[key]) m[key] = { card, count: 0 };
+                m[key].count++;
+                return m;
+            }, {})
+        ).sort((a, b) => a.card.name.localeCompare(b.card.name, 'th'));
+
+        return (
+            <div className="mt-6">
+                <h4 className="text-lg font-semibold text-emerald-600 dark:text-emerald-300 border-b border-emerald-500/20 pb-1 mb-3">
+                    {title} ({cards.length} ใบ)
+                </h4>
+                <div className="grid grid-cols-[repeat(auto-fit,minmax(4.5rem,1fr))] md:grid-cols-[repeat(auto-fit,minmax(5rem,1fr))] gap-2 justify-center">
+                    {groupedCards.map(({ card, count }, index) => {
+                        const encodedImagePath = encodePath(card.imagePath);
+                        const fileId = card.id.replace(' - Only#1', '');
+                        const thumbPng = `/cards/${encodedImagePath}/${encodeURIComponent(fileId)}.png`;
+                        return (
+                            <div key={`${card.id}-${index}`} className="relative w-18 md:w-20 group">
+                                <img 
+                                    src={thumbPng} 
+                                    alt={card.name} 
+                                    className="w-full rounded-md shadow transition-transform hover:scale-110 hover:z-10" 
+                                    onError={(e) => { e.currentTarget.src = e.currentTarget.src.replace('.png', '.jpg'); }} 
+                                />
+                                {count > 1 && (
+                                    <div className="absolute -top-2 -right-2 w-5 h-5 flex items-center justify-center bg-amber-500 text-white text-xs font-bold rounded-full border-2 border-white dark:border-slate-800">
+                                        {count}
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })}
+                </div>
+            </div>
+        );
+    };
+
     if (!isOpen || !analysis) return null;
 
-    <div className="grid grid-cols-[repeat(auto-fit,minmax(6rem,1fr))] gap-2 justify-center">
-          {groupedCards.map(({ card, count }, index) => { // <-- [1] เพิ่ม index
-            const encodedImagePath = encodePath(card.imagePath);
-            const fileId = card.id.replace(' - Only#1', '');
-            const thumbPng = `/cards/${encodedImagePath}/${encodeURIComponent(fileId)}.png`;
-            return (
-              <div key={`${card.id}-${index}`} className="relative w-24"> {/* <-- [2] แก้ไข key */}
-                <img src={thumbPng} alt={card.name} className="w-full rounded-md shadow" onError={(e) => { e.currentTarget.src = e.currentTarget.src.replace('.png', '.jpg'); }} />
-                {count > 1 && (
-                  <div className="absolute -top-2 -right-2 w-5 h-5 flex items-center justify-center bg-amber-500 text-white text-xs font-bold rounded-full border-2 border-white dark:border-slate-800">{count}</div>
-                )}
-              </div>
-            );
-          })}
-        </div>
+    return createPortal(
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-[250] p-0 md:p-4"> {/* 🟢 Mobile: p-0 */}
+            <div className={`
+                bg-slate-100 dark:bg-slate-900/80 
+                border-0 md:border border-slate-300 dark:border-emerald-500/30 
+                rounded-none md:rounded-xl 
+                shadow-2xl 
+                w-full h-full flex flex-col 
+                max-w-7xl md:max-h-[90vh] /* 🟢 Mobile: เต็มจอ h-full */
+            `}>
+                <header className="flex items-center justify-between p-4 border-b border-slate-300 dark:border-emerald-500/20 shrink-0">
+                    <h2 className="text-xl md:text-2xl font-bold text-slate-900 dark:text-white truncate pr-2">ผลลัพธ์การสร้างเด็ค</h2>
+                    <Button onClick={onClose}>Close</Button>
+                </header>
+                
+                <div className="flex-grow overflow-hidden grid grid-cols-1 md:grid-cols-3 gap-6 p-4 md:p-6">
+                    {/* Sidebar Stats */}
+                    <div className="md:col-span-1 flex flex-col gap-6 overflow-y-auto pr-2">
+                        <div>
+                            <h3 className="text-xl font-semibold text-amber-600 dark:text-amber-300 border-b border-amber-500/20 pb-1 mb-3">สถิติเด็ค</h3>
+                            <div className="grid grid-cols-3 gap-4 text-center">
+                                <div><span className="text-sm text-gray-500 dark:text-gray-400">Avg Cost</span><p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{analysis.avgCost}</p></div>
+                                <div><span className="text-sm text-gray-500 dark:text-gray-400">Avg Power</span><p className="text-2xl font-bold text-red-600 dark:text-red-400">{analysis.avgPower}</p></div>
+                                <div><span className="text-sm text-gray-500 dark:text-gray-400">Avg Gem</span><p className="text-2xl font-bold text-amber-600 dark:text-amber-400">{analysis.avgGem}</p></div>
+                            </div>
+                        </div>
 
-    return createPortal( <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-[250] p-4"> <div className="bg-slate-100 dark:bg-slate-900/80 border border-slate-300 dark:border-emerald-500/30 rounded-xl shadow-2xl w-full h-full flex flex-col max-w-7xl max-h-[90vh]"> <header className="flex items-center justify-between p-4 border-b border-slate-300 dark:border-emerald-500/20 shrink-0"> <h2 className="text-2xl font-bold text-slate-900 dark:text-white">ผลลัพธ์การสร้างเด็ค</h2> <Button onClick={onClose}>Close</Button> </header> <div className="flex-grow overflow-hidden grid grid-cols-1 md:grid-cols-3 gap-6 p-6"> <div className="md:col-span-1 flex flex-col gap-6 overflow-y-auto pr-2"> <div> <h3 className="text-xl font-semibold text-amber-600 dark:text-amber-300 border-b border-amber-500/20 pb-1 mb-3">สถิติเด็ค</h3> <div className="grid grid-cols-3 gap-4 text-center"> <div><span className="text-sm text-gray-500 dark:text-gray-400">Avg Cost</span><p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{analysis.avgCost}</p></div> <div><span className="text-sm text-gray-500 dark:text-gray-400">Avg Power</span><p className="text-2xl font-bold text-red-600 dark:text-red-400">{analysis.avgPower}</p></div> <div><span className="text-sm text-gray-500 dark:text-gray-400">Avg Gem</span><p className="text-2xl font-bold text-amber-600 dark:text-amber-400">{analysis.avgGem}</p></div> </div> </div>
-        
-        {/* ================================================================= */}
-        {/* === 📍 [2] ซ่อน/แสดง กราฟหกเหลี่ยมตาม `showChart` === */}
-        {/* ================================================================= */}
-        {showChart && (
-          <div className="aspect-square w-full max-w-[350px] mx-auto">
-            <Radar data={analysis.radarData} options={radarOptions} />
-          </div>
-        )}
+                        {showChart && (
+                            <div className="aspect-square w-full max-w-[350px] mx-auto">
+                                <Radar data={analysis.radarData} options={radarOptions} />
+                            </div>
+                        )}
 
-    <div> <h3 className="text-xl font-semibold text-amber-600 dark:text-amber-300 border-b border-amber-500/20 pb-1 mb-3">ประเภทการ์ด</h3> <ul className="space-y-1 text-sm text-slate-700 dark:text-gray-300"> {analysis.cardTypes.map(([type, count]) => ( <li key={type} className="flex justify-between"> <span>{type}</span> <span className="text-slate-900 dark:text-white font-semibold">{count} ใบ</span> </li> ))} </ul> </div> <div> <h3 className="text-xl font-semibold text-amber-600 dark:text-amber-300 border-b border-amber-500/20 pb-1 mb-3">รหัส Export</h3> <Button onClick={handleCopyCode} className="w-full"> <CopyIcon /> คัดลอกรหัสเด็ค </Button> </div> </div> <div className="md:col-span-2 overflow-y-auto pr-2 border-l border-slate-300 dark:border-emerald-500/20 pl-6"> <h3 className="text-xl font-semibold text-amber-600 dark:text-amber-300 border-b border-amber-500/20 pb-1 mb-4">การ์ดในเด็ค ({mainDeck.length} ใบ)</h3> {analysis.only1Card && ( <div className="mb-6 flex flex-col items-center"> <h4 className="text-lg font-semibold text-emerald-600 dark:text-emerald-300 mb-3">Only #1</h4> <div className="relative w-36 mx-auto"> <img src={`/cards/${encodePath(analysis.only1Card.imagePath)}/${encodeURIComponent(analysis.only1Card.id.replace(' - Only#1', ''))}.png`} alt={analysis.only1Card.name} className="w-full rounded-md shadow" onError={(e) => { e.currentTarget.src = e.currentTarget.src.replace('.png', '.jpg'); }} /> </div> </div> )} {renderCardSection("Avatar Cards", analysis.avatars)} {renderCardSection("Magic Cards", analysis.magics)} {renderCardSection("Construct Cards", analysis.constructs)} {analysis.otherCards.length > 0 && renderCardSection("Other Cards", analysis.otherCards)} </div> </div> </div> </div>, document.body ); }
+                        <div>
+                            <h3 className="text-xl font-semibold text-amber-600 dark:text-amber-300 border-b border-amber-500/20 pb-1 mb-3">ประเภทการ์ด</h3>
+                            <ul className="space-y-1 text-sm text-slate-700 dark:text-gray-300">
+                                {analysis.cardTypes.map(([type, count]) => (
+                                    <li key={type} className="flex justify-between">
+                                        <span>{type}</span>
+                                        <span className="text-slate-900 dark:text-white font-semibold">{count} ใบ</span>
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                        <div>
+                            <h3 className="text-xl font-semibold text-amber-600 dark:text-amber-300 border-b border-amber-500/20 pb-1 mb-3">รหัส Export</h3>
+                            <Button onClick={handleCopyCode} className="w-full">
+                                <CopyIcon /> คัดลอกรหัสเด็ค
+                            </Button>
+                        </div>
+                    </div>
 
-// ... (ส่วน import ด้านบนไฟล์ App.jsx คงเดิม)
+                    {/* Card List */}
+                    <div className="md:col-span-2 overflow-y-auto pr-2 md:border-l border-slate-300 dark:border-emerald-500/20 md:pl-6"> {/* 🟢 Mobile: เอา border-l ออก */}
+                        <h3 className="text-xl font-semibold text-amber-600 dark:text-amber-300 border-b border-amber-500/20 pb-1 mb-4">การ์ดในเด็ค ({mainDeck.length} ใบ)</h3>
+                        {analysis.only1Card && (
+                            <div className="mb-6 flex flex-col items-center">
+                                <h4 className="text-lg font-semibold text-emerald-600 dark:text-emerald-300 mb-3">Only #1</h4>
+                                <div className="relative w-36 mx-auto">
+                                    <img src={`/cards/${encodePath(analysis.only1Card.imagePath)}/${encodeURIComponent(analysis.only1Card.id.replace(' - Only#1', ''))}.png`} alt={analysis.only1Card.name} className="w-full rounded-md shadow" onError={(e) => { e.currentTarget.src = e.currentTarget.src.replace('.png', '.jpg'); }} />
+                                </div>
+                            </div>
+                        )}
+                        {renderCardSection("Avatar Cards", analysis.avatars)}
+                        {renderCardSection("Magic Cards", analysis.magics)}
+                        {renderCardSection("Construct Cards", analysis.constructs)}
+                        {analysis.otherCards.length > 0 && renderCardSection("Other Cards", analysis.otherCards)}
+                        {lifeDeck.length > 0 && renderCardSection("Life Deck", lifeDeck)}
+                        
+                        {/* Spacer for Mobile scrolling */}
+                        <div className="h-20 md:h-0"></div>
+                    </div>
+                </div>
+            </div>
+        </div>,
+        document.body
+    );
+}
 
 // ---------------------------------------------------------
 // 📱 DeckListModal - Redesigned for Mobile Compact View
@@ -1694,7 +1817,24 @@ const getMagicSubType = (card) => {
 export default function App() {
   const [theme, setTheme] = useLocalStorage('bot-theme', 'dark'); // <--- [เพิ่ม] State สำหรับธีม
   // ... (ต่อจาก useState ตัวอื่นๆ ใน function App) ...
+// 🟢 [เพิ่ม] State สำหรับลูกไฟ และ Ref ชี้ปุ่ม Toggle
+  const [flyingLights, setFlyingLights] = useState([]);
+  const toggleBtnRef = useRef(null); // เอาไว้เกาะตำแหน่งปุ่ม Hide Filter
 
+  // ฟังก์ชันสร้างลูกไฟ
+  const triggerLightEffect = (startElem) => {
+    if (!startElem || !toggleBtnRef.current) return;
+    
+    const startRect = startElem.getBoundingClientRect();
+    const endRect = toggleBtnRef.current.getBoundingClientRect();
+    
+    const newLight = { id: Date.now(), startRect, endRect };
+    setFlyingLights(prev => [...prev, newLight]);
+  };
+
+  const removeLight = (id) => {
+    setFlyingLights(prev => prev.filter(l => l.id !== id));
+  };
   // =========================================================
   // 🟢 [เพิ่มส่วนนี้] State และ Ref สำหรับปุ่ม Scroll to Top
   // =========================================================
@@ -1899,7 +2039,17 @@ export default function App() {
   const totalPages = Math.ceil(filteredCardDb.length / PAGE_SIZE); const startIndex = (currentPage - 1) * PAGE_SIZE; const endIndex = startIndex + PAGE_SIZE; const paginatedCards = filteredCardDb.slice(startIndex, endIndex);
   const [viewingDeck, setViewingDeck] = useState(null);
 
-  const addToMain = (card) => { if (card.lifeEligible) { showAlert("ไม่สามารถเพิ่มได้", `การ์ด "${card.name}" เป็นการ์ดสำหรับ Life Deck เท่านั้น`); return; } if (card.onlyRank === 1 && mainDeck.some(c => c.onlyRank === 1)) { showAlert("Rule Violation", "You can only have one 'Only #1' card in your Main Deck."); return; } if (mainDeck.filter(c => nameKey(c.name) === nameKey(card.name)).length >= RULES.main.maxCopiesPerName) { showAlert("Rule Violation", `You cannot have more than ${RULES.main.maxCopiesPerName} copies of "${card.name}".`); return; } if (mainDeck.length >= RULES.main.size) { showAlert("Deck Full", "Your Main Deck has reached the 50-card limit."); return; } setMainDeck(prev => [...prev, card]); };
+  const addToMain = (card, sourceElem) => { // 🟢 รับ sourceElem เพิ่ม
+    if (card.lifeEligible) { showAlert("ไม่สามารถเพิ่มได้", `การ์ด "${card.name}" เป็นการ์ดสำหรับ Life Deck เท่านั้น`); return; }
+    if (card.onlyRank === 1 && mainDeck.some(c => c.onlyRank === 1)) { showAlert("Rule Violation", "You can only have one 'Only #1' card in your Main Deck."); return; }
+    if (mainDeck.filter(c => nameKey(c.name) === nameKey(card.name)).length >= RULES.main.maxCopiesPerName) { showAlert("Rule Violation", `You cannot have more than ${RULES.main.maxCopiesPerName} copies of "${card.name}".`); return; }
+    if (mainDeck.length >= RULES.main.size) { showAlert("Deck Full", "Your Main Deck has reached the 50-card limit."); return; }
+    
+    setMainDeck(prev => [...prev, card]);
+
+    // 🟢 [เพิ่ม] เรียก Effect ลูกไฟ ถ้ามี Element ต้นทางส่งมา
+    if (sourceElem) triggerLightEffect(sourceElem);
+  };
   const removeFromMain = (card) => { const idx = mainDeck.findLastIndex(c => nameKey(c.name) === nameKey(card.name)); if (idx > -1) setMainDeck(prev => prev.filter((_, i) => i !== idx)); };
   const addToLife = (card) => { if (!card.lifeEligible) { showAlert("Invalid Card", `การ์ด "${card.name}" ไม่สามารถใส่ใน Life Deck ได้`); return; }; if (lifeDeck.length >= RULES.life.size) { showAlert("Deck Full", `Life Deck เต็มแล้ว (ใส่ได้ ${RULES.life.size} ใบ)`); return; }; if (!lifeDeck.some(c => nameKey(c.name) === nameKey(card.name))) { setLifeDeck(prev => [...prev, card]); } else { showAlert("Duplicate Card", `การ์ดชื่อ "${card.name}" มีใน Life Deck แล้ว (ชื่อห้ามซ้ำ)`); } };
   const removeFromLife = (card) => { const idx = lifeDeck.findIndex(c => c.id === card.id); if (idx > -1) setLifeDeck(prev => prev.filter((_, i) => i !== idx)); };
@@ -1981,45 +2131,55 @@ export default function App() {
             </div>
           ) : (
             <>
-              <header className="px-4 lg:px-6 py-2 border-b border-slate-300 dark:border-emerald-700/30 bg-white/60 dark:bg-black/60 backdrop-blur-sm shrink-0 z-40">
-                <div className="flex items-center justify-between gap-4">
-                  <div className="flex items-center gap-3">
+              {/* ================================================================= */}
+              {/* 🎨 Header (ปรับสเกลใหม่สำหรับ Mobile) */}
+              {/* ================================================================= */}
+              <header className="px-3 md:px-6 py-2 border-b border-slate-300 dark:border-emerald-700/30 bg-white/60 dark:bg-black/60 backdrop-blur-sm shrink-0 z-40">
+                <div className="flex items-center justify-between">
+                  
+                  {/* 🟢 ฝั่งซ้าย: เมนู + ชื่อเกม */}
+                  <div className="flex items-center gap-1.5 md:gap-3 overflow-hidden">
                     <button
                       onClick={() => setIsSettingsOpen(true)}
-                      className="p-2 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-full text-slate-800 dark:text-white transition-colors"
+                      className="p-1.5 md:p-2 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-full text-slate-800 dark:text-white transition-colors shrink-0"
                     >
                       <MenuIcon />
                     </button>
-                    <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight bg-gradient-to-r from-amber-500 to-emerald-600 dark:from-amber-300 dark:to-emerald-400 bg-clip-text text-transparent">
+                    
+                    {/* 🔽 ปรับ Text ให้เล็กลงในมือถือ และใส่ truncate กันข้อความล้น */}
+                    <h1 className="text-lg sm:text-xl md:text-3xl font-extrabold tracking-tight bg-gradient-to-r from-amber-500 to-emerald-600 dark:from-amber-300 dark:to-emerald-400 bg-clip-text text-transparent truncate">
                       Battle Of Talingchan
                     </h1>
                   </div>
 
-                  <div className="flex items-center gap-3">
+                  {/* 🟢 ฝั่งขวา: ปุ่มต่างๆ + รูปโปรไฟล์ */}
+                  <div className="flex items-center gap-1.5 md:gap-3 shrink-0">
                     <Link to="/public-decks">
+                      {/* !px-2 คือการบังคับลด padding ในมือถือ */}
                       <Button
                         as="span"
-                        className="bg-gradient-to-r from-blue-500 to-purple-600 text-white border-none shadow-lg hover:from-blue-400 hover:to-purple-500"
+                        className="!px-2 md:!px-4 bg-gradient-to-r from-blue-500 to-purple-600 text-white border-none shadow-lg hover:from-blue-400 hover:to-purple-500"
                       >
                         <UsersIcon />{" "}
-                        <span className="hidden md:inline">Public Decks</span>
+                        <span className="hidden md:inline">Public</span>
                       </Button>
                     </Link>
                     <Button
                       onClick={() => setIsDeckListModalOpen(true)}
-                      className="bg-gradient-to-r from-amber-500 to-emerald-600 text-white border-none shadow-lg hover:from-amber-400 hover:to-emerald-500"
+                      className="!px-2 md:!px-4 bg-gradient-to-r from-amber-500 to-emerald-600 text-white border-none shadow-lg hover:from-amber-400 hover:to-emerald-500"
                     >
                       <DeckIcon />{" "}
-                      <span className="hidden md:inline">My Deck List</span>
+                      <span className="hidden md:inline">My Decks</span>
                     </Button>
 
                     <img
                       src={displayUser.picture}
                       alt={displayUser.name}
-                      className="w-8 h-8 rounded-full border-2 border-emerald-500 object-cover"
+                      className="w-8 h-8 md:w-9 md:h-9 rounded-full border-2 border-emerald-500 object-cover"
                       title={`Logged in as ${displayUser.name}`}
                     />
-                    <span className="text-slate-900 dark:text-white hidden md:block text-sm font-semibold">
+                    {/* ซ่อนชื่อบนมือถือ แสดงเฉพาะบนจอใหญ่ */}
+                    <span className="text-slate-900 dark:text-white hidden lg:block text-sm font-semibold max-w-[100px] truncate">
                       {displayUser.name}
                     </span>
                   </div>
@@ -2064,6 +2224,7 @@ export default function App() {
                 >
                   {/* ปุ่มปิด (X) - 🟢 แสดงเฉพาะ Mobile */}
                   <button 
+                    ref={toggleBtnRef} // 🟢 [สำคัญ] ผูก Ref ตรงนี้ (หรือจะผูกที่ Desktop ด้วยก็ได้ ถ้าอยากให้วิ่งไปหาตอนเล่นในคอม)
                     onClick={toggleSidebar}
                     className="md:hidden absolute top-3 right-3 p-2 text-slate-500 hover:text-red-500 dark:text-slate-400 dark:hover:text-red-400 transition-colors z-50"
                     title="ปิดฟิลเตอร์"
@@ -2362,6 +2523,16 @@ export default function App() {
             </>
           )}
         </div>
+        {/* 🟢 แสดงลูกไฟวิ่ง */}
+        {flyingLights.map(light => (
+          <FlyingLight 
+            key={light.id} 
+            startRect={light.startRect} 
+            endRect={light.endRect} 
+            onComplete={() => removeLight(light.id)} 
+          />
+        ))}
+
       </DndStateProvider>
     </DndProvider>
   );
