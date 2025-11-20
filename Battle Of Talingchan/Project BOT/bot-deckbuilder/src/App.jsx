@@ -8,42 +8,10 @@ import { GoogleLogin, googleLogout } from '@react-oauth/google';
 import { jwtDecode } from 'jwt-decode';
 import { Link } from 'react-router-dom';
 import { db } from './firebase';
-import OpenBrowser from './OpenBrowser.jsx'
-import { GoogleOAuthProvider } from "@react-oauth/google";
 import { 
   collection, doc, writeBatch, serverTimestamp, getDoc, setDoc,
   query, where, getDocs, addDoc // <--- เพิ่มตัวนี้นะ
 } from 'firebase/firestore';
-
-// =========================================================
-// 🚀 [ใหม่] Hook สำหรับตรวจจับ In-App Browser (IAB)
-// =========================================================
-function useCheckInAppBrowser() {
-  useEffect(() => {
-    // ตรวจสอบเฉพาะเมื่อไม่ได้อยู่ในหน้า /open-browser แล้วเท่านั้น
-    if (window.location.pathname === "/open-browser") {
-      return; 
-    }
-
-    const ua = navigator.userAgent.toLowerCase();
-
-    // รายการ User Agent ที่บ่งบอกว่าเป็น In-App Browser (IAB)
-    const isInAppBrowser =
-      ua.includes("fbav") ||     // Facebook (iOS)
-      ua.includes("fban") ||     // Facebook (Android)
-      ua.includes("fb_iab") ||   // Facebook IAB flag
-      ua.includes("instagram") || // IG
-      ua.includes("line") ||      // Line
-      ua.includes("messenger");   // Messenger
-
-    if (isInAppBrowser) {
-      console.warn("Detected In-App Browser. Redirecting to /open-browser.");
-      // สั่ง Redirect ไปยังหน้าแจ้งเตือน
-      window.location.href = "/open-browser"; 
-    }
-  }, []);
-}
-// =========================================================
 
 ChartJS.register(RadialLinearScale, PointElement, LineElement, Filler, Tooltip, Legend);
 
@@ -61,6 +29,7 @@ const CardsIcon = () => <Svg width="24" height="24" p={<><rect x="2" y="7" width
 const DeckIcon = () => <Svg width="24" height="24" p={<><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><line x1="10" y1="9" x2="8" y2="9"></line></>} />;
 const ChevronLeftIcon = () => <Svg width="24" height="24" p={<polyline points="15 18 9 12 15 6"></polyline>} />;
 const ChevronRightIcon = () => <Svg width="24" height="24" p={<polyline points="9 18 15 12 9 6"></polyline>} />;
+const ChevronUpIcon = () => <Svg width="24" height="24" p={<polyline points="18 15 12 9 6 15"></polyline>} />;
 const UsersIcon = () => <Svg width="24" height="24" p={<><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></>} />;
 const UploadIcon = () => <Svg p={<><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></>} />;
 const MenuIcon = () => <Svg width="24" height="24" p={<><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></>} />;
@@ -604,30 +573,62 @@ function FlyingCard({ card, startRect, endRect, onComplete }) { const [isAnimati
     <div style={style} onTransitionEnd={handleTransitionEnd}> <img src={imgSrc} alt={card.name} className="w-full h-full rounded-lg shadow-2xl" /> </div> ); }
 
 // === Card component (draggable) ===
-const CardItem = forwardRef(function CardItem({ card, onDoubleClick, onViewDetails, onAddCard }, ref) { 
+// 🟢 รับ props เพิ่ม: isMobileZoomed และ onMobileClick
+const CardItem = forwardRef(function CardItem({ card, onDoubleClick, onViewDetails, onAddCard, isMobileZoomed, onMobileClick }, ref) { 
     const cardItemRef = useRef(null); 
     const { isDragging: isAnythingDragging } = useIsDragging(); 
     const [{ isDragging }, dragRef] = useDrag({ type: DND_TYPES.CARD, item: { card }, collect: (m) => ({ isDragging: m.isDragging() }) }); 
+    
+    // ❌ ลบ State ภายในทิ้ง (เพราะเราใช้ props จากแม่แทนแล้ว)
+    // const [isMobileZoomed, setIsMobileZoomed] = useState(false); <--- ลบบรรทัดนี้
+
     const encodedImagePath = encodePath(card.imagePath); 
     const fileId = card.id.replace(' - Only#1', ''); 
     const imgPng = `/cards/${encodedImagePath}/${encodeURIComponent(fileId)}.png`; 
     const imgJpg = `/cards/${encodedImagePath}/${encodeURIComponent(fileId)}.jpg`; 
     
-    // 📍
-    // 📍 === [แก้ไข] เปลี่ยน z-50 เป็น z-[80] ตรงนี้ครับ ==
-    // 📍
-    const hoverClasses = !isAnythingDragging ? 'hover:scale-[1.25] hover:z-[80]' : ''; 
+    const hoverClasses = !isAnythingDragging ? 'lg:hover:scale-[1.25] lg:hover:z-[80]' : ''; 
+
+    // Logic สำหรับ Mobile Zoom (รับค่าจาก props isMobileZoomed)
+    const mobileZoomClasses = isMobileZoomed ? 'scale-[1.15] z-[100] shadow-2xl border-amber-500/50' : '';
     
+    const handleClick = () => {
+        // เช็คว่าเป็นมือถือ/แท็บเล็ตไหม
+        if (window.innerWidth < 1024) { 
+            // เรียกฟังก์ชันที่แม่ส่งมา (เพื่อแจ้งว่าฉันถูกกดนะ แม่ช่วยจัดการหน่อย)
+            onMobileClick();
+        }
+    };
+
     return ( 
-        <CardShell ref={cardItemRef} className={`flex flex-col card group relative ${isDragging ? 'opacity-0' : ''} transition-transform duration-200 ease-in-out ${hoverClasses}`}> 
-            <div className="absolute top-2 right-2 z-10 flex flex-col gap-2"> 
-                <button onClick={() => onViewDetails(card)} className="p-1.5 bg-slate-100 dark:bg-slate-900/50 rounded-full text-amber-600 dark:text-amber-300 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-slate-300 dark:hover:bg-slate-700 hover:text-black dark:hover:text-white" title="ดูรายละเอียด"> 
+        <CardShell 
+            ref={cardItemRef} 
+            onClick={handleClick}
+            className={`
+                flex flex-col card group relative 
+                ${isDragging ? 'opacity-0' : ''} 
+                transition-transform duration-200 ease-in-out 
+                ${hoverClasses} 
+                ${mobileZoomClasses} 
+                p-0.5 lg:p-4
+            `}
+        > 
+            {/* ปุ่ม Action */}
+            <div className="absolute top-1 right-1 z-10 flex flex-col gap-1 lg:gap-2 lg:top-2 lg:right-2"> 
+                <button 
+                    onClick={(e) => { e.stopPropagation(); onViewDetails(card); }} 
+                    className="p-1 lg:p-1.5 bg-slate-100/80 dark:bg-slate-900/80 rounded-full text-amber-600 dark:text-amber-300 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-slate-300 dark:hover:bg-slate-700 hover:text-black dark:hover:text-white" title="ดูรายละเอียด"
+                > 
                     <EyeIcon /> 
                 </button> 
-                <button onClick={() => onAddCard(card)} className="p-1.5 bg-emerald-600/80 rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-emerald-500 active:scale-95" title="เพิ่มลงเด็ค"> 
+                <button 
+                    onClick={(e) => { e.stopPropagation(); onAddCard(card); }} 
+                    className="p-1 lg:p-1.5 bg-emerald-600/80 rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-emerald-500 active:scale-95" title="เพิ่มลงเด็ค"
+                > 
                     <PlusIcon /> 
                 </button> 
             </div> 
+
             <img 
                 ref={dragRef} 
                 src={imgPng} 
@@ -640,10 +641,12 @@ const CardItem = forwardRef(function CardItem({ card, onDoubleClick, onViewDetai
                         e.currentTarget.src = `https://placehold.co/300x420/1e293b/94a3b8?text=${encodeURIComponent(card.name)}`; 
                     } 
                 }} 
-                className="w-full h-auto rounded-md mb-3 object-cover aspect-[5/7] bg-slate-200 dark:bg-slate-700 shadow hover:shadow-xl transition-shadow cursor-grab active:cursor-grabbing" 
+                className="w-full h-auto rounded-[4px] lg:rounded-md mb-0 lg:mb-3 object-cover aspect-[5/7] bg-slate-200 dark:bg-slate-700 shadow hover:shadow-xl transition-shadow cursor-grab active:cursor-grabbing" 
                 loading="lazy" 
             /> 
-            <div className="flex-grow flex flex-col justify-between"> 
+
+            {/* ส่วนรายละเอียด (Desktop Only) */}
+            <div className="hidden lg:flex flex-grow flex-col justify-between"> 
                 <div> 
                     <div className="flex justify-between items-start gap-2"> 
                         <p className="font-bold text-xl text-slate-900 dark:text-white pr-2 line-clamp-2">{card.name}</p> 
@@ -656,27 +659,26 @@ const CardItem = forwardRef(function CardItem({ card, onDoubleClick, onViewDetai
                     {card.onlyRank === 1 && <Pill className="mt-2 ml-1 bg-amber-500/10 text-amber-600 dark:text-amber-300 border border-amber-500/20">Only #1</Pill>} 
                 </div> 
             </div> 
-            <div 
-                className="hidden lg:block absolute top-full mt-1 left-0 right-0 z-[60] p-4 bg-white dark:bg-slate-900 rounded-lg shadow-2xl border border-amber-500/50 space-y-2 opacity-0 group-hover:opacity-100 transition-all duration-300 ease-in-out pointer-events-none group-hover:pointer-events-auto max-h-96 overflow-y-auto"
-            >
-              <div className="grid grid-cols-3 gap-2 text-center"> 
-                    <div><span className="text-sm text-emerald-600 dark:text-emerald-400">Cost</span><p className="font-bold text-xl text-slate-900 dark:text-white">{card.cost ?? '-'}</p></div> 
-                    <div><span className="text-sm text-red-600 dark:text-red-400">Power</span><p className="font-bold text-xl text-slate-900 dark:text-white">{card.power ?? '-'}</p></div> 
-                    <div><span className="text-sm text-amber-600 dark:text-amber-400">Gem</span><p className="font-bold text-xl text-slate-900 dark:text-white">{card.gem ?? '-'}</p></div> 
-                </div> 
-                
-                {/* 📍 [ปรับ] ลดขนาดฟอนต์สำหรับข้อความหลัก */}
-                <div className="pt-2"> 
-                    <p className="text-sm text-slate-500 dark:text-gray-400">ฝ่าย: <span className="font-semibold text-slate-700 dark:text-gray-200">{card.faction ?? 'ไม่มี'}</span></p> 
-                    <p className="text-sm text-slate-700 dark:text-gray-300 font-light mt-1 break-words">{card.text || 'ไม่มีเอฟเฟ็ค'}</p> 
-                    {card.flavor && ( 
-                        <p className="text-xs text-amber-700/70 dark:text-amber-200/70 italic mt-2 font-light break-words">"{card.flavor}"</p> 
-                    )} 
+
+            {/* Popup Hover Detail (Desktop Only) */}
+            <div className="hidden lg:block absolute top-full mt-1 left-0 right-0 z-[60] p-4 bg-white dark:bg-slate-900 rounded-lg shadow-2xl border border-amber-500/50 space-y-2 opacity-0 group-hover:opacity-100 transition-all duration-300 ease-in-out pointer-events-none group-hover:pointer-events-auto max-h-96 overflow-y-auto"> 
+                <div className="grid grid-cols-3 gap-2 text-center"> 
+                    <div><span className="text-base text-emerald-600 dark:text-emerald-400">Cost</span><p className="font-bold text-2xl text-slate-900 dark:text-white">{card.cost ?? '-'}</p></div> 
+                    <div><span className="text-base text-red-600 dark:text-red-400">Power</span><p className="font-bold text-2xl text-slate-900 dark:text-white">{card.power ?? '-'}</p></div> 
+                    <div><span className="text-base text-amber-600 dark:text-amber-400">Gem</span><p className="font-bold text-2xl text-slate-900 dark:text-white">{card.gem ?? '-'}</p></div> 
+                </div> 
+                <div className="pt-2"> 
+                    <p className="text-base text-slate-500 dark:text-gray-400">ฝ่าย: <span className="font-semibold text-slate-700 dark:text-gray-200">{card.faction ?? 'ไม่มี'}</span></p> 
+                    <p className="text-base text-slate-700 dark:text-gray-300 font-light mt-1 break-words">{card.text || 'ไม่มีเอฟเฟ็ค'}</p> 
+                    {card.flavor && ( 
+                        <p className="text-sm text-amber-700/70 dark:text-amber-200/70 italic mt-2 font-light break-words">"{card.flavor}"</p> 
+                    )} 
                 </div> 
             </div> 
         </CardShell> 
     ); 
 });
+
 // === Deck Tray (droppable) ===
 const DeckTray = forwardRef(function DeckTray(
   { title, deck, onDropCard, onRemoveCard, capacity, highlight, onViewDeck },
@@ -713,34 +715,28 @@ const DeckTray = forwardRef(function DeckTray(
       } transition-colors bg-slate-100 dark:bg-slate-900/50`}
     >
       <div ref={dropRef}>
-  {/* 📍 [แก้ไข] ใช้ justify-between และจัดโครงสร้างใหม่ */}
-  <div className="flex items-center justify-between shrink-0 border-b border-slate-300 dark:border-emerald-700/30 bg-white/40 dark:bg-black/40 p-1 mb-1">
-    <div className="flex items-center gap-2"> {/* 👈 [ใหม่] Group ชื่อและปุ่ม */}
-      <h3 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider shrink-0">
-        {title}
-      </h3>
-      {onViewDeck && deck.length > 0 && (
-        <button
-          onClick={onViewDeck}
-          className="text-xs text-amber-600 dark:text-amber-400 hover:text-amber-500 dark:hover:text-amber-200 hover:underline transition"
-        >
-          ดูเด็ค
-        </button>
-      )}
-    </div>
-    
-    {/* 📍 [ปรับ] ส่วนแสดงจำนวนอยู่ทางขวา */}
-    <div>
-      {typeof capacity === "number" && (
-        <span className="text-xs text-slate-600 dark:text-slate-300">
-          {deck.length}
-          {capacity ? ` / ${capacity}` : ""}
-        </span>
-      )}
-    </div>
-  </div>
-  <div className="relative w-full transition-all" style={{ height: `${containerHeight}px` }}>
-
+        <div className="flex items-center justify-between mb-2 gap-2">
+          <h3 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider shrink-0">
+            {title}
+          </h3>
+          {onViewDeck && deck.length > 0 && (
+            <button
+              onClick={onViewDeck}
+              className="text-xs text-amber-600 dark:text-amber-400 hover:text-amber-500 dark:hover:text-amber-200 hover:underline transition"
+            >
+              ดูเด็ค
+            </button>
+          )}
+          <div className="flex-grow text-right">
+            {typeof capacity === "number" && (
+              <span className="text-xs text-slate-600 dark:text-slate-300">
+                {deck.length}
+                {capacity ? ` / ${capacity}` : ""}
+              </span>
+            )}
+          </div>
+        </div>
+        <div className="relative w-full transition-all" style={{ height: `${containerHeight}px` }}>
           {groupedDeck.length === 0 ? (
             <div className="absolute inset-0 flex items-center justify-center text-slate-400 dark:text-slate-500 text-xs">
               ลากการ์ดมาวางที่นี่
@@ -922,10 +918,9 @@ function DeckViewModal({ isOpen, onClose, deck, rules, onAddCard, onRemoveCard, 
           ) : (
             <div className="flex flex-wrap justify-center gap-4">
               {groupedDeck.map(({ card, count }, index) => { // <-- [เพิ่ม] index
-                const encodedImagePath = encodePath(card.imagePath);
-                const fileId = card.id.replace(' - Only#1', '');
-                // 📍 [แก้ไข] ใช้ Path สัมบูรณ์แทน CARD_BASE_URL
-                const thumbPng = `/cards/${encodedImagePath}/${encodeURIComponent(fileId)}.png`;
+                const encodedImagePath = encodePath(card.imagePath);
+                const fileId = card.id.replace(' - Only#1', '');
+                const thumbPng = `${CARD_BASE_URL}/${encodedImagePath}/${encodeURIComponent(fileId)}.png`;
                 const isAtMaxCopies = rules.maxCopiesPerName && count >= rules.maxCopiesPerName;
                 return (
                   <div key={`${card.id}-${index}`} className="w-40 flex flex-col items-center"> {/* <-- [แก้ไข] key */}
@@ -947,56 +942,6 @@ function DeckViewModal({ isOpen, onClose, deck, rules, onAddCard, onRemoveCard, 
   );
 }
 
-// 📍 [ใหม่] ฟังก์ชัน Helper: สำหรับแสดงผลส่วนย่อยของการ์ดใน DeckAnalysisModal
-const renderCardSection = (title, cards) => {
-  if (cards.length === 0) return null;
-
-  // ฟังก์ชัน helper สำหรับสร้าง URL รูปภาพ (ใช้ logic เดียวกับ CardItem/DeckTray)
-  const getCardImageURL = (card) => {
-    const encodedImagePath = encodePath(card.imagePath);
-    // ใช้ logic การลบ ' - Only#1' ตามที่คุณได้กำหนดไว้
-    const fileId = card.id.replace(' - Only#1', ''); 
-    // ใช้ Path สัมบูรณ์ /cards/ แทน CARD_BASE_URL
-    return `/cards/${encodedImagePath}/${encodeURIComponent(fileId)}.png`;
-  };
-
-  return (
-    <div className="mb-6">
-      <h4 className="text-lg font-semibold text-emerald-600 dark:text-emerald-300 mb-3 border-b border-dashed border-slate-300 dark:border-slate-700 pb-1">
-        {title} ({cards.length} ใบ)
-      </h4>
-      <div className="flex flex-wrap gap-x-4 gap-y-3">
-        {cards.map((card, index) => (
-          <div key={`${card.id}-${index}`} className="flex items-center gap-2 w-full md:w-[calc(50%-8px)] lg:w-[calc(33.33%-12px)]">
-            
-            {/* รูปย่อของการ์ด */}
-            <img 
-              src={getCardImageURL(card)} 
-              alt={card.name} 
-              className="w-10 h-auto rounded-sm shadow shrink-0" 
-              onError={(e) => { e.currentTarget.src = e.currentTarget.src.replace('.png', '.jpg'); }}
-            />
-
-            {/* รายละเอียด */}
-            <div className="flex flex-col min-w-0">
-              <span className="text-sm font-medium text-slate-900 dark:text-white truncate" title={card.name}>
-                {card.name}
-              </span>
-              <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-gray-400">
-                <span className="font-semibold text-emerald-600 dark:text-emerald-400">C:{card.cost ?? '-'}</span>
-                <span className="font-semibold text-red-600 dark:text-red-400">P:{card.power ?? '-'}</span>
-                <span className="font-semibold text-amber-600 dark:text-amber-400">G:{card.gem ?? '-'}</span>
-                {card.colorType && <ColorPip color={card.colorType} />}
-              </div>
-            </div>
-            
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-};
-
 // =================================================================
 // === 📍 [1] แก้ไข DeckAnalysisModal ให้รับ `showChart`
 // =================================================================
@@ -1015,8 +960,11 @@ function DeckAnalysisModal({ isOpen, onClose, mainDeck, lifeDeck, showAlert, the
         const earlyGameScore = (mainDeck.filter(c => (c.cost ?? 0) <= 2).length / (mainDeck.length * 0.5)) * maxStatValue; const midGameScore = (mainDeck.filter(c => (c.cost ?? 0) >= 3 && (c.cost ?? 0) <= 5).length / (mainDeck.length * 0.4)) * maxStatValue; const lateGameScore = (mainDeck.filter(c => (c.cost ?? 0) >= 6).length / (mainDeck.length * 0.2)) * maxStatValue; const offenseScore = (parseFloat(avgPower) / 6) * maxStatValue; const defenseScore = (mainDeck.filter(c => c.type !== 'Magic').length / 40) * maxStatValue; const utilityScore = ((typeCounts['Magic'] || 0) / 15) * maxStatValue; 
         const radarData = { labels, datasets: [{ label: 'ศักยภาพเด็ค', data: [earlyGameScore, midGameScore, lateGameScore, offenseScore, defenseScore, utilityScore].map(v => Math.round(Math.min(100, Math.max(0, v || 0)))), backgroundColor: 'rgba(52, 211, 153, 0.2)', borderColor: 'rgb(52, 211, 153)', pointBackgroundColor: 'rgb(52, 211, 153)', pointBorderColor: '#000000ff', pointHoverBackgroundColor: '#000000ff', pointHoverBorderColor: 'rgb(52, 211, 153)' }]};
         
+        // 🛑 [ลบ] radarOptions (Static) ที่เคยอยู่ตรงนี้
+        
         const deckCode = encodeDeckCode(mainDeck, lifeDeck);
         
+        // 🛑 [ลบ] radarOptions ออกจาก return นี้
         return { avgCost, avgPower, avgGem, cardTypes, radarData, deckCode, only1Card, avatars, magics, constructs, otherCards };
     
     }, [mainDeck, lifeDeck, theme]);
@@ -1077,15 +1025,13 @@ function DeckAnalysisModal({ isOpen, onClose, mainDeck, lifeDeck, showAlert, the
     
     if (!isOpen || !analysis) return null;
 
-    // 🛑 [ส่วนนี้ถูกลบออก] เนื่องจากเป็นโค้ดซ้ำซ้อนและไม่มีตัวแปร 'groupedCards'
-    /*
     <div className="grid grid-cols-[repeat(auto-fit,minmax(6rem,1fr))] gap-2 justify-center">
           {groupedCards.map(({ card, count }, index) => { // <-- [1] เพิ่ม index
             const encodedImagePath = encodePath(card.imagePath);
             const fileId = card.id.replace(' - Only#1', '');
             const thumbPng = `/cards/${encodedImagePath}/${encodeURIComponent(fileId)}.png`;
             return (
-              <div key={`${card.id}-${index}`} className="relative w-24"> // <-- [2] แก้ไข key
+              <div key={`${card.id}-${index}`} className="relative w-24"> {/* <-- [2] แก้ไข key */}
                 <img src={thumbPng} alt={card.name} className="w-full rounded-md shadow" onError={(e) => { e.currentTarget.src = e.currentTarget.src.replace('.png', '.jpg'); }} />
                 {count > 1 && (
                   <div className="absolute -top-2 -right-2 w-5 h-5 flex items-center justify-center bg-amber-500 text-white text-xs font-bold rounded-full border-2 border-white dark:border-slate-800">{count}</div>
@@ -1094,25 +1040,8 @@ function DeckAnalysisModal({ isOpen, onClose, mainDeck, lifeDeck, showAlert, the
             );
           })}
         </div>
-    */
 
-    return createPortal( 
-      <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-[250] p-4"> 
-        <div className="bg-slate-100 dark:bg-slate-900/80 border border-slate-300 dark:border-emerald-500/30 rounded-xl shadow-2xl w-full h-full flex flex-col max-w-7xl max-h-[90vh]"> 
-          <header className="flex items-center justify-between p-4 border-b border-slate-300 dark:border-emerald-500/20 shrink-0"> 
-            <h2 className="text-2xl font-bold text-slate-900 dark:text-white">ผลลัพธ์การสร้างเด็ค</h2> 
-            <Button onClick={onClose}>Close</Button> 
-          </header> 
-          <div className="flex-grow overflow-hidden grid grid-cols-1 md:grid-cols-3 gap-6 p-6"> 
-            <div className="md:col-span-1 flex flex-col gap-6 overflow-y-auto pr-2"> 
-              <div> 
-                <h3 className="text-xl font-semibold text-amber-600 dark:text-amber-300 border-b border-amber-500/20 pb-1 mb-3">สถิติเด็ค</h3> 
-                <div className="grid grid-cols-3 gap-4 text-center"> 
-                  <div><span className="text-sm text-gray-500 dark:text-gray-400">Avg Cost</span><p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{analysis.avgCost}</p></div> 
-                  <div><span className="text-sm text-gray-500 dark:text-gray-400">Avg Power</span><p className="text-2xl font-bold text-red-600 dark:text-red-400">{analysis.avgPower}</p></div> 
-                  <div><span className="text-sm text-gray-500 dark:text-gray-400">Avg Gem</span><p className="text-2xl font-bold text-amber-600 dark:text-amber-400">{analysis.avgGem}</p></div> 
-                </div> 
-              </div>
+    return createPortal( <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-[250] p-4"> <div className="bg-slate-100 dark:bg-slate-900/80 border border-slate-300 dark:border-emerald-500/30 rounded-xl shadow-2xl w-full h-full flex flex-col max-w-7xl max-h-[90vh]"> <header className="flex items-center justify-between p-4 border-b border-slate-300 dark:border-emerald-500/20 shrink-0"> <h2 className="text-2xl font-bold text-slate-900 dark:text-white">ผลลัพธ์การสร้างเด็ค</h2> <Button onClick={onClose}>Close</Button> </header> <div className="flex-grow overflow-hidden grid grid-cols-1 md:grid-cols-3 gap-6 p-6"> <div className="md:col-span-1 flex flex-col gap-6 overflow-y-auto pr-2"> <div> <h3 className="text-xl font-semibold text-amber-600 dark:text-amber-300 border-b border-amber-500/20 pb-1 mb-3">สถิติเด็ค</h3> <div className="grid grid-cols-3 gap-4 text-center"> <div><span className="text-sm text-gray-500 dark:text-gray-400">Avg Cost</span><p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{analysis.avgCost}</p></div> <div><span className="text-sm text-gray-500 dark:text-gray-400">Avg Power</span><p className="text-2xl font-bold text-red-600 dark:text-red-400">{analysis.avgPower}</p></div> <div><span className="text-sm text-gray-500 dark:text-gray-400">Avg Gem</span><p className="text-2xl font-bold text-amber-600 dark:text-amber-400">{analysis.avgGem}</p></div> </div> </div>
         
         {/* ================================================================= */}
         {/* === 📍 [2] ซ่อน/แสดง กราฟหกเหลี่ยมตาม `showChart` === */}
@@ -1128,7 +1057,7 @@ function DeckAnalysisModal({ isOpen, onClose, mainDeck, lifeDeck, showAlert, the
 // ... (ส่วน import ด้านบนไฟล์ App.jsx คงเดิม)
 
 // ---------------------------------------------------------
-// ค้นหา function DeckListModal ในไฟล์ App.jsx แล้วแทนที่ด้วยโค้ดนี้
+// 📱 DeckListModal - Redesigned for Mobile Compact View
 // ---------------------------------------------------------
 
 function DeckListModal({
@@ -1185,11 +1114,7 @@ function DeckListModal({
 
   const handleSave = (index) => {
     const newSlots = [...slots];
-    newSlots[index] = {
-      ...newSlots[index],
-      main: mainDeck,
-      life: lifeDeck
-    };
+    newSlots[index] = { ...newSlots[index], main: mainDeck, life: lifeDeck };
     updateSlots(newSlots);
     showAlert("Deck Saved!", `บันทึกเด็คปัจจุบันลงใน "${newSlots[index].name}" แล้ว`);
   };
@@ -1253,57 +1178,6 @@ function DeckListModal({
     });
   };
 
-  const performShare = async (slot, only1Card, targetDeckId = null) => {
-    closeModal(); 
-    try {
-      const batch = writeBatch(db);
-      const newDeckRef = targetDeckId 
-        ? doc(db, "publicDecks", targetDeckId) 
-        : doc(collection(db, "publicDecks"));
-        
-      const deckId = newDeckRef.id;
-      const allCardsInDeck = [...slot.main, ...slot.life];
-      const factions = [...new Set(allCardsInDeck.map(c => c.faction).filter(Boolean))];
-
-      const listData = {
-        deckName: slot.name,
-        only1CardData: {
-          id: only1Card.id,
-          name: only1Card.name,
-          imagePath: only1Card.imagePath,
-        },
-        user: {
-          name: userProfile.name,
-          picture: userProfile.picture,
-          email: userProfile.email,
-        },
-        sharedAt: serverTimestamp(),
-        likeCount: 0,
-        likedBy: [],
-        factions: factions,
-        viewCount: 0
-      };
-
-      const detailData = {
-        mainDeck: slot.main.map(c => c.id),
-        lifeDeck: slot.life.map(c => c.id),
-      };
-
-      batch.set(newDeckRef, listData); 
-      const detailRef = doc(db, "publicDeckDetails", deckId);
-      batch.set(detailRef, detailData);
-      
-      await batch.commit();
-
-      const actionText = targetDeckId ? "เขียนทับเด็คเรียบร้อย!" : "แชร์เด็คสำเร็จ!";
-      showAlert(actionText, `เด็ค "${slot.name}" ของคุณถูกแชร์สู่สาธารณะแล้ว!`);
-
-    } catch (e) {
-      console.error("Error sharing deck: ", e);
-      showAlert("เกิดข้อผิดพลาด", "ไม่สามารถแชร์เด็คได้ โปรดลองอีกครั้ง");
-    }
-  };
-
   const handleShareDeck = async (index) => {
     const slot = slots[index];
     const only1Card = slot.main.find(c => c.onlyRank === 1);
@@ -1318,76 +1192,70 @@ function DeckListModal({
       const querySnapshot = await getDocs(q);
       const existingDecks = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
+      const performShare = async (targetDeckId = null) => {
+        closeModal();
+        try {
+          const batch = writeBatch(db);
+          const newDeckRef = targetDeckId ? doc(db, "publicDecks", targetDeckId) : doc(collection(db, "publicDecks"));
+          const deckId = newDeckRef.id;
+          const allCardsInDeck = [...slot.main, ...slot.life];
+          const factions = [...new Set(allCardsInDeck.map(c => c.faction).filter(Boolean))];
+          
+          const listData = {
+            deckName: slot.name,
+            only1CardData: { id: only1Card.id, name: only1Card.name, imagePath: only1Card.imagePath },
+            user: { name: userProfile.name, picture: userProfile.picture, email: userProfile.email },
+            sharedAt: serverTimestamp(),
+            likeCount: 0, likedBy: [], factions: factions, viewCount: 0
+          };
+          const detailData = { mainDeck: slot.main.map(c => c.id), lifeDeck: slot.life.map(c => c.id) };
+
+          batch.set(newDeckRef, listData); 
+          batch.set(doc(db, "publicDeckDetails", deckId), detailData);
+          await batch.commit();
+
+          showAlert(targetDeckId ? "เขียนทับเรียบร้อย!" : "แชร์เด็คสำเร็จ!", `เด็ค "${slot.name}" ถูกแชร์แล้ว!`);
+        } catch (e) { console.error(e); showAlert("Error", "แชร์ไม่สำเร็จ"); }
+      };
+
       if (existingDecks.length >= 2) {
         setModal({
-          isOpen: true,
-          title: "โควตาเต็ม (Max 2 Decks)",
+          isOpen: true, title: "โควตาเต็ม (Max 2 Decks)",
           message: (
-            <div className="flex flex-col gap-3">
-              <p className="text-slate-700 dark:text-gray-300">
-                คุณแชร์เด็คสาธารณะครบ 2 เด็คแล้ว <br/>
-                กรุณาเลือกเด็คที่ต้องการ <b>เขียนทับ</b>:
-              </p>
+            <div className="flex flex-col gap-3"><p>คุณแชร์ครบ 2 เด็คแล้ว เลือกเด็คที่ต้องการเขียนทับ:</p>
               <div className="flex flex-col gap-2 mt-2">
-                {existingDecks.map(deck => (
-                  <button
-                    key={deck.id}
-                    onClick={() => performShare(slot, only1Card, deck.id)}
-                    className="flex flex-col items-start p-3 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 hover:bg-red-50 dark:hover:bg-red-900/20 hover:border-red-400 transition-all group"
-                  >
-                    <span className="font-bold text-slate-900 dark:text-white group-hover:text-red-600 dark:group-hover:text-red-400">
-                      {deck.deckName}
-                    </span>
-                    <span className="text-xs text-slate-500">
-                      แชร์เมื่อ: {deck.sharedAt?.toDate().toLocaleString('th-TH')}
-                    </span>
-                  </button>
+                {existingDecks.map(d => (
+                  <button key={d.id} onClick={() => performShare(d.id)} className="p-3 rounded border hover:bg-red-50 text-left font-bold">{d.deckName}</button>
                 ))}
               </div>
-              <button onClick={closeModal} className="mt-2 text-sm text-slate-500 hover:underline self-center">ยกเลิก</button>
+              <button onClick={closeModal} className="mt-2 text-sm underline self-center">ยกเลิก</button>
             </div>
-          ),
-          confirmText: null,
-          onConfirm: null
+          ), confirmText: null
         });
       } else {
-        setModal({ 
-          isOpen: true,
-          title: "Confirm Share Deck",
-          message: `คุณต้องการแชร์เด็ค "${slot.name}" สู่สาธารณะใช่หรือไม่? (ชื่อและรูปโปรไฟล์ Google ของคุณจะถูกแสดง)`,
-          onConfirm: () => performShare(slot, only1Card, null),
-          confirmText: "Confirm Share",
-          confirmIcon: <UploadIcon />
-        });
+        setModal({ isOpen: true, title: "Confirm Share", message: `แชร์เด็ค "${slot.name}" สู่สาธารณะ?`, onConfirm: () => performShare(null), confirmText: "Share", confirmIcon: <UploadIcon /> });
       }
-
-    } catch (e) {
-      console.error("Error checking existing decks:", e);
-      showAlert("Error", "ไม่สามารถตรวจสอบข้อมูลเด็คได้");
-    }
+    } catch (e) { console.error(e); showAlert("Error", "ตรวจสอบข้อมูลไม่สำเร็จ"); }
   };
 
   return createPortal(
     <>
       <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-[220] p-4">
-        <div className="bg-slate-100 dark:bg-slate-900/80 border border-slate-300 dark:border-emerald-500/30 rounded-xl shadow-2xl w-full max-w-4xl max-h-[85vh] flex flex-col">
+        <div className="bg-slate-100 dark:bg-slate-900/90 border border-slate-300 dark:border-emerald-500/30 rounded-xl shadow-2xl w-full max-w-4xl max-h-[85vh] flex flex-col">
           <header className="flex items-center justify-between p-4 border-b border-slate-300 dark:border-emerald-500/20 shrink-0">
-            <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Deck List Manager</h2>
-            <Button onClick={onClose}>Close</Button>
+            <h2 className="text-2xl font-bold text-slate-900 dark:text-white">My Decks</h2>
+            <Button onClick={onClose} className="px-3 py-1 text-sm">Close</Button>
           </header>
           
-          <div className="flex-grow overflow-y-auto p-6">
-            <p className="text-slate-700 dark:text-gray-300 mb-6">
-              บันทึกเด็คของคุณที่เชื่อมต่อกับบัญชี: <span className="font-bold text-amber-600 dark:text-amber-300">{userProfile.name} ({userProfile.email})</span>
+          <div className="flex-grow overflow-y-auto p-4">
+            <p className="text-sm text-slate-600 dark:text-gray-400 mb-4">
+              Account: <span className="font-bold text-amber-600 dark:text-amber-300">{userProfile.name}</span>
             </p>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* 🟢 Grid Layout ที่ปรับ Responsive */}
+            <div className="flex flex-col md:grid md:grid-cols-2 gap-4">
               {slots.map((slot, index) => {
                 const deckSize = slot.main.length + slot.life.length;
-
-                // -----------------------------------------------------
-                // ✨ ส่วนที่เพิ่ม: ค้นหาการ์ด Only #1 เพื่อนำมาแสดงรูป
-                // -----------------------------------------------------
                 const only1Card = slot.main.find(c => c.onlyRank === 1);
                 let coverImage = null;
                 if (only1Card) {
@@ -1395,81 +1263,61 @@ function DeckListModal({
                   const fileId = only1Card.id.replace(' - Only#1', '');
                   coverImage = `/cards/${encodedImagePath}/${encodeURIComponent(fileId)}.png`;
                 }
-                // -----------------------------------------------------
 
                 return (
-                  <CardShell key={index} className="flex flex-col gap-4 relative overflow-hidden">
+                  <div key={index} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-3 shadow-sm hover:shadow-md transition-shadow">
                     
-                    {/* แสดงรูปภาพหน้าปกเด็ค */}
-                    <div className="w-full h-48 bg-slate-200 dark:bg-slate-800 rounded-lg overflow-hidden flex items-center justify-center mb-1 shadow-inner relative group">
-                      {coverImage ? (
-                        <img 
-                          src={coverImage} 
-                          alt="Deck Cover" 
-                          className="h-full w-full object-contain p-2 transition-transform duration-500 group-hover:scale-105"
-                          onError={(e) => e.currentTarget.style.display = 'none'}
-                        />
-                      ) : (
-                        <div className="flex flex-col items-center text-slate-400 dark:text-slate-600">
-                          <span className="text-4xl mb-2">🃏</span>
-                          <span className="text-sm font-medium">No "Only #1" Card</span>
-                        </div>
-                      )}
+                    {/* 📱 Mobile: Flex Row / 💻 Desktop: Flex Col (บางส่วน) */}
+                    <div className="flex flex-row md:flex-col gap-3 h-full">
                       
-                      {/* Badge จำนวนการ์ด */}
-                      <div className="absolute top-2 right-2 bg-black/60 backdrop-blur-sm text-white text-xs px-2 py-1 rounded-full">
-                        {deckSize} Cards
+                      {/* 🖼️ Cover Image */}
+                      <div className="shrink-0 w-20 h-28 md:w-full md:h-40 bg-slate-200 dark:bg-slate-900 rounded-lg overflow-hidden relative flex items-center justify-center">
+                        {coverImage ? (
+                          <img src={coverImage} alt="Cover" className="w-full h-full object-cover md:object-contain" />
+                        ) : (
+                          <span className="text-2xl">🃏</span>
+                        )}
+                         <div className="absolute bottom-0 right-0 bg-black/60 text-white text-[10px] px-1.5 py-0.5 rounded-tl-md">
+                            {deckSize} Cards
+                          </div>
+                      </div>
+
+                      {/* 📝 Info & Actions */}
+                      <div className="flex-grow flex flex-col justify-between min-w-0">
+                        <div className="mb-2">
+                           <input
+                            type="text"
+                            value={slot.name}
+                            onChange={(e) => handleNameChange(index, e.target.value)}
+                            className="w-full bg-transparent border-b border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white font-bold text-lg focus:border-emerald-500 outline-none py-1"
+                          />
+                        </div>
+
+                        {/* 🟢 Action Buttons Group */}
+                        <div className="flex flex-col gap-2">
+                            {/* Primary Actions (Load/Save) */}
+                            <div className="flex gap-2">
+                                <Button onClick={() => handleLoad(index)} disabled={deckSize === 0} className="flex-1 py-1.5 text-xs bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300 border-emerald-200">
+                                    Load
+                                </Button>
+                                <Button onClick={() => handleSave(index)} className="flex-1 py-1.5 text-xs bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 border-amber-200">
+                                    Save
+                                </Button>
+                            </div>
+
+                            {/* Secondary Actions (Icons Row) */}
+                            <div className="flex items-center justify-between gap-1 mt-1">
+                                <button onClick={() => onShowCards({ main: slot.main, life: slot.life })} disabled={deckSize === 0} className="p-2 rounded-lg text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/20 disabled:opacity-30" title="Show Cards"><EyeIcon /></button>
+                                <button onClick={() => handleImport(index)} className="p-2 rounded-lg text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-700" title="Import"><ImportIcon /></button>
+                                <button onClick={() => handleExport(index)} disabled={deckSize === 0} className="p-2 rounded-lg text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-700 disabled:opacity-30" title="Export"><ExportIcon /></button>
+                                <button onClick={() => handleShareDeck(index)} disabled={deckSize === 0} className="p-2 rounded-lg text-purple-600 hover:bg-purple-50 dark:text-purple-400 dark:hover:bg-purple-900/20 disabled:opacity-30" title="Share"><UploadIcon /></button>
+                                <div className="w-px h-4 bg-slate-300 dark:bg-slate-600 mx-1"></div>
+                                <button onClick={() => handleClearSlot(index)} className="p-2 rounded-lg text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20" title="Clear"><TrashIcon /></button>
+                            </div>
+                        </div>
                       </div>
                     </div>
-
-                    <input
-                      type="text"
-                      value={slot.name}
-                      onChange={(e) => handleNameChange(index, e.target.value)}
-                      className="w-full px-3 py-2 border border-slate-300 dark:border-emerald-500/30 rounded-lg focus:ring-2 focus:ring-amber-500 focus:outline-none transition bg-white/50 dark:bg-slate-700/50 placeholder-gray-500 dark:placeholder-gray-400 text-slate-900 dark:text-white text-lg font-bold text-center"
-                    />
-                    
-                    <div className="grid grid-cols-2 gap-2">
-                      <Button onClick={() => handleLoad(index)} disabled={deckSize === 0} className="bg-emerald-200 dark:bg-emerald-600/30 border-emerald-300 dark:border-emerald-500/30 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-300 dark:hover:bg-emerald-500/50 dark:hover:text-white">
-                        Load
-                      </Button>
-                      <Button onClick={() => handleSave(index)} className="bg-amber-200 dark:bg-amber-600/30 border-amber-300 dark:border-amber-500/30 text-amber-700 dark:text-amber-300 hover:bg-amber-300 dark:hover:bg-amber-500/50 dark:hover:text-white">
-                        Save Current
-                      </Button>
-                    </div>
-
-                    <Button
-                      onClick={() => onShowCards({ main: slot.main, life: slot.life })}
-                      disabled={deckSize === 0}
-                      className="w-full bg-blue-200 dark:bg-blue-600/30 border-blue-300 dark:border-blue-500/30 text-blue-700 dark:text-blue-300 hover:bg-blue-300 dark:hover:bg-blue-500/50 dark:hover:text-white"
-                    >
-                      <EyeIcon /> Show Cards
-                    </Button>
-
-                    <div className="grid grid-cols-3 gap-2">
-                      <Button onClick={() => handleImport(index)} className="px-2">
-                        <ImportIcon /> <span className="hidden sm:inline">Import</span>
-                      </Button>
-                      <Button onClick={() => handleExport(index)} disabled={deckSize === 0} className="px-2">
-                        <ExportIcon /> <span className="hidden sm:inline">Export</span>
-                      </Button>
-                      <Button 
-                        onClick={() => handleShareDeck(index)} 
-                        disabled={deckSize === 0}
-                        className="bg-blue-200 dark:bg-blue-600/30 border-blue-300 dark:border-blue-500/30 text-blue-700 dark:text-blue-300 hover:bg-blue-300 dark:hover:bg-blue-500/50 dark:hover:text-white px-2"
-                      >
-                        <UploadIcon /> <span className="hidden sm:inline">Share</span>
-                      </Button>
-                    </div>
-                    
-                    <Button 
-                      onClick={() => handleClearSlot(index)} 
-                      className="w-full mt-2 bg-red-200 dark:bg-red-900/30 border-red-300 dark:border-red-500/30 text-red-700 dark:text-red-300 hover:bg-red-300 dark:hover:bg-red-800/50 dark:hover:text-white"
-                    >
-                       <TrashIcon /> Clear Slot
-                    </Button>
-
-                  </CardShell>
+                  </div>
                 );
               })}
             </div>
@@ -1477,22 +1325,21 @@ function DeckListModal({
         </div>
       </div>
 
+      {/* Import Modal (Sub-modal) */}
       {importingSlot !== null && createPortal(
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[230] p-4">
           <div className="bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-emerald-500/30 rounded-xl shadow-2xl p-6 w-full max-w-md">
-            <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4">Import Deck Code (to {slots[importingSlot].name})</h2>
+            <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4">Import to "{slots[importingSlot].name}"</h2>
             <textarea
               value={importCode}
               onChange={(e) => setImportCode(e.target.value)}
               placeholder="วางรหัสเด็คที่นี่..."
               rows="4"
-              className="w-full px-3 py-2 border border-slate-300 dark:border-emerald-500/30 rounded-lg focus:ring-2 focus:ring-amber-500 focus:outline-none transition bg-white dark:bg-slate-700/50 placeholder-gray-400 text-slate-900 dark:text-white mb-6 resize-none"
+              className="w-full px-3 py-2 border border-slate-300 dark:border-emerald-500/30 rounded-lg focus:ring-2 focus:ring-amber-500 focus:outline-none bg-white dark:bg-slate-700/50 text-slate-900 dark:text-white mb-4 resize-none"
             />
             <div className="flex justify-end gap-3">
-              <Button onClick={() => setImportingSlot(null)} className="bg-slate-200 dark:bg-slate-700/50 border-slate-300 dark:border-slate-600 text-slate-700 dark:text-gray-300 hover:bg-slate-300 dark:hover:bg-slate-600">Cancel</Button>
-              <Button onClick={confirmInternalImport} className="bg-emerald-200 dark:bg-emerald-900/50 border-emerald-300 dark:border-emerald-500/30 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-300 dark:hover:bg-emerald-800/50 dark:hover:text-white">
-                <ImportIcon /> Import
-              </Button>
+              <Button onClick={() => setImportingSlot(null)} className="bg-slate-200 dark:bg-slate-700/50 text-slate-700 dark:text-gray-300">Cancel</Button>
+              <Button onClick={confirmInternalImport} className="bg-emerald-600 text-white hover:bg-emerald-500 border-none"><ImportIcon /> Import</Button>
             </div>
           </div>
         </div>, document.body
@@ -1549,15 +1396,22 @@ function LeftSidebar({
   };
   return (
     <aside
-      className={`w-full flex flex-col p-4 bg-white/40 dark:bg-black/40 md:h-full md:w-full md:shrink-0 md:border-r border-slate-300 dark:border-emerald-700/30 backdrop-blur-lg z-30 transition-opacity duration-300 ${
-        isSidebarOpen ? "opacity-100" : "opacity-0 md:opacity-100"
-      }`}
+      className={`
+        w-full h-full flex flex-col 
+        p-4 
+        bg-transparent
+        overflow-y-auto overflow-x-hidden /* ✅ ให้ scroll ทั้งก้อนที่ตรงนี้ */
+        scrollbar-thin scrollbar-thumb-slate-400 dark:scrollbar-thumb-slate-600
+        md:w-full md:shrink-0 md:border-r border-slate-300 dark:border-emerald-700/30 
+        z-30 
+        transition-opacity duration-300 
+        ${isSidebarOpen ? "opacity-100" : "opacity-0 md:opacity-100"}
+      `}
     >
-      <div className="flex-1 md:overflow-y-auto pr-2 space-y-4">
+      {/* 🟢 ส่วนรายการ Filter */}
+      <div className="space-y-4 pb-4"> {/* ลบ flex-1 overflow-y-auto ออก */}
         <div>
-          <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-2">
-            Filters
-          </h2>
+          <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-2">Filters</h2>
           <input
             type="search"
             placeholder="ค้นหาชื่อการ์ด..."
@@ -1566,221 +1420,99 @@ function LeftSidebar({
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
+        
+        {/* Filters: Card Type */}
         {allCardTypes.length > 0 && (
           <div className="flex flex-wrap gap-2">
-            <button
-              onClick={() => setFilterTypes([])}
-              className={`px-3 py-1 text-sm rounded-full transition-colors ${
-                filterTypes.length === 0
-                  ? "bg-amber-500 text-white font-semibold shadow"
-                  : "bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-700 dark:text-gray-300"
-              }`}
-            >
-              All
-            </button>
+            <button onClick={() => setFilterTypes([])} className={`px-3 py-1 text-sm rounded-full transition-colors ${filterTypes.length === 0 ? "bg-amber-500 text-white font-semibold shadow" : "bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-700 dark:text-gray-300"}`}>All</button>
             {allCardTypes.map((type) => (
-              <button
-                key={type}
-                onClick={() => handleToggle(setFilterTypes, type)}
-                className={`px-3 py-1 text-sm rounded-full transition-colors ${
-                  filterTypes.includes(type)
-                    ? "bg-amber-500 text-white font-semibold shadow"
-                    : "bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-700 dark:text-gray-300"
-                }`}
-              >
-                {type}
-              </button>
+              <button key={type} onClick={() => handleToggle(setFilterTypes, type)} className={`px-3 py-1 text-sm rounded-full transition-colors ${filterTypes.includes(type) ? "bg-amber-500 text-white font-semibold shadow" : "bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-700 dark:text-gray-300"}`}>{type}</button>
             ))}
           </div>
         )}
+
+        {/* Filters: Magic Subtype */}
         {filterTypes.includes("Magic") && (
           <div className="pl-4 mt-2 border-l-2 border-slate-300 dark:border-slate-600">
-            <h3 className="text-sm font-semibold text-slate-500 dark:text-gray-400 mt-2 mb-2 uppercase tracking-wider">
-              Magic Type
-            </h3>
+            <h3 className="text-sm font-semibold text-slate-500 dark:text-gray-400 mt-2 mb-2 uppercase tracking-wider">Magic Type</h3>
             <div className="flex flex-wrap gap-2">
               {["All", ...allMagicTypes].map((magicType) => (
-                <button
-                  key={magicType}
-                  onClick={() => setFilterMagicType(magicType)}
-                  className={`px-3 py-1 text-xs rounded-full transition-colors ${
-                    filterMagicType === magicType
-                      ? "bg-amber-600 text-white font-semibold shadow"
-                      : "bg-slate-300 dark:bg-slate-600 hover:bg-slate-400 dark:hover:bg-slate-500 text-slate-700 dark:text-gray-300"
-                  }`}
-                >
-                  {magicType}
-                </button>
+                <button key={magicType} onClick={() => setFilterMagicType(magicType)} className={`px-3 py-1 text-xs rounded-full transition-colors ${filterMagicType === magicType ? "bg-amber-600 text-white font-semibold shadow" : "bg-slate-300 dark:bg-slate-600 hover:bg-slate-400 dark:hover:bg-slate-500 text-slate-700 dark:text-gray-300"}`}>{magicType}</button>
               ))}
             </div>
           </div>
         )}
+
+        {/* Filters: Color */}
         {allColorTypes.length > 0 && (
           <div>
-            <h3 className="text-sm font-semibold text-slate-500 dark:text-gray-400 mt-4 mb-2 uppercase tracking-wider">
-              Color
-            </h3>
+            <h3 className="text-sm font-semibold text-slate-500 dark:text-gray-400 mt-4 mb-2 uppercase tracking-wider">Color</h3>
             <div className="flex flex-wrap gap-2">
-              <button
-                onClick={() => setFilterColors([])}
-                className={`px-3 py-1 text-sm rounded-full transition-colors ${
-                  filterColors.length === 0
-                    ? "bg-amber-500 text-white font-semibold shadow"
-                    : "bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-700 dark:text-gray-300"
-                }`}
-              >
-                All
-              </button>
+              <button onClick={() => setFilterColors([])} className={`px-3 py-1 text-sm rounded-full transition-colors ${filterColors.length === 0 ? "bg-amber-500 text-white font-semibold shadow" : "bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-700 dark:text-gray-300"}`}>All</button>
               {allColorTypes.map((color) => (
-                <button
-                  key={color}
-                  onClick={() => handleToggle(setFilterColors, color)}
-                  className={`px-3 py-1 text-sm rounded-full transition-colors ${
-                    filterColors.includes(color)
-                      ? "bg-amber-500 text-white font-semibold shadow"
-                      : "bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-700 dark:text-gray-300"
-                  }`}
-                >
-                  {color}
-                </button>
+                <button key={color} onClick={() => handleToggle(setFilterColors, color)} className={`px-3 py-1 text-sm rounded-full transition-colors ${filterColors.includes(color) ? "bg-amber-500 text-white font-semibold shadow" : "bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-700 dark:text-gray-300"}`}>{color}</button>
               ))}
             </div>
           </div>
         )}
+
+        {/* Filters: Rarity */}
         {allRarities.length > 0 && (
-          <div>
-            <h3 className="text-sm font-semibold text-slate-500 dark:text-gray-400 mt-4 mb-2 uppercase tracking-wider">
-              Rarity
-            </h3> {/* 🛑 แก้ไขจาก </b> เป็น </h3> */}
-            <div className="flex flex-wrap gap-2">
-              <button
-                onClick={() => setFilterRarities([])}
-                className={`px-3 py-1 text-sm rounded-full transition-colors ${
-                  filterRarities.length === 0
-                    ? "bg-amber-500 text-white font-semibold shadow"
-                    : "bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-700 dark:text-gray-300"
-                }`}
-              >
-                All
-              </button>
+          <div>
+            <h3 className="text-sm font-semibold text-slate-500 dark:text-gray-400 mt-4 mb-2 uppercase tracking-wider">Rarity</h3>
+            <div className="flex flex-wrap gap-2">
+              <button onClick={() => setFilterRarities([])} className={`px-3 py-1 text-sm rounded-full transition-colors ${filterRarities.length === 0 ? "bg-amber-500 text-white font-semibold shadow" : "bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-700 dark:text-gray-300"}`}>All</button>
               {allRarities.map((rarity) => (
-                <button
-                  key={rarity}
-                  onClick={() => handleToggle(setFilterRarities, rarity)}
-                  className={`px-3 py-1 text-sm rounded-full transition-colors ${
-                    filterRarities.includes(rarity)
-                      ? "bg-amber-500 text-white font-semibold shadow"
-                      : "bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-700 dark:text-gray-300"
-                  }`}
-                >
-                  {rarity}
-                </button>
+                <button key={rarity} onClick={() => handleToggle(setFilterRarities, rarity)} className={`px-3 py-1 text-sm rounded-full transition-colors ${filterRarities.includes(rarity) ? "bg-amber-500 text-white font-semibold shadow" : "bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-700 dark:text-gray-300"}`}>{rarity}</button>
               ))}
             </div>
           </div>
         )}
-        {allSets.length > 0 && (
-          <div>
-            <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2 mt-4">
-              Sets
-            </h3> {/* 🛑 แก้ไขจาก </b> เป็น </h3> */}
-            <div className="space-y-2 max-h-40 overflow-y-auto pr-2">
+
+        {/* Filters: Sets */}
+        {allSets.length > 0 && (
+          <div>
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2 mt-4">Sets</h3>
+            <div className="space-y-2 max-h-40 overflow-y-auto pr-2 border border-slate-200 dark:border-slate-700 rounded p-2">
               {allSets.map((set) => (
-                <label
-                  key={set}
-                  className="flex items-center gap-2 text-slate-700 dark:text-gray-300 cursor-pointer"
-                >
-                  <input
-                    type="checkbox"
-                    checked={selectedSets.includes(set)}
-                    onChange={() => onSetSelectionChange(set)}
-                    className="w-4 h-4 rounded bg-slate-200 dark:bg-slate-600 border-slate-400 dark:border-slate-500 text-amber-500 focus:ring-amber-500"
-                  />
+                <label key={set} className="flex items-center gap-2 text-slate-700 dark:text-gray-300 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 p-1 rounded">
+                  <input type="checkbox" checked={selectedSets.includes(set)} onChange={() => onSetSelectionChange(set)} className="w-4 h-4 rounded bg-slate-200 dark:bg-slate-600 border-slate-400 dark:border-slate-500 text-amber-500 focus:ring-amber-500" />
                   {typeof set === "string" ? set.split("/")[1] || set : set}
                 </label>
               ))}
             </div>
           </div>
         )}
+
+        {/* Filters: Stats */}
         <div>
-          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2 mt-4">
-            Stats
-          </h3>
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2 mt-4">Stats</h3>
           <div className="grid grid-cols-3 gap-2 text-sm">
             {["cost", "power", "gem"].map((stat) => (
               <div key={stat}>
-                <label className="capitalize text-slate-500 dark:text-gray-400">
-                  {stat}
-                </label>
-                <input
-                  type="number"
-                  placeholder="Min"
-                  min="0"
-                  value={statFilters[stat].min}
-                  onChange={(e) =>
-                    onStatFilterChange(stat, "min", e.target.value)
-                  }
-                  className="w-full mt-1 px-2 py-1 border border-slate-300 dark:border-emerald-500/30 rounded-md bg-white/50 dark:bg-slate-700/50 text-slate-900 dark:text-white text-center"
-                />
-                <input
-                  type="number"
-                  placeholder="Max"
-                  min="0"
-                  value={statFilters[stat].max}
-                  onChange={(e) =>
-                    onStatFilterChange(stat, "max", e.target.value)
-                  }
-                  className="w-full mt-1 px-2 py-1 border border-slate-300 dark:border-emerald-500/30 rounded-md bg-white/50 dark:bg-slate-700/50 text-slate-900 dark:text-white text-center"
-                />
+                <label className="capitalize text-slate-500 dark:text-gray-400">{stat}</label>
+                <input type="number" placeholder="Min" min="0" value={statFilters[stat].min} onChange={(e) => onStatFilterChange(stat, "min", e.target.value)} className="w-full mt-1 px-2 py-1 border border-slate-300 dark:border-emerald-500/30 rounded-md bg-white/50 dark:bg-slate-700/50 text-slate-900 dark:text-white text-center" />
+                <input type="number" placeholder="Max" min="0" value={statFilters[stat].max} onChange={(e) => onStatFilterChange(stat, "max", e.target.value)} className="w-full mt-1 px-2 py-1 border border-slate-300 dark:border-emerald-500/30 rounded-md bg-white/50 dark:bg-slate-700/50 text-slate-900 dark:text-white text-center" />
               </div>
             ))}
           </div>
         </div>
       </div>
-      <div className="shrink-0 pt-4">
+
+      {/* 🟢 ส่วน Bottom (Deck Trays & Buttons) - ตอนนี้รวมอยู่ใน Flow เดียวกันแล้ว */}
+      <div className="pt-4 pb-20 border-t border-slate-300 dark:border-emerald-700/30 bg-transparent">
         <div className="flex flex-col gap-4 mb-4">
-          <DeckTray
-            ref={mainDeckRef}
-            title={`Main Deck`}
-            deck={mainDeck}
-            capacity={RULES.main.size}
-            onDropCard={addToMain}
-            onRemoveCard={removeFromMain}
-            highlight
-            onViewDeck={() => onViewDeck("main")}
-          />
-          <DeckTray
-            title={`Life Deck`}
-            deck={lifeDeck}
-            capacity={RULES.life.size}
-            onDropCard={addToLife}
-            onRemoveCard={removeFromLife}
-            onViewDeck={() => onViewDeck("life")}
-          />
+          <DeckTray ref={mainDeckRef} title={`Main Deck`} deck={mainDeck} capacity={RULES.main.size} onDropCard={addToMain} onRemoveCard={removeFromMain} highlight onViewDeck={() => onViewDeck("main")} />
+          <DeckTray title={`Life Deck`} deck={lifeDeck} capacity={RULES.life.size} onDropCard={addToLife} onRemoveCard={removeFromLife} onViewDeck={() => onViewDeck("life")} />
         </div>
-        <Button
-          onClick={onAnalyzeDeck}
-          disabled={isLoadingAnalysis}
-          className="w-full bg-emerald-200 dark:bg-emerald-600/30 border-emerald-300 dark:border-emerald-500/30 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-300 dark:hover:bg-emerald-500/50 dark:hover:text-white"
-        >
+        <Button onClick={onAnalyzeDeck} disabled={isLoadingAnalysis} className="w-full bg-emerald-200 dark:bg-emerald-600/30 border-emerald-300 dark:border-emerald-500/30 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-300 dark:hover:bg-emerald-500/50 dark:hover:text-white">
           {isLoadingAnalysis ? "กำลังประมวลผล..." : "สร้างเด็ค"}
         </Button>
         <div className="grid grid-cols-2 gap-2 pt-4 mt-4 border-t border-slate-300 dark:border-emerald-700/30">
-          <Button onClick={handleImport}>
-            <ImportIcon /> Import
-          </Button>
-          <Button onClick={handleExport}>
-            <ExportIcon /> Export
-          </Button>
-          <Button
-            onClick={handleClear}
-            className="col-span-2 bg-red-200 dark:bg-red-900/50 border-red-300 dark:border-red-500/30 text-red-700 dark:text-red-300 hover:bg-red-300 dark:hover:bg-red-800/50 dark:hover:text-white"
-          >
-            <TrashIcon /> Clear Deck
-          </Button>
-          <Button onClick={handleReloadFromTxt} className="col-span-2">
-            <DBLoadIcon /> Reload from TXT
-          </Button>
+          <Button onClick={handleImport}><ImportIcon /> Import</Button>
+          <Button onClick={handleExport}><ExportIcon /> Export</Button>
+          <Button onClick={handleClear} className="col-span-2 bg-red-200 dark:bg-red-900/50 border-red-300 dark:border-red-500/30 text-red-700 dark:text-red-300 hover:bg-red-300 dark:hover:bg-red-800/50 dark:hover:text-white"><TrashIcon /> Clear Deck</Button>
+          <Button onClick={handleReloadFromTxt} className="col-span-2"><DBLoadIcon /> Reload from TXT</Button>
         </div>
       </div>
     </aside>
@@ -1789,7 +1521,16 @@ function LeftSidebar({
 
 // === Card grid (right) ===
 function CardGrid({ cards, onDoubleClick, onViewDetails, onAddCard }) {
-  // ตรวจสอบว่ามี cards หรือไม่
+  // 🟢 1. เพิ่ม State ที่ตัวแม่ เพื่อจำว่า "การ์ดใบไหน" (index ไหน) กำลังซูมอยู่
+  // เก็บเป็น string unique key (เช่น "cardID-index")
+  const [activeZoomKey, setActiveZoomKey] = useState(null);
+
+  const handleMobileZoom = (key) => {
+    // ถ้ากดซ้ำใบเดิม -> ให้ปิด (set null)
+    // ถ้ากดใบใหม่ -> ให้ set เป็น key ใหม่ (ใบเก่าจะปิดเองอัตโนมัติ)
+    setActiveZoomKey(prev => prev === key ? null : key);
+  };
+
   if (cards.length === 0) {
     return (
       <CardShell>
@@ -1800,20 +1541,28 @@ function CardGrid({ cards, onDoubleClick, onViewDetails, onAddCard }) {
     );
   }
 
-  // แสดงผล grid ของการ์ด
   return (
-    // 📍 [แก้ไข Layout]: เริ่มที่ grid-cols-2 และลดช่องว่าง (gap) เพื่อเพิ่มขนาดการ์ด
-    <div className="grid grid-cols-2 gap-x-3 gap-y-6 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 lg:gap-x-4 lg:gap-y-8">
-      {cards.map((card, index) => (
-        <CardItem
-          // key ที่รวม id และ index เพื่อให้แน่ใจว่า key ไม่ซ้ำกัน
-          key={`${card.id}-${index}`} 
-          card={card}
-          onDoubleClick={onDoubleClick}
-          onViewDetails={onViewDetails}
-          onAddCard={onAddCard}
-        />
-      ))}
+    <div className="
+      grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 
+      gap-x-2 gap-y-4 
+      pb-32 
+    ">
+      {cards.map((card, index) => {
+        const uniqueKey = `${card.id}-${index}`;
+        return (
+          <CardItem
+            key={uniqueKey}
+            card={card}
+            onDoubleClick={onDoubleClick}
+            onViewDetails={onViewDetails}
+            onAddCard={onAddCard}
+            
+            // 🟢 2. ส่งสถานะไปบอกลูกว่า "เธอต้องขยายไหม" และส่งฟังก์ชันกดไปให้
+            isMobileZoomed={activeZoomKey === uniqueKey} 
+            onMobileClick={() => handleMobileZoom(uniqueKey)}
+          />
+        );
+      })}
     </div>
   );
 }
@@ -1851,7 +1600,7 @@ const CARD_PATHS = [
     file: "cardsSD07 - VS 18 หัวเมือง.txt" 
   },
 
-  // --- [ใหม่] Booster Set (BT01 - BT0) ---
+  // --- [ใหม่] Booster Set (BT01 - BT07) ---
   // (ผมอิงจากรูปและ Path ที่คุณส่งมานะครับ)
   { 
     path: "003.BOOSTER (BT01 - BT08)/BT01 - Welcome ตลิ่งชัน", 
@@ -1869,10 +1618,10 @@ const CARD_PATHS = [
     path: "003.BOOSTER (BT01 - BT08)/BT04 - ความจริง Today", 
     file: "cardsBT04 - ความจริง Today.txt" // (❗️ ต้องแน่ใจว่าชื่อไฟล์ .txt ตรงกัน)
   },
-  { 
-    path: "003.BOOSTER (BT01 - BT08)/BT05 - Culture ช๊อค",
-    file: "cardsBT05 - Culture ช๊อค.txt"  // (❗️ ต้องแน่ใจว่าชื่อไฟล์ .txt ตรงกัน)
-  },
+  { 
+    path: "003.BOOSTER (BT01 - BT08)/BT05 - Culture ช๊อค",
+    file: "cardsBT05 - Culture ช๊อค.txt"  // (❗️ ต้องแน่ใจว่าชื่อไฟล์ .txt ตรงกัน)
+  },
   { 
     path: "003.BOOSTER (BT01 - BT08)/BT06 - โลกา Amagedon", 
     file: "cardsBT06 - โลกา Amagedon.txt" // (❗️ ต้องแน่ใจว่าชื่อไฟล์ .txt ตรงกัน)
@@ -1943,22 +1692,42 @@ const getMagicSubType = (card) => {
 
 // === Main App ===
 export default function App() {
-  const [user, setUser] = useState(null);
   const [theme, setTheme] = useLocalStorage('bot-theme', 'dark'); // <--- [เพิ่ม] State สำหรับธีม
+  // ... (ต่อจาก useState ตัวอื่นๆ ใน function App) ...
+
+  // =========================================================
+  // 🟢 [เพิ่มส่วนนี้] State และ Ref สำหรับปุ่ม Scroll to Top
+  // =========================================================
+  const [showScrollTop, setShowScrollTop] = useState(false);
+  const scrollRef = useRef(null);
+
+  const handleScroll = () => {
+    if (scrollRef.current && scrollRef.current.scrollTop > 300) {
+      setShowScrollTop(true);
+    } else {
+      setShowScrollTop(false);
+    }
+  };
+
+  const scrollToTop = () => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+  // =========================================================
+
+  // ... (โค้ดส่วน useEffect หรืออื่นๆ ต่อไป) ...
   const [mainDeck, setMainDeck] = useLocalStorage("bot-mainDeck-v32-final", []); 
   const [lifeDeck, setLifeDeck] = useLocalStorage("bot-lifeDeck-v32-final", []); 
   const [cardDb, setCardDb] = useLocalStorage("bot-cardDb-v32-final", []);
   const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
   const [userDecks, setUserDecks] = useLocalStorage("bot-userDecks-v1", {});
   const [isDeckListModalOpen, setIsDeckListModalOpen] = useState(false);
-  const dndContextValue = useMemo(() => ({ cardDb }), [cardDb]);
+
   const [isAnimating, setIsAnimating] = useState(false); 
   const [flyingCard, setFlyingCard] = useState(null); 
   const mainDeckRef = useRef(null); 
   const [zoomedCard, setZoomedCard] = useState(null); 
-  
-  // 🟢 [REQUIRED CALL] เรียกใช้ Hook ตรวจจับ IAB ทันที
-  useCheckInAppBrowser();
   
   // =================================================================
   // === 📍 [3] แก้ไข State `analysisDeck`
@@ -2134,33 +1903,8 @@ export default function App() {
   const removeFromMain = (card) => { const idx = mainDeck.findLastIndex(c => nameKey(c.name) === nameKey(card.name)); if (idx > -1) setMainDeck(prev => prev.filter((_, i) => i !== idx)); };
   const addToLife = (card) => { if (!card.lifeEligible) { showAlert("Invalid Card", `การ์ด "${card.name}" ไม่สามารถใส่ใน Life Deck ได้`); return; }; if (lifeDeck.length >= RULES.life.size) { showAlert("Deck Full", `Life Deck เต็มแล้ว (ใส่ได้ ${RULES.life.size} ใบ)`); return; }; if (!lifeDeck.some(c => nameKey(c.name) === nameKey(card.name))) { setLifeDeck(prev => [...prev, card]); } else { showAlert("Duplicate Card", `การ์ดชื่อ "${card.name}" มีใน Life Deck แล้ว (ชื่อห้ามซ้ำ)`); } };
   const removeFromLife = (card) => { const idx = lifeDeck.findIndex(c => c.id === card.id); if (idx > -1) setLifeDeck(prev => prev.filter((_, i) => i !== idx)); };
-  // ใน App.jsx (ประมาณบรรทัดที่ 490)
-// ...
-  const handleCardDoubleClick = (card, cardElement) => { 
-    if (!cardElement || !mainDeckRef.current) return;
-    
-    // 🛑 [ใหม่] Logic: หากมีการ์ดกำลังบินอยู่ และเป็นการ์ดใบเดียวกัน ให้ยุบ/ยกเลิก
-    if (isAnimating && flyingCard?.card?.id === card.id) {
-        setFlyingCard(null); // หยุด Animation / ยุบการ์ด
-        setIsAnimating(false);
-        return; 
-    }
-    
-    if (card.lifeEligible) { 
-      showAlert("ไม่สามารถเพิ่มได้", `การ์ด "${card.name}" เป็นการ์ดสำหรับ Life Deck เท่านั้น โปรดลากไปวางใน Life Deck`); 
-      return; 
-    } 
-    
-    if (card.onlyRank === 1 && mainDeck.some(c => c.onlyRank === 1)) { showAlert("Rule Violation", "You can only have one 'Only #1' card in your Main Deck."); return; } 
-    if (mainDeck.filter(c => nameKey(c.name) === nameKey(card.name)).length >= RULES.main.maxCopiesPerName) { showAlert("Rule Violation", `You cannot have more than ${RULES.main.maxCopiesPerName} copies of "${card.name}".`); return; } 
-    if (mainDeck.length >= RULES.main.size) { showAlert("Deck Full", "Your Main Deck has reached the 50-card limit."); return; } 
-    
-    setIsAnimating(true); 
-    const startRect = cardElement.getBoundingClientRect(); 
-    const endRect = mainDeckRef.current.getBoundingClientRect(); 
-    setFlyingCard({ card, startRect, endRect }); 
-  };
-// ...const handleAnimationComplete = () => { if (flyingCard) { addToMain(flyingCard.card); setFlyingCard(null); setIsAnimating(false); } };
+  const handleCardDoubleClick = (card, cardElement) => { if (isAnimating || !cardElement || !mainDeckRef.current) return; if (card.lifeEligible) { showAlert("ไม่สามารถเพิ่มได้", `การ์ด "${card.name}" เป็นการ์ดสำหรับ Life Deck เท่านั้น โปรดลากไปวางใน Life Deck`); return; } setIsAnimating(true); const startRect = cardElement.getBoundingClientRect(); const endRect = mainDeckRef.current.getBoundingClientRect(); setFlyingCard({ card, startRect, endRect }); };
+  const handleAnimationComplete = () => { if (flyingCard) { addToMain(flyingCard.card); setFlyingCard(null); setIsAnimating(false); } };
   const handleExportCode = () => { if (mainDeck.length === 0 && lifeDeck.length === 0) { showAlert("Empty Deck", "เด็คของคุณว่างเปล่า ไม่มีอะไรให้ Export"); return; } const code = encodeDeckCode(mainDeck, lifeDeck); navigator.clipboard.writeText(code) .then(() => showAlert("Success!", `✅ คัดลอกรหัสเด็คลง Clipboard แล้ว!`)) .catch(err => { console.error('Failed to copy code: ', err); showAlert("Error", "ไม่สามารถคัดลอกรหัสเด็คได้"); }); };
   const handleImport = () => { setIsImportModalOpen(true); };
   const confirmImport = (code) => { closeImportModal(); if (!code) { return; } const decoded = decodeDeckCode(code, cardDb); if (decoded) { setMainDeck(decoded.main); setLifeDeck(decoded.life); showAlert("Import Success", "นำเข้าเด็คสำเร็จ!"); } else { showAlert("Import Error", "รหัสเด็คไม่ถูกต้อง หรือไม่พบการ์ดบางใบในฐานข้อมูลปัจจุบัน"); } };
@@ -2238,37 +1982,20 @@ export default function App() {
           ) : (
             <>
               <header className="px-4 lg:px-6 py-2 border-b border-slate-300 dark:border-emerald-700/30 bg-white/60 dark:bg-black/60 backdrop-blur-sm shrink-0 z-40">
-                <div className="flex items-center justify-between gap-4">
-                  <div className="flex items-center gap-3">
-                    {/* ปุ่ม MenuIcon ยังอยู่ */}
-                    <button
-                      onClick={() => setIsSettingsOpen(true)}
-                      className="p-2 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-full text-slate-800 dark:text-white transition-colors"
-                    >
-                      <MenuIcon />
-                    </button>
-                    <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight bg-gradient-to-r from-amber-500 to-emerald-600 dark:from-amber-300 dark:to-emerald-400 bg-clip-text text-transparent">
-                      Battle Of Talingchan
-                    </h1>
-                  </div>
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => setIsSettingsOpen(true)}
+                      className="p-2 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-full text-slate-800 dark:text-white transition-colors"
+                    >
+                      <MenuIcon />
+                    </button>
+                    <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight bg-gradient-to-r from-amber-500 to-emerald-600 dark:from-amber-300 dark:to-emerald-400 bg-clip-text text-transparent">
+                      Battle Of Talingchan
+                    </h1>
+                  </div>
 
-                  <div className="flex items-center gap-3">
-
-                  <div className="md:hidden flex items-center gap-2">
-                        <Button 
-                          onClick={() => setActiveView('cards')} 
-                          className={`px-3 py-1 text-sm ${activeView === 'cards' ? 'bg-emerald-600 text-white' : 'bg-slate-200 dark:bg-slate-700/50 text-slate-700 dark:text-gray-300'}`}
-                        >
-                          <CardsIcon />
-                        </Button>
-                        <Button 
-                          onClick={() => setActiveView('deck')} 
-                          className={`px-3 py-1 text-sm ${activeView === 'deck' ? 'bg-emerald-600 text-white' : 'bg-slate-200 dark:bg-slate-700/50 text-slate-700 dark:text-gray-300'}`}
-                        >
-                          <DeckIcon />
-                        </Button>
-                    </div>
-
+                  <div className="flex items-center gap-3">
                     <Link to="/public-decks">
                       <Button
                         as="span"
@@ -2299,14 +2026,51 @@ export default function App() {
                 </div>
               </header>
 
-              <main className="flex-1 flex flex-col md:flex-row overflow-x-hidden">
+              <main className="flex-1 flex flex-col md:flex-row overflow-hidden">
+                {/* ================================================================= */}
+                {/* 🌑 Backdrop (ฉากหลังสีดำ) - 🟢 แก้ไข: แสดงเฉพาะ Mobile (md:hidden) */}
+                {/* ================================================================= */}
                 <div
-                  className={` ${
-                    activeView === "deck" ? "block" : "hidden"
-                  } md:block ${
-                    isSidebarOpen ? "md:w-[360px]" : "md:w-0"
-                  } transition-all duration-300 ease-in-out overflow-hidden shrink-0 relative md:h-full w-full h-full overflow-y-auto md:overflow-y-hidden pb-16 md:pb-0 `}
+                  className={`
+                    fixed inset-0 bg-black/60 backdrop-blur-sm z-[80]
+                    transition-opacity duration-300 ease-in-out
+                    ${isSidebarOpen ? "opacity-100" : "opacity-0 pointer-events-none"}
+                    md:hidden /* 👈 ซ่อนบนจอใหญ่ เพื่อไม่ให้จอมืด */
+                  `}
+                  onClick={() => isSidebarOpen && toggleSidebar()}
+                />
+
+                {/* ================================================================= */}
+                {/* 🚪 Sidebar Container */}
+                {/* ================================================================= */}
+                <div
+                  className={`
+                    /* Mobile: Fixed Drawer */
+                    fixed top-0 left-0 h-full 
+                    z-[150] /* 🟢 แก้จาก z-[90] เป็น z-[150] (ให้สูงกว่าการ์ดที่ซูมอยู่) */
+                    w-[300px]
+                    bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl
+                    border-r border-slate-300 dark:border-emerald-500/30
+                    shadow-2xl
+                    transition-transform duration-300 ease-in-out
+                    ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"}
+
+                    /* Desktop: Relative Split View */
+                    md:relative md:translate-x-0 md:z-0 md:shadow-none
+                    md:bg-transparent md:backdrop-blur-none
+                    transition-[width,opacity]
+                    ${isSidebarOpen ? "md:w-[360px] opacity-100" : "md:w-0 opacity-0 md:overflow-hidden"}
+                  `}
                 >
+                  {/* ปุ่มปิด (X) - 🟢 แสดงเฉพาะ Mobile */}
+                  <button 
+                    onClick={toggleSidebar}
+                    className="md:hidden absolute top-3 right-3 p-2 text-slate-500 hover:text-red-500 dark:text-slate-400 dark:hover:text-red-400 transition-colors z-50"
+                    title="ปิดฟิลเตอร์"
+                  >
+                    <CloseIcon />
+                  </button>
+
                   <LeftSidebar
                     isSidebarOpen={isSidebarOpen}
                     searchTerm={searchTerm}
@@ -2344,59 +2108,92 @@ export default function App() {
                     isLoadingAnalysis={isLoadingAnalysis}
                   />
                 </div>
-                <div className="hidden md:flex items-center justify-center shrink-0 border-l border-slate-300 dark:border-emerald-700/30 bg-white/40 dark:bg-black/40">
-                  {" "}
-                  <button
-                    onClick={toggleSidebar}
-                    className="p-1 text-emerald-600 dark:text-emerald-400 hover:text-black dark:hover:text-white hover:bg-emerald-200/50 dark:hover:bg-emerald-700/50 rounded-full transition-colors"
-                    title={isSidebarOpen ? "ซ่อน Filter" : "แสดง Filter"}
-                  >
-                    {" "}
-                    {isSidebarOpen ? (
-                      <ChevronLeftIcon />
-                    ) : (
-                      <ChevronRightIcon />
-                    )}
-                  </button>{" "}
-                </div>
+
+                {/* ================================================================= */}
+                {/* 📱 1. ปุ่ม Mobile Toggle */}
+                {/* ================================================================= */}
+                <button
+                  onClick={toggleSidebar}
+                  className={`
+                    md:hidden
+                    flex fixed 
+                    bottom-6 
+                    z-[160]                         /* 🟢 แก้เป็น z-[160] (สูงกว่า Sidebar) */
+                    items-center justify-center
+                    w-12 h-12 rounded-full 
+                    bg-white/90 dark:bg-slate-800/90
+                    backdrop-blur-md
+                    border border-slate-300 dark:border-emerald-500/50
+                    text-emerald-600 dark:text-emerald-400
+                    shadow-xl
+                    transition-all duration-300 ease-in-out
+                    ${isSidebarOpen ? "left-[310px]" : "left-4"}
+                  `}
+                >
+                  {isSidebarOpen ? <ChevronLeftIcon /> : <ChevronRightIcon />}
+                </button>
+
+                {/* ================================================================= */}
+                {/* 💻 2. ปุ่ม Desktop Toggle */}
+                {/* ================================================================= */}
+                <button
+                  onClick={toggleSidebar}
+                  className={`
+                    hidden md:flex
+                    fixed 
+                    z-[160]                         /* 🟢 แก้เป็น z-[160] (สูงกว่า Sidebar) */
+                    top-1/2 -translate-y-1/2
+                    items-center justify-center
+                    w-8 h-24 rounded-r-2xl border-y border-r border-l-0
+                    bg-white/90 dark:bg-slate-900/90
+                    backdrop-blur-md
+                    border-slate-300 dark:border-emerald-700/50
+                    text-emerald-600 dark:text-emerald-400
+                    shadow-[4px_0_10px_-2px_rgba(0,0,0,0.1)]
+                    hover:w-10
+                    transition-all duration-300 ease-in-out
+                    ${isSidebarOpen ? "left-[360px]" : "left-0"}
+                  `}
+                  title={isSidebarOpen ? "ซ่อน Filter" : "แสดง Filter"}
+                >
+                  <div className={`${!isSidebarOpen ? "rotate-180" : ""} transition-transform duration-300`}>
+                    <ChevronLeftIcon />
+                  </div>
+                </button>
+                {/* ======================================================== */}
 
                 <div
                   className={`${
                     activeView === "cards" ? "flex" : "hidden"
-                  } md:flex flex-1 flex-col`}
+                  } md:flex flex-1 flex-col h-full min-h-0 relative`} /* ✅ เพิ่ม min-h-0 เพื่อแก้บั๊ก Flexbox ไม่ยอม Scroll */
                 >
                   <section
-                    className={` flex-1 overflow-y-auto transition-all duration-300 ease-in-out p-4 lg:py-8 md:pr-12 lg:pr-16 ${
-                      isSidebarOpen
+                    ref={scrollRef}
+                    onScroll={handleScroll}
+                    className={`
+                      flex-1 h-full w-full
+                      overflow-y-auto           /* ✅ อนุญาตให้เลื่อนแนวตั้ง */
+                      overflow-x-hidden         /* ❌ ห้ามเลื่อนแนวนอน */
+                      -webkit-overflow-scrolling-touch /* ✅ เพิ่มความลื่นไหลบน iOS */
+                      transition-all duration-300 ease-in-out 
+                      p-2 lg:py-8 md:pr-12 lg:pr-16 
+                      pb-40                     /* ✅ เพิ่มพื้นที่ด้านล่างเยอะๆ ให้เลื่อนหนีปุ่มได้ */
+                      ${isSidebarOpen
                         ? "md:pl-12 lg:pl-16"
                         : "md:pl-16 lg:pl-24 xl:pl-32"
-                    } `}
+                      } 
+                    `}
                   >
+                    
                     <div className="relative bg-white dark:bg-slate-900 text-center py-8 px-4 border-b border-slate-300 dark:border-emerald-700/30 overflow-hidden rounded-lg mb-10">
-                      {" "}
-                      <div className="absolute inset-0 bg-gradient-to-b from-black/30 to-slate-900 opacity-50"></div>{" "}
-                      <div
-                        className="absolute inset-0 bg-cover bg-center opacity-10"
-                        style={{
-                          backgroundImage:
-                            "url('https://www.tcgthailand.com/assets/img/banner.1b838965.webp')",
-                        }}
-                      ></div>{" "}
-                      <div className="relative z-10 flex flex-col items-center justify-center">
-                        {" "}
-                        <img
-                          src="/cards/LOGOBOT.png"
-                          alt="Battle Of Talingchan Logo"
-                          className="w-24 h-24 md:w-28 md:h-28 mb-2 object-contain drop-shadow-lg"
-                          onError={(e) => {
-                            e.currentTarget.style.display = "none";
-                          }}
-                        />{" "}
-                        <h1 className="text-3xl md:text-5xl font-extrabold tracking-tight text-slate-900 dark:text-white drop-shadow-md">
-                          Battle Of Talingchan
-                        </h1>{" "}
-                      </div>{" "}
+                       <div className="absolute inset-0 bg-gradient-to-b from-black/30 to-slate-900 opacity-50"></div>
+                       <div className="absolute inset-0 bg-cover bg-center opacity-10" style={{ backgroundImage: "url('https://www.tcgthailand.com/assets/img/banner.1b838965.webp')" }}></div>
+                       <div className="relative z-10 flex flex-col items-center justify-center">
+                          <img src="/cards/LOGOBOT.png" alt="Battle Of Talingchan Logo" className="w-24 h-24 md:w-28 md:h-28 mb-2 object-contain drop-shadow-lg" onError={(e) => { e.currentTarget.style.display = "none"; }} />
+                          <h1 className="text-3xl md:text-5xl font-extrabold tracking-tight text-slate-900 dark:text-white drop-shadow-md">Battle Of Talingchan</h1>
+                       </div>
                     </div>
+
                     {cardDb.length === 0 ? (
                       <CardShell>
                         <div className="text-center py-20">
@@ -2416,51 +2213,54 @@ export default function App() {
                           onViewDetails={setZoomedCard}
                           onAddCard={addToMain}
                         />
+                        
                         {totalPages > 1 && (
-                          <div className="relative z-[70] flex items-center justify-center gap-4 mt-12 py-4">
-                            <Button
-                              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                              disabled={currentPage === 1}
-                            >
-                              {" "}
-                              ย้อนกลับ{" "}
+                          <div className="relative z-[70] flex items-center justify-center gap-4 mt-12 py-4 pb-10">
+                            <Button onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} disabled={currentPage === 1}>
+                              ย้อนกลับ
                             </Button>
                             <span className="text-slate-900 dark:text-white font-semibold tabular-nums">
-                              {" "}
-                              หน้า {currentPage} / {totalPages}{" "}
+                              หน้า {currentPage} / {totalPages}
                             </span>
-                            <Button
-                              onClick={() =>
-                                setCurrentPage((p) =>
-                                  Math.min(totalPages, p + 1)
-                                )
-                              }
-                              disabled={currentPage === totalPages}
-                            >
-                              {" "}
-                              ถัดไป{" "}
+                            <Button onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}>
+                              ถัดไป
                             </Button>
                           </div>
                         )}
-                        <footer className="relative z-[70] mt-16 py-10 text-center border-t border-slate-300 dark:border-emerald-700/30">
+
+                        <footer className="relative z-[70] mt-4 py-10 text-center border-t border-slate-300 dark:border-emerald-700/30">
                           <h3 className="text-lg font-semibold text-amber-600 dark:text-amber-300 mb-4">
-                            สามารถสนับสนุนค่ากาแฟและค่าเซิร์ฟเวอร์ได้ที่นี่นะคะ
-                            ❤️❤️❤️
+                            สามารถสนับสนุนค่ากาแฟและค่าเซิร์ฟเวอร์ได้ที่นี่นะคะ ❤️❤️❤️
                           </h3>
-                          <img
-                            src="/assets/QRCODE.png"
-                            alt="Donate QR Code"
-                            className="w-48 h-48 mx-auto rounded-lg border-4 border-emerald-500/30"
-                            onError={(e) =>
-                              (e.currentTarget.style.display = "none")
-                            }
-                          />
+                          <img src="/assets/QRCODE.png" alt="Donate QR Code" className="w-48 h-48 mx-auto rounded-lg border-4 border-emerald-500/30" onError={(e) => (e.currentTarget.style.display = "none")} />
                         </footer>
+
+                        {/* ===================================================== */}
+                        {/* 🟢 ปุ่ม Scroll to Top (แก้ไขเงื่อนไขการแสดงผล) */}
+                        {/* ===================================================== */}
+                        <button
+                          onClick={scrollToTop}
+                          className={`
+                            fixed bottom-6 right-6 z-[90]
+                            p-3 rounded-full shadow-xl
+                            bg-amber-500 text-white
+                            border border-amber-400
+                            hover:bg-amber-400 hover:-translate-y-1
+                            transition-all duration-300 ease-in-out
+                            
+                            /* 👇 แก้ตรงนี้: เพิ่ม && !isSidebarOpen */
+                            /* ความหมาย: ต้องเลื่อนลงมา (showScrollTop) AND ฟิลเตอร์ต้องปิดอยู่ (!isSidebarOpen) ถึงจะโชว์ */
+                            ${showScrollTop && !isSidebarOpen ? "opacity-100 scale-100" : "opacity-0 scale-0 pointer-events-none"}
+                          `}
+                          title="เลื่อนขึ้นบนสุด"
+                        >
+                          <ChevronUpIcon />
+                        </button>
                       </>
                     )}
                   </section>
-                </div> 
-              </main> 
+                </div>
+              </main>
 
               {/* Modals */}
               <Modal
@@ -2559,7 +2359,6 @@ export default function App() {
                 userProfile={displayUser}
                 showAlert={showAlert}
               />
-
             </>
           )}
         </div>
