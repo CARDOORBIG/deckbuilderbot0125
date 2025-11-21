@@ -1,89 +1,69 @@
-// ไฟล์: OpenBrowser.jsx
-import { useEffect } from 'react'; // <--- 💡 ต้องเพิ่ม useEffect
-import { useNavigate } from 'react-router-dom'; // <--- 💡 ต้องเพิ่ม useNavigate
+import { useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 export default function OpenBrowser() {
-  const ua = navigator.userAgent.toLowerCase();
-  const isIOS = /iphone|ipad|ipod/.test(ua); 
-  const isAndroid = /android/.test(ua);
-  
-  // 💡 [ใหม่] ใช้ useNavigate hook สำหรับการเปลี่ยนหน้า
-  const navigate = useNavigate();
+  const navigate = useNavigate();
 
-  const currentUrl = window.location.origin + window.location.pathname;
+  useEffect(() => {
+    const ua = navigator.userAgent || navigator.vendor || window.opera;
+    const isAndroid = /android/i.test(ua);
+    const isIOS = /iPad|iPhone|iPod/.test(ua) && !window.MSStream;
 
-  // =================================================================
-  // 💡 [ใหม่] Check 1: ตรวจสอบว่าเปิดในเบราว์เซอร์จริงหรือไม่
-  // =================================================================
-  useEffect(() => {
-    // ตรวจสอบว่า UA ไม่มีคำว่า IAB อีกแล้ว (แสดงว่าเปิดใน Chrome/Safari แล้ว)
-    const isStillInAppBrowser =
-      ua.includes("fbav") ||
-      ua.includes("fban") ||
-      ua.includes("fb_iab") ||
-      ua.includes("instagram") ||
-      ua.includes("line") ||
-      ua.includes("messenger");
+    // ตรวจสอบว่ายังอยู่ใน In-App Browser หรือไม่
+    const isInApp = /(Line|FBAN|FBAV|Instagram|Messenger)/i.test(ua);
 
-    // ถ้า 'ไม่ได้' อยู่ใน IAB แล้ว (เช่น เปิดใน Chrome) ให้ Redirect กลับไปหน้าหลัก
-    if (!isStillInAppBrowser) {
-      console.log("Redirecting to Home: Browser environment confirmed.");
-      // ใช้ replace เพื่อไม่ให้ผู้ใช้กดปุ่มย้อนกลับมาที่หน้านี้อีก
-      window.location.replace('/'); 
-    }
-    // Note: If you want to use react-router's navigate:
-    // navigate('/', { replace: true });
-    
-  }, []); 
-  
-  // =================================================================
+    // 1. ถ้าไม่ได้อยู่ใน In-App แล้ว (เช่น เปิดใน Chrome แล้ว) -> กลับหน้าแรก
+    if (!isInApp) {
+      navigate('/', { replace: true });
+      return;
+    }
 
-  const handleOpenBrowser = () => {
-    // โค้ดนี้ใช้สำหรับพยายาม Deep Link ไปที่เบราว์เซอร์จริง
-    const targetUrl = currentUrl.replace(window.location.pathname, '/'); // ส่งกลับไปหน้าหลัก
-
-    if (isIOS) {
-      // 1. iOS: พยายามใช้ window.location.href (พยายามครั้งที่ 1)
-      window.location.href = targetUrl;
-    } else if (isAndroid) {
-      // 2. Android: ใช้ Intent Scheme เพื่อบังคับเปิดใน Chrome
-      const intentUrl = 
-        "intent://" + 
-        targetUrl.replace(/^https?:\/\//, "") + 
-        "#Intent;scheme=https;package=com.android.chrome;end";
-      
-      window.location.href = intentUrl;
-    }
-  };
-
-  return (
-    <div style={{ padding: 20, textAlign: "center" }} className="bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-200 h-screen flex flex-col items-center justify-center">
-      <h2 className="text-xl font-bold mb-4">⚠️ โปรดเปิดผ่านเบราว์เซอร์ภายนอก</h2>
-      <p className="text-base mb-6">เพื่อใช้งาน **Google Login** ได้อย่างถูกต้อง</p>
+    // 2. ถ้าเป็น Android -> สั่งเด้งไป Chrome อัตโนมัติ
+    if (isAndroid) {
+      // URL ปัจจุบันที่ต้องการให้เปิด (หน้าแรก)
+      const targetUrl = window.location.href.replace('/open-browser', '/');
       
-      {/* 🛑 แสดงหน้านี้ต่อเมื่อยังอยู่ใน IAB เท่านั้น */}
-      <button
-        onClick={handleOpenBrowser}
-        className="text-white font-semibold transition duration-200 hover:opacity-80"
-        style={{
-          marginTop: 20,
-          padding: "12px 20px",
-          background: "#4285F4", // Google Blue
-          color: "white",
-          borderRadius: 8,
-          fontSize: 16,
-        }}
-      >
-        เปิดในเบราว์เซอร์จริง
-      </button>
+      // สร้าง Intent Scheme สำหรับ Android Chrome
+      // syntax: intent://<url>#Intent;scheme=https;package=com.android.chrome;end
+      const intentUrl = targetUrl.replace("https://", "intent://") + "#Intent;scheme=https;package=com.android.chrome;end";
+      
+      // สั่ง Redirect
+      window.location.href = intentUrl;
+    }
 
-      <p className="mt-8 text-sm text-slate-500 dark:text-slate-400 max-w-sm">
-        หากเปิดไม่ได้ ให้ลองทำตามขั้นตอนต่อไปนี้:
-        <br/>
-        กด **⋮** หรือ **…** แล้วเลือก 
-        <br/>
-        <b>“Open in Chrome / Safari”</b>
-      </p>
-    </div>
-  );
+    // 3. ถ้าเป็น iOS -> ทำอะไรไม่ได้มาก ต้องแสดง UI บอกให้ user กดเปิดเอง (ข้อจำกัดของ Apple)
+  }, [navigate]);
+
+  return (
+    <div className="min-h-screen flex flex-col items-center justify-center p-6 text-center bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white">
+      <div className="max-w-md w-full bg-white dark:bg-slate-800 p-8 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700">
+        <div className="text-6xl mb-4">⚠️</div>
+        <h1 className="text-2xl font-bold mb-4 text-red-500">ไม่รองรับการเปิดในแอปนี้</h1>
+        
+        <p className="text-lg mb-6 text-slate-600 dark:text-slate-300">
+          ระบบ Login ของ Google ไม่สามารถใช้งานผ่าน LINE หรือ Facebook Browser ได้
+        </p>
+
+        <div className="bg-slate-100 dark:bg-slate-700/50 p-4 rounded-xl mb-6 text-left">
+          <p className="font-bold mb-2">วิธีแก้ไข:</p>
+          <ol className="list-decimal list-inside space-y-2 text-sm">
+            <li>กดที่จุด 3 จุด <span className="font-bold text-xl">⋮</span> หรือ <span className="font-bold text-xl">…</span> ที่มุมขวาบน/ล่าง</li>
+            <li>เลือกเมนู <span className="font-bold text-emerald-600 dark:text-emerald-400">"Open in External Browser"</span> หรือ <span className="font-bold text-blue-600 dark:text-blue-400">"Open in Safari/Chrome"</span></li>
+          </ol>
+        </div>
+        
+        {/* ปุ่มสำรองสำหรับ Android เผื่อ Auto Redirect ไม่ทำงาน */}
+        <button
+           onClick={() => {
+             const targetUrl = window.location.href.replace('/open-browser', '/');
+             const intentUrl = targetUrl.replace("https://", "intent://") + "#Intent;scheme=https;package=com.android.chrome;end";
+             window.location.href = intentUrl;
+           }}
+           className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-bold shadow-lg active:scale-95 transition-all"
+        >
+          เปิดใน Google Chrome
+        </button>
+      </div>
+    </div>
+  );
 }

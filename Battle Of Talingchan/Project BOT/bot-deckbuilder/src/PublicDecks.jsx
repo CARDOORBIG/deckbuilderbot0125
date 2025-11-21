@@ -33,6 +33,7 @@ const SunIcon = () => <Svg p={<><circle cx="12" cy="12" r="5"></circle><line x1=
 const MoonIcon = () => <Svg p={<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>} />;
 const MessageIcon = () => <Svg p={<><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></>} />;
 const ImageIcon = () => <Svg p={<><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></>} />;
+const MoreVertIcon = () => <Svg width="20" height="20" p={<><circle cx="12" cy="5" r="1" /><circle cx="12" cy="12" r="1" /><circle cx="12" cy="19" r="1" /></>} />;
 
 // === UI Components ===
 const Button = ({ className = "", children, ...props }) => ( <button className={`flex items-center justify-center gap-2 px-4 py-2 rounded-lg shadow-lg border border-amber-400/20 bg-amber-200/20 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 hover:bg-amber-200/50 dark:hover:bg-amber-700/50 dark:hover:text-white hover:border-amber-400/60 active:scale-[.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed ${className}`} {...props} > {children} </button> );
@@ -252,7 +253,17 @@ function CommentSection({ deckId, userProfile, showAlert, deckOwnerEmail }) {
   );
 }
 
+// =================================================================
+// 📱 DeckViewModal - Redesigned (Tab System)
+// =================================================================
 function DeckViewModal({ isOpen, onClose, deck, showAlert, isLoading, onTakePhoto, isCapturing, userProfile, onClone }) {
+  const [activeTab, setActiveTab] = useState("deck"); // 'deck' | 'comments'
+
+  // Reset tab เมื่อเปิดใหม่
+  useEffect(() => {
+    if (isOpen) setActiveTab("deck");
+  }, [isOpen]);
+
   const analysis = useMemo(() => {
     if (isLoading || !deck || !deck.main || deck.main.length === 0) return null;
     const main = (deck.main || []).filter(Boolean);
@@ -271,52 +282,135 @@ function DeckViewModal({ isOpen, onClose, deck, showAlert, isLoading, onTakePhot
   }, [deck, isLoading]);
 
   if (!isOpen) return null;
-  const handleCopyCode = () => { if (analysis?.deckCode) { navigator.clipboard.writeText(analysis.deckCode).then(()=>showAlert("Success!", `✅ คัดลอกรหัสเด็คแล้ว!`)).catch(()=>showAlert("Error", "ไม่สามารถคัดลอกรหัสเด็คได้")); } };
+
+  const handleCopyCode = () => { 
+    if (analysis?.deckCode) { 
+        navigator.clipboard.writeText(analysis.deckCode)
+        .then(()=>showAlert("Success!", `✅ คัดลอกรหัสเด็คแล้ว!`))
+        .catch(()=>showAlert("Error", "ไม่สามารถคัดลอกรหัสเด็คได้")); 
+    } 
+  };
+
   const renderCardSection = (title, cards) => {
     if (!cards || cards.length === 0) return null;
     const groupedCards = cards.reduce((acc, card) => { const existing = acc.find(item => item.card.id === card.id); if (existing) { existing.count++; } else { acc.push({ card, count: 1 }); } return acc; }, []);
     return (
-      <div className="mt-6">
-        <h4 className="text-lg font-semibold text-emerald-600 dark:text-emerald-300 border-b border-emerald-500/20 pb-1 mb-3">{title} ({cards.length} ใบ)</h4>
-        <div className="grid grid-cols-[repeat(auto-fit,minmax(6rem,1fr))] gap-2 justify-center">
+      <div className="mt-4">
+        <h4 className="text-base md:text-lg font-bold text-emerald-600 dark:text-emerald-400 border-b border-emerald-500/20 pb-1 mb-2">{title} ({cards.length})</h4>
+        <div className="grid grid-cols-[repeat(auto-fit,minmax(4.5rem,1fr))] gap-2 justify-center">
           {groupedCards.map(({ card, count }) => (
-            <div key={card.id} className="relative w-24">
-              <img src={`/cards/${encodePath(card.imagePath)}/${encodeURIComponent(card.id.replace(' - Only#1', ''))}.png`} className="w-full rounded-md shadow" onError={(e) => { e.currentTarget.src = e.currentTarget.src.replace('.png', '.jpg'); }} />
-              {count > 1 && ( <div className="absolute -top-3 -right-3 w-8 h-8 bg-amber-500 text-white text-lg font-bold rounded-full border-2 border-white dark:border-slate-800 text-center leading-none pt-0.5">{count}</div> )}
+            <div key={card.id} className="relative w-20 md:w-24 group">
+              <img src={`/cards/${encodePath(card.imagePath)}/${encodeURIComponent(card.id.replace(' - Only#1', ''))}.png`} className="w-full rounded-md shadow-md" onError={(e) => { e.currentTarget.src = e.currentTarget.src.replace('.png', '.jpg'); }} />
+              {count > 1 && ( <div className="absolute -top-2 -right-2 w-6 h-6 bg-amber-500 text-white text-xs font-bold rounded-full border-2 border-white dark:border-slate-900 flex items-center justify-center shadow-sm">{count}</div> )}
             </div>
           ))}
         </div>
       </div>
     );
-  }
+  };
 
   return createPortal(
-    <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-[200] p-4">
-      <div className="bg-white dark:bg-slate-900/80 border border-slate-300 dark:border-emerald-500/30 rounded-xl shadow-2xl w-full h-full flex flex-col max-w-[95vw] max-h-[90vh]">
-        <header className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-emerald-500/20 shrink-0">
-          <h2 className="text-2xl font-bold text-slate-900 dark:text-white truncate pr-4">{isLoading ? "กำลังโหลด..." : deck?.deckName}</h2>
-          <div className="flex items-center gap-3 shrink-0">
-            <Button onClick={()=>onTakePhoto(deck, analysis)} disabled={isLoading||!analysis||isCapturing} className="bg-blue-200 dark:bg-blue-600/30 border-blue-300 dark:border-blue-500/30 text-blue-800 dark:text-blue-300"><CameraIcon /> {isCapturing?"ถ่ายรูป...":"ถ่ายรูป"}</Button>
-            {onClone && <Button onClick={() => onClone(deck)} disabled={isLoading||!analysis} className="bg-emerald-200 dark:bg-emerald-600/30 border-emerald-300 dark:border-emerald-500/30 text-emerald-800 dark:text-emerald-300"><ImportIcon /> Clone</Button>}
-            <Button onClick={handleCopyCode} disabled={isLoading||!analysis}><CopyIcon /> คัดลอกรหัสเด็ค</Button>
-            <Button onClick={onClose} disabled={isCapturing}>Close</Button>
-          </div>
+    <div className="fixed inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center z-[200] p-0 md:p-4">
+      <div className="bg-white dark:bg-slate-900 border-0 md:border border-slate-300 dark:border-emerald-500/30 rounded-none md:rounded-xl shadow-2xl w-full h-full flex flex-col max-w-[95vw] max-h-[100vh] md:max-h-[90vh] overflow-hidden">
+        
+        {/* === 1. Header: Title & Close Button === */}
+        <header className="flex items-center justify-between p-3 border-b border-slate-200 dark:border-slate-700 shrink-0 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md z-10">
+          <h2 className="text-lg md:text-2xl font-bold text-slate-900 dark:text-white truncate pr-2 flex-1">
+            {isLoading ? "กำลังโหลด..." : deck?.deckName}
+          </h2>
+          <button onClick={onClose} className="p-2 bg-slate-100 dark:bg-slate-800 rounded-full text-slate-500 hover:text-red-500 dark:text-slate-400 dark:hover:text-red-400 transition-colors">
+            <CloseIcon />
+          </button>
         </header>
-        {isLoading || !analysis ? (<div className="flex-grow flex items-center justify-center"><p className="text-xl text-slate-500 dark:text-slate-300">กำลังโหลดรายละเอียดเด็ค...</p></div>) : (
-          <div className="flex-grow overflow-hidden grid grid-cols-1 lg:grid-cols-12 bg-white dark:bg-slate-900/80">
-            <div className="lg:col-span-3 flex flex-col gap-6 overflow-y-auto p-6 pr-2 border-r border-slate-200 dark:border-emerald-500/20">
-              <div><h3 className="text-xl font-semibold text-amber-600 dark:text-amber-300 border-b border-amber-500/20 pb-1 mb-3">สถิติเด็ค</h3><div className="grid grid-cols-3 gap-2 text-center"><div><span className="text-xs text-gray-500 dark:text-gray-400">Cost</span><p className="text-xl font-bold text-emerald-600 dark:text-emerald-400">{analysis.avgCost}</p></div><div><span className="text-xs text-gray-500 dark:text-gray-400">Power</span><p className="text-xl font-bold text-red-600 dark:text-red-400">{analysis.avgPower}</p></div><div><span className="text-xs text-gray-500 dark:text-gray-400">Gem</span><p className="text-xl font-bold text-amber-600 dark:text-amber-400">{analysis.avgGem}</p></div></div></div>
-              <div><h3 className="text-xl font-semibold text-amber-600 dark:text-amber-300 border-b border-amber-500/20 pb-1 mb-3">ประเภทการ์ด</h3><ul className="space-y-1 text-sm">{analysis.cardTypes.map(([t, c]) => <li key={t} className="flex justify-between text-slate-700 dark:text-gray-300"><span>{t}</span><span className="text-slate-900 dark:text-white font-bold">{c}</span></li>)}</ul></div>
+
+        {/* === 2. Tabs Navigation === */}
+        <div className="flex border-b border-slate-200 dark:border-slate-700 shrink-0">
+          <button 
+            onClick={() => setActiveTab("deck")}
+            className={`flex-1 py-3 text-sm md:text-base font-bold transition-colors relative ${activeTab === "deck" ? "text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/10" : "text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800"}`}
+          >
+            🔍 ดูการ์ด & สถิติ
+            {activeTab === "deck" && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-emerald-500"></div>}
+          </button>
+          <button 
+            onClick={() => setActiveTab("comments")}
+            className={`flex-1 py-3 text-sm md:text-base font-bold transition-colors relative ${activeTab === "comments" ? "text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/10" : "text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800"}`}
+          >
+            💬 ความคิดเห็น
+            {activeTab === "comments" && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-blue-500"></div>}
+          </button>
+        </div>
+
+        {/* === 3. Content Area === */}
+        <div className="flex-grow overflow-hidden relative bg-slate-50 dark:bg-black/20">
+          
+          {/* --- Tab 1: Deck View --- */}
+          {activeTab === "deck" && (
+            <div className="h-full flex flex-col">
+              {isLoading || !analysis ? (
+                <div className="flex-grow flex items-center justify-center"><p className="text-slate-500">กำลังโหลด...</p></div>
+              ) : (
+                <>
+                  <div className="flex-grow overflow-y-auto p-4 pb-24 scrollbar-hide">
+                    
+                    {/* Stats Row */}
+                    <div className="grid grid-cols-3 gap-2 mb-6 bg-white dark:bg-slate-800 p-3 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700">
+                         <div className="text-center"><span className="text-[10px] text-gray-500 uppercase">Avg Cost</span><p className="text-lg font-bold text-emerald-500">{analysis.avgCost}</p></div>
+                         <div className="text-center border-l border-slate-200 dark:border-slate-600"><span className="text-[10px] text-gray-500 uppercase">Avg Power</span><p className="text-lg font-bold text-red-500">{analysis.avgPower}</p></div>
+                         <div className="text-center border-l border-slate-200 dark:border-slate-600"><span className="text-[10px] text-gray-500 uppercase">Avg Gem</span><p className="text-lg font-bold text-amber-500">{analysis.avgGem}</p></div>
+                    </div>
+
+                    {/* Only #1 */}
+                    {analysis.only1 && (
+                        <div className="mb-6 flex justify-center">
+                            <div className="relative group">
+                                <div className="absolute -inset-1 bg-gradient-to-r from-amber-500 to-yellow-300 rounded-lg blur opacity-30"></div>
+                                <img src={`/cards/${encodePath(analysis.only1.imagePath)}/${encodeURIComponent(analysis.only1.id.replace(' - Only#1', ''))}.png`} className="relative w-32 rounded-lg shadow-xl border-2 border-amber-400/50" />
+                                <div className="absolute top-2 right-2 bg-black/70 text-amber-400 text-[10px] px-2 py-0.5 rounded-full border border-amber-400/50 backdrop-blur-sm font-bold">Only #1</div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Cards Grid */}
+                    <div className="space-y-2">
+                        {renderCardSection("Avatar", analysis.avatars)}
+                        {renderCardSection("Magic", analysis.magics)}
+                        {renderCardSection("Construct", analysis.constructs)}
+                        {renderCardSection("Other", analysis.others)}
+                        {renderCardSection("Life Deck", analysis.life)}
+                    </div>
+                  </div>
+
+                  {/* 🟢 Action Bar (Sticky Bottom) */}
+                  <div className="absolute bottom-0 left-0 w-full p-3 bg-white/90 dark:bg-slate-900/90 backdrop-blur border-t border-slate-200 dark:border-emerald-500/20 flex gap-2 z-20 shadow-[0_-4px_20px_rgba(0,0,0,0.1)]">
+                    <Button onClick={()=>onTakePhoto(deck, analysis)} disabled={isCapturing} className="flex-1 bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800 py-3 rounded-lg text-xs flex-col gap-1 h-auto">
+                        <CameraIcon /> <span>รูปภาพ</span>
+                    </Button>
+                    <Button onClick={handleCopyCode} className="flex-1 bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-800 py-3 rounded-lg text-xs flex-col gap-1 h-auto">
+                        <CopyIcon /> <span>คัดลอก</span>
+                    </Button>
+                    {onClone && (
+                        <Button onClick={() => onClone(deck)} className="flex-1 bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-800 py-3 rounded-lg text-xs flex-col gap-1 h-auto">
+                            <ImportIcon /> <span>โคลน</span>
+                        </Button>
+                    )}
+                  </div>
+                </>
+              )}
             </div>
-            <div className="lg:col-span-6 overflow-y-auto p-6 border-r border-slate-200 dark:border-emerald-500/20 bg-slate-50 dark:bg-black/20">
-              {analysis.only1 && <div className="mb-6 flex flex-col items-center"><h4 className="text-lg font-semibold text-emerald-700 dark:text-emerald-300 mb-3">Only #1</h4><div className="relative w-40"><img src={`/cards/${encodePath(analysis.only1.imagePath)}/${encodeURIComponent(analysis.only1.id.replace(' - Only#1', ''))}.png`} className="w-full rounded-md shadow" onError={(e) => { e.currentTarget.src = e.currentTarget.src.replace('.png', '.jpg'); }} /></div></div>}
-              {renderCardSection("Avatar Cards", analysis.avatars)}{renderCardSection("Magic Cards", analysis.magics)}{renderCardSection("Construct Cards", analysis.constructs)}{renderCardSection("Other Cards", analysis.others)}{renderCardSection("Life Deck", analysis.life)}
+          )}
+
+          {/* --- Tab 2: Comments View --- */}
+          {activeTab === "comments" && (
+            <div className="h-full">
+              <CommentSection deckId={deck.id} userProfile={userProfile} showAlert={showAlert} deckOwnerEmail={deck.user.email} />
             </div>
-            <div className="lg:col-span-3 h-full overflow-hidden"><CommentSection deckId={deck.id} userProfile={userProfile} showAlert={showAlert} deckOwnerEmail={deck.user.email} /></div>
-          </div>
-        )}
+          )}
+
+        </div>
       </div>
-    </div>, document.body
+    </div>, 
+    document.body
   );
 }
 
@@ -345,32 +439,134 @@ const DeckImageTemplate = React.forwardRef(({ deck, analysis }, ref) => {
 });
 
 function DeckCard({ deck, onViewDeck, userProfile, onDeleteDeck, isDetailLoading, onLikeDeck, isLiking }) {
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const menuRef = useRef(null);
+  
+  // 🟢 [1] เพิ่ม Ref สำหรับจับเวลา Double Tap เอง
+  const lastTapRef = useRef(0);
+
   const mainCardImg = useMemo(() => {
     if (!deck.only1CardData) return 'https://placehold.co/300x420/1e293b/94a3b8?text=Deck';
     return `/cards/${encodePath(deck.only1CardData.imagePath)}/${encodeURIComponent(deck.only1CardData.id.replace(' - Only#1', ''))}.png`;
   }, [deck.only1CardData]);
+
   const isOwner = userProfile && userProfile.email === deck.user.email;
   const isLiked = userProfile && (deck.likedBy || []).includes(userProfile.email);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (menuRef.current && !menuRef.current.contains(event.target)) {
+        setIsMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // 🟢 [2] ฟังก์ชันจัดการ Double Tap แบบ Manual (ใช้ได้ทั้งมือถือและคอม)
+  const handleCardClick = (e) => {
+    const now = Date.now();
+    const DOUBLE_TAP_DELAY = 300; // ระยะเวลา (ms) ที่ถือว่าเป็น double tap (0.3 วินาที)
+    
+    if (now - lastTapRef.current < DOUBLE_TAP_DELAY) {
+      e.preventDefault();
+      onViewDeck(deck); // เรียกฟังก์ชันเปิดเด็ค
+    }
+    
+    lastTapRef.current = now;
+  };
+
   return (
-    <CardShell className="flex flex-col">
-      <div className="flex justify-between items-start mb-3">
-        <div className="flex items-center gap-3">
-          <img src={deck.user.picture} alt={deck.user.name} className="w-10 h-10 rounded-full bg-slate-200 dark:bg-slate-700 object-cover" loading="lazy" />
-          <div><p className="font-semibold text-slate-900 dark:text-white">{deck.user.name}</p><p className="text-xs text-gray-500 dark:text-gray-400">{deck.sharedAt?.toDate().toLocaleString('th-TH')}</p></div>
+    <div 
+      className="relative group select-none cursor-pointer" // select-none กันการไฮไลท์ข้อความเวลากดรัวๆ
+      onClick={handleCardClick} // 🟢 [3] ใช้ onClick แทน onDoubleClick
+    >
+      <CardShell className="flex flex-col p-2 md:p-3 h-full relative hover:border-amber-400/50 transition-all">
+        
+        {/* Header: User & 3-Dot Menu */}
+        <div className="flex justify-between items-start mb-2 relative z-20">
+          <div className="flex items-center gap-2 overflow-hidden pr-6">
+            <img 
+              src={deck.user.picture} 
+              alt={deck.user.name} 
+              className="w-6 h-6 rounded-full bg-slate-200 dark:bg-slate-700 object-cover shrink-0" 
+              loading="lazy" 
+            />
+            <p className="font-semibold text-[10px] md:text-xs text-slate-700 dark:text-slate-300 truncate">
+              {deck.user.name}
+            </p>
+          </div>
+
+          {/* 3-Dot Menu (เฉพาะเจ้าของ) */}
+          {isOwner && (
+            <div ref={menuRef} className="absolute top-[-4px] right-[-4px]">
+              <button 
+                onClick={(e) => { e.stopPropagation(); setIsMenuOpen(!isMenuOpen); }}
+                className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+              >
+                <MoreVertIcon />
+              </button>
+              
+              {isMenuOpen && (
+                <div className="absolute right-0 mt-1 w-28 bg-white dark:bg-slate-800 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 overflow-hidden z-50 animate-fade-in">
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); onDeleteDeck(deck); }}
+                    className="w-full text-left px-3 py-2 text-xs text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-2"
+                  >
+                    <TrashIcon /> ลบเด็ค
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
-      </div>
-      <h3 className="text-xl font-bold text-amber-600 dark:text-amber-300 mb-3 line-clamp-2">{deck.deckName}</h3>
-      <div className="aspect-[5/7] w-full rounded-lg mb-4 overflow-hidden bg-slate-200 dark:bg-slate-800"><img src={mainCardImg} className="w-full h-full object-cover" loading="lazy"/></div>
-      <div className="flex items-center gap-3 mb-3">
-        <Button onClick={() => onLikeDeck(deck)} disabled={!userProfile || isLiking} className={`px-3 ${isLiked ? 'bg-red-200 dark:bg-red-600/30 border-red-300 dark:border-red-500/50 text-red-700 dark:text-red-300' : ''}`}><HeartIcon filled={isLiked} /></Button>
-        <span className="text-gray-600 dark:text-gray-400 text-sm">{deck.likeCount || 0} Likes</span>
-        <span className="ml-auto text-gray-500 dark:text-gray-500 text-sm flex items-center gap-1.5"><EyeIcon /> {deck.viewCount || 0}</span>
-      </div>
-      <div className="flex flex-col gap-2 mt-auto">
-        <Button onClick={() => onViewDeck(deck)} className="w-full bg-blue-200 dark:bg-blue-600/30 border-blue-300 dark:border-blue-500/30 text-blue-800 dark:text-blue-300" disabled={isDetailLoading}><EyeIcon /> {isDetailLoading ? "Loading..." : "View Detail"}</Button>
-        {isOwner && <Button onClick={() => onDeleteDeck(deck)} className="w-full bg-red-200 dark:bg-red-900/50 border-red-300 dark:border-red-500/30 text-red-700 dark:text-red-300"><ClearIcon /> Un-share</Button>}
-      </div>
-    </CardShell>
+
+        {/* Image (กด 2 ทีได้) */}
+        <div className="aspect-[5/7] w-full rounded mb-2 overflow-hidden bg-slate-200 dark:bg-slate-800 relative shadow-inner">
+          <img 
+            src={mainCardImg} 
+            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" 
+            loading="lazy"
+          />
+          {/* Overlay บอกว่า Double Tap ได้ */}
+          <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/20 pointer-events-none">
+            <span className="text-white text-[10px] bg-black/50 px-2 py-1 rounded-full backdrop-blur-sm">Double Tap</span>
+          </div>
+        </div>
+
+        {/* Deck Name */}
+        <h3 className="text-xs md:text-sm font-bold text-amber-600 dark:text-amber-400 mb-2 line-clamp-1 leading-tight">
+          {deck.deckName}
+        </h3>
+
+        {/* Stats Row */}
+        <div className="flex items-center justify-between gap-1 mb-2 text-[10px] text-gray-500 dark:text-gray-400">
+          <div className="flex items-center gap-1">
+             <button 
+               onClick={(e) => { e.stopPropagation(); onLikeDeck(deck); }} 
+               disabled={!userProfile || isLiking} 
+               className={`flex items-center gap-1 px-1.5 py-0.5 rounded ${isLiked ? 'bg-red-100 dark:bg-red-900/30 text-red-600' : 'hover:bg-slate-100 dark:hover:bg-slate-800'}`}
+             >
+               <div className="scale-75"><HeartIcon filled={isLiked} /></div>
+               <span>{deck.likeCount || 0}</span>
+             </button>
+          </div>
+          <span className="flex items-center gap-1">
+            <div className="scale-75"><EyeIcon /></div> {deck.viewCount || 0}
+          </span>
+        </div>
+
+        {/* View Button Only */}
+        <Button 
+          onClick={(e) => { e.stopPropagation(); onViewDeck(deck); }} 
+          className="w-full py-1 text-[10px] md:text-xs bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-300 border border-blue-100 dark:border-blue-800 hover:bg-blue-100 mt-auto h-7 md:h-8" 
+          disabled={isDetailLoading}
+        >
+          {isDetailLoading ? "..." : "View Detail"}
+        </Button>
+
+      </CardShell>
+    </div>
   );
 }
 
@@ -641,38 +837,107 @@ export default function PublicDecks() {
   return (
     <div className="h-screen flex flex-col text-slate-900 dark:text-gray-200 bg-slate-100 dark:bg-black">
       <style>{`::-webkit-scrollbar{width:8px}::-webkit-scrollbar-track{background:#0f172a}::-webkit-scrollbar-thumb{background:#1e293b;border-radius:4px}::-webkit-scrollbar-thumb:hover{background:#334155}.image-render-target{position:fixed;top:-9999px;left:0;width:1280px;height:auto;background:#1e293b;padding:24px;box-shadow:0 0 30px rgba(0,0,0,0.5);display:flex;gap:24px;flex-shrink:0;flex-grow:0;}`}</style>
-      <header className="px-4 lg:px-6 py-2 border-b border-slate-200 dark:border-emerald-700/30 bg-white/80 dark:bg-black/60 backdrop-blur-sm shrink-0 z-40">
-         <div className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-             {/* Menu Button for Mobile/Settings */}
+      {/* Header: Redesigned for Mobile Compact View */}
+      <header className="px-3 md:px-6 py-2 border-b border-slate-200 dark:border-emerald-700/30 bg-white/80 dark:bg-black/60 backdrop-blur-sm shrink-0 z-40 h-14 flex flex-col justify-center">
+         <div className="flex items-center justify-between gap-2">
+          
+          {/* 🟢 ฝั่งซ้าย: Menu + Title */}
+          <div className="flex items-center gap-1.5 overflow-hidden">
              {userProfile && (
-                 <button onClick={() => setIsSettingsOpen(true)} className="p-2 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-full text-slate-800 dark:text-white transition-colors">
-                    <MenuIcon />
+                 <button onClick={() => setIsSettingsOpen(true)} className="p-1.5 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-full text-slate-800 dark:text-white transition-colors shrink-0">
+                    <div className="scale-90"><MenuIcon /></div>
                  </button>
              )}
-             <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight bg-gradient-to-r from-amber-500 to-emerald-600 dark:from-amber-300 dark:to-emerald-400 bg-clip-text text-transparent">Battle Of Talingchan</h1>
+             <h1 className="text-lg md:text-3xl font-extrabold tracking-tight bg-gradient-to-r from-amber-500 to-emerald-600 dark:from-amber-300 dark:to-emerald-400 bg-clip-text text-transparent truncate pt-0.5">
+                Battle Of Talingchan
+             </h1>
           </div>
-          <Link to="/"><Button className="bg-emerald-200 dark:bg-emerald-600/30 border-emerald-300 dark:border-emerald-500/30 text-emerald-800 dark:text-emerald-300"><ChevronLeftIcon /> Back to Deck Builder</Button></Link>
+
+          {/* 🟢 ฝั่งขวา: ปุ่มย้อนกลับ (ดีไซน์ใหม่) */}
+          <Link to="/" className="shrink-0">
+            <button className="
+              flex items-center gap-0.5 
+              pl-1 pr-3 py-1.5               /* Padding กะทัดรัด */
+              rounded-full                   /* ทรงแคปซูลมนๆ กดง่าย */
+              bg-emerald-100/80 dark:bg-emerald-900/40 
+              border border-emerald-200 dark:border-emerald-500/30 
+              text-emerald-700 dark:text-emerald-300 
+              hover:bg-emerald-200 dark:hover:bg-emerald-800/50 
+              active:scale-95 transition-all
+              text-xs md:text-sm font-bold
+              shadow-sm
+            ">
+              <div className="scale-75"><ChevronLeftIcon /></div>
+              <span>Back</span> <span className="hidden md:inline">to Builder</span>
+            </button>
+          </Link>
+
         </div>
       </header>
       <main className="flex-1 overflow-y-auto p-4 md:p-8 lg:p-12">
         <h2 className="text-3xl font-bold text-slate-900 dark:text-white mb-6">Public Shared Decks</h2>
         <div className="mb-8 p-4 bg-white dark:bg-slate-900/70 rounded-xl border border-slate-200 dark:border-emerald-500/20">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4"><input type="search" placeholder="Search decks..." className="w-full px-4 py-2 border border-slate-300 dark:border-emerald-500/30 rounded-lg bg-white dark:bg-slate-700/50 text-slate-900 dark:text-white" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} /></div>
-          <div className="flex flex-wrap items-center gap-2 mt-4"><span className="text-gray-500 dark:text-gray-400 text-sm mr-2">Sort by:</span>
-            <Button onClick={() => setSortOrder({ field: "sharedAt", direction: "desc" })} className={`text-sm ${sortOrder.field==='sharedAt'&&sortOrder.direction==='desc'?'bg-amber-400/50 border-amber-500':'bg-slate-200 dark:bg-slate-800 border-slate-300 dark:border-slate-600'}`}>Latest</Button>
-            <Button onClick={() => setSortOrder({ field: "likeCount", direction: "desc" })} className={`text-sm ${sortOrder.field==='likeCount'?'bg-amber-400/50 border-amber-500':'bg-slate-200 dark:bg-slate-800 border-slate-300 dark:border-slate-600'}`}>Popular</Button>
-            <Button onClick={() => setSortOrder({ field: "viewCount", direction: "desc" })} className={`text-sm ${sortOrder.field==='viewCount'?'bg-amber-400/50 border-amber-500':'bg-slate-200 dark:bg-slate-800 border-slate-300 dark:border-slate-600'}`}>Most Views</Button>
-            <Button onClick={() => setSortOrder({ field: "sharedAt", direction: "asc" })} className={`text-sm ${sortOrder.field==='sharedAt'&&sortOrder.direction==='asc'?'bg-amber-400/50 border-amber-500':'bg-slate-200 dark:bg-slate-800 border-slate-300 dark:border-slate-600'}`}>Oldest</Button>
+          {/* 🔽 Sort Dropdown (New Design) */}
+          <div className="flex items-center gap-3 mt-4">
+            <label className="text-sm text-slate-600 dark:text-gray-400 font-medium">
+              Sort by:
+            </label>
+            <div className="relative group">
+              <select
+                value={`${sortOrder.field}-${sortOrder.direction}`}
+                onChange={(e) => {
+                  const [field, direction] = e.target.value.split('-');
+                  setSortOrder({ field, direction });
+                }}
+                className="
+                  appearance-none cursor-pointer
+                  pl-4 pr-10 py-2 
+                  rounded-lg 
+                  bg-white dark:bg-slate-800 
+                  border border-slate-300 dark:border-emerald-500/30 
+                  text-slate-900 dark:text-white text-sm font-medium 
+                  shadow-sm 
+                  focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none 
+                  transition-all duration-200
+                  hover:border-emerald-400 dark:hover:border-emerald-400
+                "
+              >
+                <option value="sharedAt-desc">ล่าสุด (Latest)</option>
+                <option value="likeCount-desc">ยอดนิยม (Popular)</option>
+                <option value="viewCount-desc">คนดูเยอะสุด (Most Views)</option>
+                <option value="sharedAt-asc">เก่าสุด (Oldest)</option>
+              </select>
+              
+              {/* Custom Chevron Icon */}
+              <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none text-slate-500 dark:text-emerald-500 group-hover:text-emerald-600 transition-colors">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path>
+                </svg>
+              </div>
+            </div>
           </div>
         </div>
         
-        {/* --- [1] Grid Layout (Responsive 3/5 Cols) --- */}
-        {isLoading && <div className="grid grid-cols-3 md:grid-cols-5 gap-3 md:gap-6">{Array.from({ length: CHUNK_SIZE }).map((_, i) => <DeckCardSkeleton key={i} />)}</div>}
+        {/* --- [1] Grid Layout (Mobile=2 Cols / Desktop=5 Cols) --- */}
+        {isLoading && (
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 md:gap-6"> {/* 🟢 แก้ตรงนี้ */}
+            {Array.from({ length: CHUNK_SIZE }).map((_, i) => <DeckCardSkeleton key={i} />)}
+          </div>
+        )}
         {!isLoading && sharedDecks.length > 0 && (
-          <div className="grid grid-cols-3 md:grid-cols-5 gap-3 md:gap-6">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 md:gap-6"> {/* 🟢 แก้ตรงนี้ */}
             {sharedDecks.filter(d => d.deckName.toLowerCase().includes(searchTerm.toLowerCase())).map(d => (
-              <DeckCard key={d.id} deck={d} onViewDeck={handleView} userProfile={displayUser} onDeleteDeck={handleDelete} isDetailLoading={isDetailLoading && viewingDeck?.id === d.id} onLikeDeck={handleLike} isLiking={isLiking} />
+              <DeckCard 
+                key={d.id} 
+                deck={d} 
+                onViewDeck={handleView} 
+                userProfile={displayUser} 
+                onDeleteDeck={handleDelete} 
+                isDetailLoading={isDetailLoading && viewingDeck?.id === d.id} 
+                onLikeDeck={handleLike} 
+                isLiking={isLiking} 
+              />
             ))}
           </div>
         )}

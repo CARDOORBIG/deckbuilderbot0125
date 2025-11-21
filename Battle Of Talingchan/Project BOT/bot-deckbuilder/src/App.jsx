@@ -12,7 +12,7 @@ import {
   collection, doc, writeBatch, serverTimestamp, getDoc, setDoc,
   query, where, getDocs, addDoc // <--- เพิ่มตัวนี้นะ
 } from 'firebase/firestore';
-
+import { useNavigate, useLocation } from 'react-router-dom';
 ChartJS.register(RadialLinearScale, PointElement, LineElement, Filler, Tooltip, Legend);
 
 // === Icons ===
@@ -32,6 +32,13 @@ const ChevronRightIcon = () => <Svg width="24" height="24" p={<polyline points="
 const ChevronUpIcon = () => <Svg width="24" height="24" p={<polyline points="18 15 12 9 6 15"></polyline>} />;
 const UsersIcon = () => <Svg width="24" height="24" p={<><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></>} />;
 const UploadIcon = () => <Svg p={<><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></>} />;
+const ShareIconNew = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+    <polyline points="15 3 21 3 21 9"></polyline>
+    <line x1="10" y1="14" x2="21" y2="3"></line>
+  </svg>
+);
 const MenuIcon = () => <Svg width="24" height="24" p={<><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></>} />;
 const UserCogIcon = () => <Svg width="24" height="24" p={<><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle><circle cx="12" cy="12" r="3"></circle></>} />;
 const ImageIcon = () => <Svg p={<><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></>} />;
@@ -1433,7 +1440,7 @@ function DeckListModal({
                                 <button onClick={() => onShowCards({ main: slot.main, life: slot.life })} disabled={deckSize === 0} className="p-2 rounded-lg text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/20 disabled:opacity-30" title="Show Cards"><EyeIcon /></button>
                                 <button onClick={() => handleImport(index)} className="p-2 rounded-lg text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-700" title="Import"><ImportIcon /></button>
                                 <button onClick={() => handleExport(index)} disabled={deckSize === 0} className="p-2 rounded-lg text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-700 disabled:opacity-30" title="Export"><ExportIcon /></button>
-                                <button onClick={() => handleShareDeck(index)} disabled={deckSize === 0} className="p-2 rounded-lg text-purple-600 hover:bg-purple-50 dark:text-purple-400 dark:hover:bg-purple-900/20 disabled:opacity-30" title="Share"><UploadIcon /></button>
+                                <button onClick={() => handleShareDeck(index)} disabled={deckSize === 0} className="p-2 rounded-lg text-purple-600 hover:bg-purple-50 dark:text-purple-400 dark:hover:bg-purple-900/20 disabled:opacity-30" title="Share"><ShareIconNew /></button>
                                 <div className="w-px h-4 bg-slate-300 dark:bg-slate-600 mx-1"></div>
                                 <button onClick={() => handleClearSlot(index)} className="p-2 rounded-lg text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20" title="Clear"><TrashIcon /></button>
                             </div>
@@ -1815,6 +1822,25 @@ const getMagicSubType = (card) => {
 
 // === Main App ===
 export default function App() {
+  // ... hooks เดิม ...
+  const navigate = useNavigate(); // 🟢 2. เรียกใช้ hook
+  const location = useLocation();
+
+  // =========================================================
+  // 🟢 3. ระบบตรวจจับ In-App Browser (LINE, FB, IG)
+  // =========================================================
+  useEffect(() => {
+    const ua = navigator.userAgent || navigator.vendor || window.opera;
+    // Regex ตรวจหาคำว่า Line, Facebook, Instagram
+    const isInApp = /(Line|FBAN|FBAV|Instagram|Messenger)/i.test(ua);
+
+    // ถ้าเป็น In-App Browser และยังไม่ได้อยู่ที่หน้า /open-browser
+    if (isInApp && location.pathname !== '/open-browser') {
+      // ส่งไปหน้า OpenBrowser เพื่อบังคับเด้งออก
+      navigate('/open-browser', { replace: true });
+    }
+  }, [location, navigate]);
+
   const [theme, setTheme] = useLocalStorage('bot-theme', 'dark'); // <--- [เพิ่ม] State สำหรับธีม
   // ... (ต่อจาก useState ตัวอื่นๆ ใน function App) ...
 // 🟢 [เพิ่ม] State สำหรับลูกไฟ และ Ref ชี้ปุ่ม Toggle
