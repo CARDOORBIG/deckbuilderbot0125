@@ -11,6 +11,7 @@ import { Chart as ChartJS, RadialLinearScale, PointElement, LineElement, Filler,
 import { Radar } from 'react-chartjs-2';
 import html2canvas from 'html2canvas';
 import { googleLogout } from '@react-oauth/google'; // ต้อง import เพื่อให้ logout ได้
+import NotificationCenter from './NotificationCenter'; // 👈 เพิ่มบรรทัดนี้
 
 ChartJS.register(RadialLinearScale, PointElement, LineElement, Filler, Tooltip, Legend);
 
@@ -34,7 +35,17 @@ const MoonIcon = () => <Svg p={<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21
 const MessageIcon = () => <Svg p={<><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></>} />;
 const ImageIcon = () => <Svg p={<><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></>} />;
 const MoreVertIcon = () => <Svg width="20" height="20" p={<><circle cx="12" cy="5" r="1" /><circle cx="12" cy="12" r="1" /><circle cx="12" cy="19" r="1" /></>} />;
+// 🟢 แก้ไข: เปลี่ยนรูปบ้าน เป็นรูปค้อนประมูล
+const StoreIcon = () => (
+  <Svg width="24" height="24" p={<><path d="m14 13-7.5 7.5c-.83.83-2.17.83-3 0 0 0 0 0 0 0a2.12 2.12 0 0 1 0-3L11 10"/><path d="m16 16 6-6"/><path d="m8 8 6-6"/><path d="m9 7 8-8"/><path d="m21 11-8-8"/></>} />
+);
+// 🟢 [เพิ่ม] ไอคอนรูปบ้าน
+const HomeIcon = () => <Svg width="24" height="24" p={<><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></>} />;
+// 🟢 เพิ่มไอคอนเหล่านี้ลงไปใน PublicDecks.jsx (รวมกับไอคอนอื่นๆ)
 
+const UsersIcon = () => <Svg width="24" height="24" p={<><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></>} />;
+
+const DeckIcon = () => <Svg width="24" height="24" p={<><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><line x1="10" y1="9" x2="8" y2="9"></line></>} />;
 // === UI Components ===
 const Button = ({ className = "", children, ...props }) => ( <button className={`flex items-center justify-center gap-2 px-4 py-2 rounded-lg shadow-lg border border-amber-400/20 bg-amber-200/20 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 hover:bg-amber-200/50 dark:hover:bg-amber-700/50 dark:hover:text-white hover:border-amber-400/60 active:scale-[.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed ${className}`} {...props} > {children} </button> );
 const CardShell = ({ children, className = "", ...props }) => ( <div className={`bg-white dark:bg-slate-900/70 backdrop-blur-sm p-4 rounded-xl border border-slate-200 dark:border-emerald-500/20 shadow-lg transition-all hover:border-amber-400/50 hover:shadow-amber-500/10 ${className}`} {...props}> {children} </div> );
@@ -142,7 +153,12 @@ const SettingsDrawer = ({ isOpen, onClose, userProfile, onEditProfile, onLogout,
           <div className="p-6 flex flex-col items-center gap-4">
             <img src={userProfile?.picture} alt={userProfile?.name} className="w-24 h-24 rounded-full border-4 border-emerald-500 shadow-lg object-cover" />
             <div className="text-center"><h3 className="text-xl font-bold text-slate-900 dark:text-white">{userProfile?.name}</h3><p className="text-sm text-slate-500 dark:text-gray-400">{userProfile?.email}</p></div>
-            <Button onClick={() => { onEditProfile(); onClose(); }} className="w-full mt-4 bg-slate-200 dark:bg-slate-800 border-slate-300 dark:border-slate-600 text-emerald-700 dark:text-emerald-400 hover:bg-slate-300 dark:hover:bg-slate-700">แก้ไขโปรไฟล์</Button>
+            <Button onClick={() => { onEditProfile(); onClose(); }} className="w-full mt-4 bg-slate-200 dark:bg-slate-800 border-slate-300 dark:border-slate-600 text-emerald-700 dark:text-emerald-400 hover:bg-slate-300 dark:hover:bg-slate-700">แก้ไขโปรไฟล์</Button><button 
+                onClick={() => { onOpenMyDecks(); onClose(); }}
+                className="w-full py-3 bg-amber-100 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 font-bold rounded-xl shadow-sm hover:scale-105 transition-transform flex items-center justify-center gap-2"
+            >
+                <DeckIcon /> My Decks
+            </button>
             <div className="mt-4 w-full"><label className="text-sm font-semibold text-slate-500 dark:text-gray-400">เลือกธีม</label><div className="mt-2 grid grid-cols-2 gap-2"><Button onClick={() => setTheme("light")} className={`text-sm ${theme === "light" ? "bg-amber-500/50 border-amber-400" : "bg-slate-200 dark:bg-slate-800 border-slate-300 dark:border-slate-600 text-slate-600 dark:text-gray-400"}`}><SunIcon /> สว่าง</Button><Button onClick={() => setTheme("dark")} className={`text-sm ${theme === "dark" ? "bg-amber-500/50 border-amber-400" : "bg-slate-200 dark:bg-slate-800 border-slate-300 dark:border-slate-600 text-slate-600 dark:text-gray-400"}`}><MoonIcon /> มืด</Button></div></div>
             {/* ปุ่มติดต่อผู้พัฒนา */}
             <div className="w-full pt-4 mt-4 border-t border-slate-200 dark:border-emerald-700/20">
@@ -486,6 +502,7 @@ function DeckCard({ deck, onViewDeck, userProfile, onDeleteDeck, isDetailLoading
         {/* Header: User & 3-Dot Menu */}
         <div className="flex justify-between items-start mb-2 relative z-20">
           <div className="flex items-center gap-2 overflow-hidden pr-6">
+            
             <img 
               src={deck.user.picture} 
               alt={deck.user.name} 
@@ -837,7 +854,7 @@ export default function PublicDecks() {
   return (
     <div className="h-screen flex flex-col text-slate-900 dark:text-gray-200 bg-slate-100 dark:bg-black">
       <style>{`::-webkit-scrollbar{width:8px}::-webkit-scrollbar-track{background:#0f172a}::-webkit-scrollbar-thumb{background:#1e293b;border-radius:4px}::-webkit-scrollbar-thumb:hover{background:#334155}.image-render-target{position:fixed;top:-9999px;left:0;width:1280px;height:auto;background:#1e293b;padding:24px;box-shadow:0 0 30px rgba(0,0,0,0.5);display:flex;gap:24px;flex-shrink:0;flex-grow:0;}`}</style>
-      {/* Header: Redesigned for Mobile Compact View */}
+      {/* Header: Redesigned (Consistent with App.jsx) */}
       <header className="px-3 md:px-6 py-2 border-b border-slate-200 dark:border-emerald-700/30 bg-white/80 dark:bg-black/60 backdrop-blur-sm shrink-0 z-40 h-14 flex flex-col justify-center">
          <div className="flex items-center justify-between gap-2">
           
@@ -849,31 +866,52 @@ export default function PublicDecks() {
                  </button>
              )}
              <h1 className="text-lg md:text-3xl font-extrabold tracking-tight bg-gradient-to-r from-amber-500 to-emerald-600 dark:from-amber-300 dark:to-emerald-400 bg-clip-text text-transparent truncate pt-0.5">
-                Battle Of Talingchan
+                Public Decks
              </h1>
           </div>
+          
+          {/* 🟢 ฝั่งขวา: ปุ่มต่างๆ เรียงตามลำดับ (Market -> Public -> My Decks -> Bell -> Profile) */}
+          <div className="flex items-center gap-1.5 md:gap-3 shrink-0">
+            
+            {/* 1. Market */}
+            <Link to="/auction">
+                <Button className="!px-2 md:!px-4 bg-gradient-to-r from-rose-500 to-orange-600 text-white border-none shadow-md hover:shadow-lg hover:from-rose-400 hover:to-orange-500">
+                    <StoreIcon /> 
+                    <span className="hidden md:inline ml-1">Market</span>
+                </Button>
+            </Link>
 
-          {/* 🟢 ฝั่งขวา: ปุ่มย้อนกลับ (ดีไซน์ใหม่) */}
-          <Link to="/" className="shrink-0">
-            <button className="
-              flex items-center gap-0.5 
-              pl-1 pr-3 py-1.5               /* Padding กะทัดรัด */
-              rounded-full                   /* ทรงแคปซูลมนๆ กดง่าย */
-              bg-emerald-100/80 dark:bg-emerald-900/40 
-              border border-emerald-200 dark:border-emerald-500/30 
-              text-emerald-700 dark:text-emerald-300 
-              hover:bg-emerald-200 dark:hover:bg-emerald-800/50 
-              active:scale-95 transition-all
-              text-xs md:text-sm font-bold
-              shadow-sm
-            ">
-              <div className="scale-75"><ChevronLeftIcon /></div>
-              <span>Back</span> <span className="hidden md:inline">to Builder</span>
-            </button>
-          </Link>
+            {/* 2. Public (หน้าหลัก) */}
+            <Link to="/">
+                <Button
+                    as="span"
+                    className="!px-2 md:!px-4 bg-gradient-to-r from-blue-500 to-purple-600 text-white border-none shadow-lg hover:from-blue-400 hover:to-purple-500 ring-2 ring-offset-2 ring-blue-500/50 dark:ring-offset-slate-900"
+                >
+                    <HomeIcon />{" "}
+                    <span className="hidden md:inline">Public</span>
+                </Button>
+            </Link>
+
+            {/* 4. Bell (Notification) */}
+            <NotificationCenter userEmail={userProfile?.email} />
+
+            {/* 5. Profile Picture */}
+            <img
+                src={displayUser.picture}
+                alt={displayUser.name}
+                className="w-8 h-8 md:w-9 md:h-9 rounded-full border-2 border-emerald-500 object-cover ml-1 cursor-pointer hover:scale-105 transition-transform"
+                title={`Logged in as ${displayUser.name}`}
+                onClick={() => setIsSettingsOpen(true)} 
+            />
+            {/* ซ่อนชื่อบนมือถือ */}
+            <span className="text-slate-900 dark:text-white hidden lg:block text-sm font-semibold max-w-[100px] truncate">
+                {displayUser.name}
+            </span>
+          </div>
 
         </div>
       </header>
+
       <main className="flex-1 overflow-y-auto p-4 md:p-8 lg:p-12">
         <h2 className="text-3xl font-bold text-slate-900 dark:text-white mb-6">Public Shared Decks</h2>
         <div className="mb-8 p-4 bg-white dark:bg-slate-900/70 rounded-xl border border-slate-200 dark:border-emerald-500/20">

@@ -14,6 +14,8 @@ import {
 } from 'firebase/firestore';
 import { useNavigate, useLocation } from 'react-router-dom';
 ChartJS.register(RadialLinearScale, PointElement, LineElement, Filler, Tooltip, Legend);
+import CreateAuctionModal from './CreateAuctionModal';
+import NotificationCenter from './NotificationCenter';
 
 // === Icons ===
 const Svg = ({ p, ...r }) => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...r}>{p}</svg>;
@@ -46,6 +48,11 @@ const SunIcon = () => <Svg p={<><circle cx="12" cy="12" r="5"></circle><line x1=
 const MoonIcon = () => <Svg p={<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>} />;
 const ClearIcon = TrashIcon;
 const MessageIcon = () => <Svg p={<><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></>} />;
+// 🟢 แก้ไข: เปลี่ยนรูปบ้าน เป็นรูปค้อนประมูล
+const StoreIcon = () => (
+  <Svg width="24" height="24" p={<><path d="m14 13-7.5 7.5c-.83.83-2.17.83-3 0 0 0 0 0 0 0a2.12 2.12 0 0 1 0-3L11 10"/><path d="m16 16 6-6"/><path d="m8 8 6-6"/><path d="m9 7 8-8"/><path d="m21 11-8-8"/></>} />
+);
+
 // === UI helpers ===
 const Button = ({ className = "", children, ...props }) => (
   <button
@@ -425,16 +432,8 @@ const ProfileSetupModal = ({ isOpen, onClose, userProfile, onSave }) => {
 };
 
 // === Settings Sidebar ===
-const SettingsDrawer = ({
-  isOpen,
-  onClose,
-  userProfile,
-  onEditProfile,
-  onLogout,
-  theme,
-  setTheme,
-  onOpenFeedback, // <--- 🟢 [4.1] เพิ่มบรรทัดนี้ในวงเล็บรับค่า
-}) => {
+const SettingsDrawer = ({ isOpen, onClose, userProfile, onEditProfile, onLogout, theme, setTheme, onOpenFeedback, onOpenAdmin, onOpenMyDecks }) => {
+
   return (
     <>
       <div
@@ -466,6 +465,7 @@ const SettingsDrawer = ({
             alt={userProfile?.name}
             className="w-24 h-24 rounded-full border-4 border-emerald-500 shadow-lg object-cover"
           />
+          
           <div className="text-center">
             <h3 className="text-xl font-bold text-slate-900 dark:text-white">
               {userProfile?.name}
@@ -484,6 +484,12 @@ const SettingsDrawer = ({
           >
             แก้ไขโปรไฟล์
           </Button>
+          <button 
+                onClick={() => { onOpenMyDecks(); onClose(); }}
+                className="w-full py-3 bg-amber-100 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 font-bold rounded-xl shadow-sm hover:scale-105 transition-transform flex items-center justify-center gap-2"
+            >
+                <DeckIcon /> My Decks
+            </button>
           {/* === [เพิ่ม] ส่วนสลับ Theme === */}
           <div className="mt-4 w-full">
             <label className="text-sm font-semibold text-slate-500 dark:text-gray-400">
@@ -928,7 +934,44 @@ const FeedbackModal = ({ isOpen, onClose, userProfile, showAlert }) => {
 };
 
 // === CardDetailModal ===
-function CardDetailModal({ card, onClose }) { if (!card) return null; const encodedImagePath = encodePath(card.imagePath); const fileId = card.id.replace(' - Only#1', ''); const imgPng = `/cards/${encodedImagePath}/${encodeURIComponent(fileId)}.png`; const imgJpg = `/cards/${encodedImagePath}/${encodeURIComponent(fileId)}.jpg`; return createPortal( <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-[300] p-4" onClick={onClose}> <img src={imgPng} alt={card.name} className="max-w-full max-h-full h-auto w-auto object-contain rounded-xl shadow-2xl" onClick={(e) => e.stopPropagation()} onError={(e) => { if (!e.currentTarget.src.endsWith('.jpg')) { e.currentTarget.src = imgJpg; } }} /> <button onClick={onClose} className="absolute top-4 right-4 text-white bg-slate-800/50 rounded-full p-2 hover:bg-slate-700"> <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg> </button> </div>, document.body ); }
+// ✅ CardDetailModal เวอร์ชันมีปุ่มประมูล
+function CardDetailModal({ card, onClose, onSell }) {
+  if (!card) return null;
+  const encodedImagePath = encodePath(card.imagePath);
+  const fileId = card.id.replace(' - Only#1', '');
+  const imgPng = `/cards/${encodedImagePath}/${encodeURIComponent(fileId)}.png`;
+  const imgJpg = `/cards/${encodedImagePath}/${encodeURIComponent(fileId)}.jpg`;
+
+  return createPortal(
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-[300] p-4" onClick={onClose}>
+      <img 
+        src={imgPng} 
+        alt={card.name}
+        className="max-w-full max-h-full h-auto w-auto object-contain rounded-xl shadow-2xl" 
+        onClick={(e) => e.stopPropagation()} 
+        onError={(e) => { if (!e.currentTarget.src.endsWith('.jpg')) e.currentTarget.src = imgJpg; }} 
+      />
+      
+      {/* ปุ่มปิด */}
+      <button onClick={onClose} className="absolute top-4 right-4 text-white bg-slate-800/50 rounded-full p-2 hover:bg-slate-700">
+        <CloseIcon />
+      </button>
+
+      {/* 👇 ปุ่มเปิดประมูล (ที่ขาดหายไป) */}
+      <button 
+        onClick={(e) => { 
+            e.stopPropagation(); 
+            if(onSell) onSell(card); // เรียกฟังก์ชันขาย
+        }} 
+        className="absolute bottom-6 right-6 flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-amber-500 to-orange-600 text-white rounded-full font-bold shadow-xl hover:scale-105 transition-transform z-[310]"
+      >
+         <span className="text-xl">🔨</span>
+         <span>เปิดประมูล</span>
+      </button>
+
+    </div>, document.body
+  );
+}
 // === DeckViewModal ===
 function DeckViewModal({ isOpen, onClose, deck, rules, onAddCard, onRemoveCard, title }) {
   const groupedDeck = useMemo(() => {
@@ -1823,6 +1866,9 @@ const getMagicSubType = (card) => {
 // === Main App ===
 export default function App() {
   // ... hooks เดิม ...
+  const [isAuctionModalOpen, setIsAuctionModalOpen] = useState(false);
+  const [auctionTargetCard, setAuctionTargetCard] = useState(null);
+
   const navigate = useNavigate(); // 🟢 2. เรียกใช้ hook
   const location = useLocation();
 
@@ -1916,7 +1962,7 @@ export default function App() {
   const allSets = useMemo(() => Array.from(new Set(cardDb.map(c => c.imagePath).filter(Boolean))).sort(), [cardDb]);
   const [currentPage, setCurrentPage] = useState(1); 
   const PAGE_SIZE = 30;
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true); 
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false); 
   const toggleSidebar = () => setIsSidebarOpen(prev => !prev);
   const [modal, setModal] = useState({ isOpen: false, title: '', message: '', onConfirm: null }); 
   const [isImportModalOpen, setIsImportModalOpen] = useState(false); 
@@ -2178,10 +2224,19 @@ export default function App() {
                     </h1>
                   </div>
 
-                  {/* 🟢 ฝั่งขวา: ปุ่มต่างๆ + รูปโปรไฟล์ */}
+                  {/* 🟢 ฝั่งขวา: จัดเรียงใหม่ (Market -> Public -> My Decks -> Bell -> Profile) */}
                   <div className="flex items-center gap-1.5 md:gap-3 shrink-0">
+                    
+                    {/* 1. Market */}
+                    <Link to="/auction">
+                      <Button className="!px-2 md:!px-4 bg-gradient-to-r from-rose-500 to-orange-600 text-white border-none shadow-md hover:shadow-lg hover:from-rose-400 hover:to-orange-500">
+                          <StoreIcon /> 
+                          <span className="hidden md:inline ml-1">Market</span>
+                      </Button>
+                    </Link>
+
+                    {/* 2. Public Decks */}
                     <Link to="/public-decks">
-                      {/* !px-2 คือการบังคับลด padding ในมือถือ */}
                       <Button
                         as="span"
                         className="!px-2 md:!px-4 bg-gradient-to-r from-blue-500 to-purple-600 text-white border-none shadow-lg hover:from-blue-400 hover:to-purple-500"
@@ -2190,19 +2245,18 @@ export default function App() {
                         <span className="hidden md:inline">Public</span>
                       </Button>
                     </Link>
-                    <Button
-                      onClick={() => setIsDeckListModalOpen(true)}
-                      className="!px-2 md:!px-4 bg-gradient-to-r from-amber-500 to-emerald-600 text-white border-none shadow-lg hover:from-amber-400 hover:to-emerald-500"
-                    >
-                      <DeckIcon />{" "}
-                      <span className="hidden md:inline">My Decks</span>
-                    </Button>
 
+                    {/* 4. Bell (Notification) */}
+                    <NotificationCenter userEmail={userProfile?.email} />
+
+                    {/* 5. Profile Picture */}
                     <img
                       src={displayUser.picture}
                       alt={displayUser.name}
-                      className="w-8 h-8 md:w-9 md:h-9 rounded-full border-2 border-emerald-500 object-cover"
+                      className="w-8 h-8 md:w-9 md:h-9 rounded-full border-2 border-emerald-500 object-cover ml-1 cursor-pointer hover:scale-105 transition-transform"
                       title={`Logged in as ${displayUser.name}`}
+                      // เผื่ออยากให้กดรูปแล้วเปิดตั้งค่าได้ด้วย
+                      onClick={() => setIsSettingsOpen(true)} 
                     />
                     {/* ซ่อนชื่อบนมือถือ แสดงเฉพาะบนจอใหญ่ */}
                     <span className="text-slate-900 dark:text-white hidden lg:block text-sm font-semibold max-w-[100px] truncate">
@@ -2496,10 +2550,24 @@ export default function App() {
                 title={viewingDeck === "main" ? "Main Deck" : "Life Deck"}
               />
               <CardDetailModal
-                card={zoomedCard}
-                onClose={() => setZoomedCard(null)}
-              />
+    card={zoomedCard}
+    onClose={() => setZoomedCard(null)}
+    // 👇 ต้องเพิ่มบรรทัดนี้ ปุ่มถึงจะทำงานได้
+    onSell={(card) => {
+        setAuctionTargetCard(card);
+        setIsAuctionModalOpen(true);
+        setZoomedCard(null);
+    }}
+/>
 
+{/* 👇 เพิ่ม Modal นี้ต่อท้ายด้วย (ถ้ายังไม่มี) */}
+<CreateAuctionModal
+    isOpen={isAuctionModalOpen}
+    onClose={() => setIsAuctionModalOpen(false)}
+    card={auctionTargetCard}
+    userProfile={displayUser}
+/>
+                
               {/* ================================================================= */}
               {/* === 📍 [6] แก้ไข `onShowCards` ให้ตั้ง `showChart: false` === */}
               {/* ================================================================= */}
@@ -2539,6 +2607,7 @@ export default function App() {
                 theme={theme}
                 setTheme={setTheme}
                 onOpenFeedback={() => setIsFeedbackOpen(true)} // <--- เพิ่มบรรทัดนี้
+                onOpenMyDecks={() => setIsDeckListModalOpen(true)}
               />
               <FeedbackModal 
                 isOpen={isFeedbackOpen}

@@ -1,38 +1,40 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App.jsx'
-import PublicDecks from './PublicDecks.jsx' // 1. Import Component PublicDecks
+import PublicDecks from './PublicDecks.jsx'
+import OpenBrowser from './OpenBrowser.jsx'
+import AuctionMarket from './AuctionMarket.jsx' // 🟢 1. เพิ่มบรรทัดนี้ (Import)
+
 import './index.css'
 
-// 🛑 [แก้ไข] เพิ่ม OpenBrowser เข้ามา (บรรทัดที่ 7)
-import OpenBrowser from './OpenBrowser.jsx' 
-
 import { GoogleOAuthProvider } from "@react-oauth/google";
-import { createBrowserRouter, RouterProvider } from "react-router-dom"; // 2. Import router
+import { createBrowserRouter, RouterProvider } from "react-router-dom";
 
 const GOOGLE_CLIENT_ID = "618176300223-rfano65abopbddenjppd972m57hhgstn.apps.googleusercontent.com";
 
-// 3. กำหนดเส้นทาง
 const router = createBrowserRouter([
   {
-    path: "/", // หน้าแรก (หน้าจัดเด็ค)
+    path: "/", 
     element: <App />,
   },
   {
-    path: "/public-decks", // หน้า Public Decks
+    path: "/public-decks", 
     element: <PublicDecks />,
   },
-  // 🟢 [เพิ่ม Route สำหรับ In-App Browser]
   {
     path: "/open-browser", 
     element: <OpenBrowser />,
+  },
+  // 🟢 2. เพิ่มก้อนนี้เข้าไปครับ (Route)
+  {
+    path: "/auction",
+    element: <AuctionMarket />,
   },
 ]);
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
-      {/* 4. เปลี่ยน <App /> เป็น <RouterProvider /> */}
       <RouterProvider router={router} />
     </GoogleOAuthProvider>
   </React.StrictMode>,

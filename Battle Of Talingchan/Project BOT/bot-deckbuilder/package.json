@@ -30,6 +30,8 @@
 
     "@react-oauth/google": "^0.12.2",
 
+    "@supabase/supabase-js": "^2.84.0",
+
     "chart.js": "^4.5.1",
 
     "fast-average-color": "^9.5.0",
