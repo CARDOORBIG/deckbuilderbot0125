@@ -39,21 +39,39 @@ export default function CreateAuctionModal({ isOpen, onClose, card, userProfile 
   };
 
   return (
+    // 🟢 [แก้ไข] ปรับขนาด Modal เป็น max-w-lg
     <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[500] p-4">
-      <div className="bg-white dark:bg-slate-900 p-6 rounded-xl w-full max-w-sm border border-slate-300 dark:border-emerald-500/30 shadow-2xl">
+      <div className="bg-white dark:bg-slate-900 p-6 rounded-xl w-full max-w-lg border border-slate-300 dark:border-emerald-500/30 shadow-2xl">
         <h2 className="text-xl font-bold mb-4 text-slate-900 dark:text-white flex items-center gap-2">
            <span className="text-2xl">⚖️</span> เปิดประมูล: {card.name}
         </h2>
         
         {/* กล่องคำเตือน */}
-        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-3 rounded-lg mb-4 text-xs text-red-700 dark:text-red-300">
-            <p className="font-bold mb-1">⚠️ คำเตือนสำคัญ:</p>
-            <ul className="list-disc list-inside space-y-1">
-                <li>โปรดตรวจสอบให้แน่ใจว่า <b>ท่านมีการ์ดใบนี้อยู่จริง</b> และพร้อมส่งมอบเมื่อจบการประมูล</li>
-                <li>การตั้งประมูลเพื่อปั่นป่วน ก่อกวน หรือไม่มีสินค้าจริง ถือเป็นการกระทำผิดร้ายแรงต่อชุมชน</li>
-                <li>หากตรวจสอบพบ <b>ไอดีของท่านจะถูกระงับถาวร (Ban)</b> ทันทีโดยไม่มีการแจ้งเตือนล่วงหน้า</li>
-            </ul>
-        </div>
+        {/* กล่องคำเตือนแบบใหญ่พิเศษ */}
+<div className="bg-red-50 dark:bg-red-900/20 border border-red-300 dark:border-red-800 
+                p-5 rounded-xl mb-5 
+                text-lg md:text-xl lg:text-2xl 
+                text-red-700 dark:text-red-300 leading-relaxed font-medium">
+
+    <p className="font-bold mb-3 
+                  text-xl md:text-2xl lg:text-3xl 
+                  text-red-800 dark:text-red-200">
+        ⚠️ คำเตือนสำคัญ
+    </p>
+
+    <ul className="list-disc list-inside space-y-2">
+        <li>
+            โปรดตรวจสอบให้แน่ใจว่า <b>ท่านมีการ์ดใบนี้อยู่จริง</b> และพร้อมส่งมอบเมื่อจบการประมูล
+        </li>
+        <li>
+            การตั้งประมูลเพื่อปั่นป่วน ก่อกวน หรือไม่มีสินค้าจริง ถือเป็นการกระทำผิดร้ายแรงต่อชุมชน
+        </li>
+        <li>
+            หากตรวจสอบพบ <b>ไอดีของท่านจะถูกระงับถาวร (Ban)</b> ทันทีโดยไม่มีการแจ้งเตือนล่วงหน้า
+        </li>
+    </ul>
+</div>
+
 
         <div className="space-y-4">
             <div>
@@ -69,15 +87,17 @@ export default function CreateAuctionModal({ isOpen, onClose, card, userProfile 
             <div>
                 <label className="block text-sm text-slate-500 dark:text-gray-400 mb-1">ระยะเวลา (หน่วย: ชั่วโมง)</label>
                 <div className="relative">
+                    {/* 🟢 [แก้ไข] Input: p-3 และ text-lg */}
                     <input 
                         type="number" 
                         value={hours} 
                         onChange={e => setHours(e.target.value)} 
-                        className="w-full p-2 pr-12 rounded border bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-white outline-none focus:border-amber-500 font-mono" 
+                        className="w-full p-3 pr-12 rounded border bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-white outline-none focus:border-amber-500 font-mono text-lg" 
                         min="1"
                         placeholder="เช่น 24"
                     />
-                    <span className="absolute right-3 top-2 text-sm text-slate-400">ชม.</span>
+                    {/* 🟢 [แก้ไข] Span: top-3 และ text-lg */}
+                    <span className="absolute right-3 top-3 text-lg text-slate-400">ชม.</span>
                 </div>
                 <p className="text-[10px] text-slate-400 mt-1">
                     *เช่น 24 = 1 วัน, 48 = 2 วัน

@@ -1006,7 +1006,7 @@ export default function AuctionMarket() {
             <div className="animate-fade-in w-full md:px-8">
                 <div className="flex justify-between items-center mb-6 px-4 md:px-0"> {/* เพิ่ม px-4 สำหรับ Header ของ Grid */}
                     <h2 className="text-xl font-black flex items-center gap-3 text-slate-800 dark:text-white">
-                        <span className="text-xl">🔥</span> มาแรง !!
+                        <span className="text-xl"></span>
                     </h2>
                     <button 
                         onClick={() => setIsCompletedModalOpen(true)} 
