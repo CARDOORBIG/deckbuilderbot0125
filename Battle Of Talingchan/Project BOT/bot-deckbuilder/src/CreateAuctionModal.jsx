@@ -3,15 +3,18 @@ import { supabase } from './supabaseClient';
 
 export default function CreateAuctionModal({ isOpen, onClose, card, userProfile }) {
   const [price, setPrice] = useState(100);
-  const [hours, setHours] = useState(24);
+  const [hours, setHours] = useState(24); // ค่าเริ่มต้น 24 ชม.
   const [loading, setLoading] = useState(false);
 
   if (!isOpen || !card) return null;
 
   const handleCreate = async () => {
     if (!userProfile) return alert("กรุณา Login ก่อนตั้งขายครับ");
+    if (parseInt(hours) < 1) return alert("ระยะเวลาต้องอย่างน้อย 1 ชั่วโมงครับ");
+    
     setLoading(true);
 
+    // คำนวณเวลาจบ (บวกชั่วโมงเพิ่มจากเวลาปัจจุบัน)
     const endTime = new Date();
     endTime.setHours(endTime.getHours() + parseInt(hours));
 
@@ -38,28 +41,53 @@ export default function CreateAuctionModal({ isOpen, onClose, card, userProfile 
   return (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[500] p-4">
       <div className="bg-white dark:bg-slate-900 p-6 rounded-xl w-full max-w-sm border border-slate-300 dark:border-emerald-500/30 shadow-2xl">
-        <h2 className="text-xl font-bold mb-4 text-slate-900 dark:text-white">เปิดประมูล: {card.name}</h2>
+        <h2 className="text-xl font-bold mb-4 text-slate-900 dark:text-white flex items-center gap-2">
+           <span className="text-2xl">⚖️</span> เปิดประมูล: {card.name}
+        </h2>
         
+        {/* กล่องคำเตือน */}
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-3 rounded-lg mb-4 text-xs text-red-700 dark:text-red-300">
+            <p className="font-bold mb-1">⚠️ คำเตือนสำคัญ:</p>
+            <ul className="list-disc list-inside space-y-1">
+                <li>โปรดตรวจสอบให้แน่ใจว่า <b>ท่านมีการ์ดใบนี้อยู่จริง</b> และพร้อมส่งมอบเมื่อจบการประมูล</li>
+                <li>การตั้งประมูลเพื่อปั่นป่วน ก่อกวน หรือไม่มีสินค้าจริง ถือเป็นการกระทำผิดร้ายแรงต่อชุมชน</li>
+                <li>หากตรวจสอบพบ <b>ไอดีของท่านจะถูกระงับถาวร (Ban)</b> ทันทีโดยไม่มีการแจ้งเตือนล่วงหน้า</li>
+            </ul>
+        </div>
+
         <div className="space-y-4">
             <div>
                 <label className="block text-sm text-slate-500 dark:text-gray-400 mb-1">ราคาเริ่มต้น (บาท)</label>
-                <input type="number" value={price} onChange={e=>setPrice(e.target.value)} className="w-full p-2 rounded border bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-white" />
+                <input 
+                    type="number" 
+                    value={price} 
+                    onChange={e => setPrice(e.target.value)} 
+                    className="w-full p-2 rounded border bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-white outline-none focus:border-amber-500 font-mono" 
+                    min="0"
+                />
             </div>
             <div>
-                <label className="block text-sm text-slate-500 dark:text-gray-400 mb-1">ระยะเวลา (ชั่วโมง)</label>
-                <select value={hours} onChange={e=>setHours(e.target.value)} className="w-full p-2 rounded border bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-white">
-                    <option value="1">1 ชั่วโมง (Test)</option>
-                    <option value="6">6 ชั่วโมง</option>
-                    <option value="12">12 ชั่วโมง</option>
-                    <option value="24">24 ชั่วโมง (1 วัน)</option>
-                    <option value="48">48 ชั่วโมง (2 วัน)</option>
-                </select>
+                <label className="block text-sm text-slate-500 dark:text-gray-400 mb-1">ระยะเวลา (หน่วย: ชั่วโมง)</label>
+                <div className="relative">
+                    <input 
+                        type="number" 
+                        value={hours} 
+                        onChange={e => setHours(e.target.value)} 
+                        className="w-full p-2 pr-12 rounded border bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-white outline-none focus:border-amber-500 font-mono" 
+                        min="1"
+                        placeholder="เช่น 24"
+                    />
+                    <span className="absolute right-3 top-2 text-sm text-slate-400">ชม.</span>
+                </div>
+                <p className="text-[10px] text-slate-400 mt-1">
+                    *เช่น 24 = 1 วัน, 48 = 2 วัน
+                </p>
             </div>
             
             <div className="flex gap-3 pt-4">
-                <button onClick={onClose} className="flex-1 py-2 rounded bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300">ยกเลิก</button>
-                <button onClick={handleCreate} disabled={loading} className="flex-1 py-2 rounded bg-amber-500 text-white font-bold hover:bg-amber-600 disabled:opacity-50">
-                    {loading ? "กำลังส่ง..." : "เริ่มประมูล"}
+                <button onClick={onClose} className="flex-1 py-2 rounded bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-700 font-bold text-sm">ยกเลิก</button>
+                <button onClick={handleCreate} disabled={loading} className="flex-1 py-2 rounded bg-gradient-to-r from-amber-500 to-orange-600 text-white font-bold hover:from-amber-600 hover:to-orange-700 disabled:opacity-50 text-sm">
+                    {loading ? "กำลังตรวจสอบ..." : "ข้าพเจ้ายอมรับและเริ่มประมูล"}
                 </button>
             </div>
         </div>

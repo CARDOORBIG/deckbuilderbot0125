@@ -888,7 +888,7 @@ export default function PublicDecks() {
                     className="!px-2 md:!px-4 bg-gradient-to-r from-blue-500 to-purple-600 text-white border-none shadow-lg hover:from-blue-400 hover:to-purple-500 ring-2 ring-offset-2 ring-blue-500/50 dark:ring-offset-slate-900"
                 >
                     <HomeIcon />{" "}
-                    <span className="hidden md:inline">Public</span>
+                    <span className="hidden md:inline">Home</span>
                 </Button>
             </Link>
 

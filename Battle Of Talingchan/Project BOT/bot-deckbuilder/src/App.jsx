@@ -48,6 +48,8 @@ const SunIcon = () => <Svg p={<><circle cx="12" cy="12" r="5"></circle><line x1=
 const MoonIcon = () => <Svg p={<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>} />;
 const ClearIcon = TrashIcon;
 const MessageIcon = () => <Svg p={<><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></>} />;
+// 🟢 [เพิ่ม] ไอคอนค้อนประมูล
+const GavelIcon = () => <Svg p={<><path d="m14 13-7.5 7.5c-.83.83-2.17.83-3 0 0 0 0 0 0 0a2.12 2.12 0 0 1 0-3L11 10"/><path d="m16 16 6-6"/><path d="m8 8 6-6"/><path d="m9 7 8-8"/><path d="m21 11-8-8"/></>} />;
 // 🟢 แก้ไข: เปลี่ยนรูปบ้าน เป็นรูปค้อนประมูล
 const StoreIcon = () => (
   <Svg width="24" height="24" p={<><path d="m14 13-7.5 7.5c-.83.83-2.17.83-3 0 0 0 0 0 0 0a2.12 2.12 0 0 1 0-3L11 10"/><path d="m16 16 6-6"/><path d="m8 8 6-6"/><path d="m9 7 8-8"/><path d="m21 11-8-8"/></>} />
@@ -623,7 +625,8 @@ const FlyingLight = ({ startRect, endRect, onComplete }) => {
 
 // === Card component (draggable) ===
 // 🟢 รับ props เพิ่ม: isMobileZoomed และ onMobileClick
-const CardItem = forwardRef(function CardItem({ card, onDoubleClick, onViewDetails, onAddCard, isMobileZoomed, onMobileClick }, ref) { 
+// 👇 เติม , onAuction เข้าไปตรงนี้ครับ
+const CardItem = forwardRef(function CardItem({ card, onDoubleClick, onViewDetails, onAddCard, isMobileZoomed, onMobileClick, onAuction }, ref) { 
     const cardItemRef = useRef(null); 
     const { isDragging: isAnythingDragging } = useIsDragging(); 
     const [{ isDragging }, dragRef] = useDrag({ type: DND_TYPES.CARD, item: { card }, collect: (m) => ({ isDragging: m.isDragging() }) }); 
@@ -677,6 +680,13 @@ const CardItem = forwardRef(function CardItem({ card, onDoubleClick, onViewDetai
                 > 
                     <PlusIcon /> 
                 </button> 
+                <button 
+                    onClick={(e) => { e.stopPropagation(); onAuction(card); }} 
+                    className="p-1 lg:p-1.5 bg-amber-500/90 rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-amber-600 active:scale-95 shadow-md" 
+                    title="เปิดประมูล"
+                > 
+                    <GavelIcon /> 
+                </button>
             </div> 
 
             <img 
@@ -1664,14 +1674,35 @@ function LeftSidebar({
             {["cost", "power", "gem"].map((stat) => (
               <div key={stat}>
                 <label className="capitalize text-slate-500 dark:text-gray-400">{stat}</label>
-                <input type="number" placeholder="Min" min="0" value={statFilters[stat].min} onChange={(e) => onStatFilterChange(stat, "min", e.target.value)} className="w-full mt-1 px-2 py-1 border border-slate-300 dark:border-emerald-500/30 rounded-md bg-white/50 dark:bg-slate-700/50 text-slate-900 dark:text-white text-center" />
-                <input type="number" placeholder="Max" min="0" value={statFilters[stat].max} onChange={(e) => onStatFilterChange(stat, "max", e.target.value)} className="w-full mt-1 px-2 py-1 border border-slate-300 dark:border-emerald-500/30 rounded-md bg-white/50 dark:bg-slate-700/50 text-slate-900 dark:text-white text-center" />
+                
+                {/* 🟢 Min Dropdown */}
+                <select 
+                    value={statFilters[stat].min} 
+                    onChange={(e) => onStatFilterChange(stat, "min", e.target.value)} 
+                    className="w-full mt-1 px-2 py-1 border border-slate-300 dark:border-emerald-500/30 rounded-md bg-white/50 dark:bg-slate-700/50 text-slate-900 dark:text-white text-center appearance-none cursor-pointer"
+                >
+                    <option value="">Min</option>
+                    {[...Array(11).keys()].map(n => (
+                        <option key={n} value={n}>{n}</option>
+                    ))}
+                </select>
+
+                {/* 🟢 Max Dropdown */}
+                <select 
+                    value={statFilters[stat].max} 
+                    onChange={(e) => onStatFilterChange(stat, "max", e.target.value)} 
+                    className="w-full mt-1 px-2 py-1 border border-slate-300 dark:border-emerald-500/30 rounded-md bg-white/50 dark:bg-slate-700/50 text-slate-900 dark:text-white text-center appearance-none cursor-pointer"
+                >
+                    <option value="">Max</option>
+                    {[...Array(11).keys()].map(n => (
+                        <option key={n} value={n}>{n}</option>
+                    ))}
+                </select>
               </div>
             ))}
           </div>
         </div>
       </div>
-
       {/* 🟢 ส่วน Bottom (Deck Trays & Buttons) - ตอนนี้รวมอยู่ใน Flow เดียวกันแล้ว */}
       <div className="pt-4 pb-20 border-t border-slate-300 dark:border-emerald-700/30 bg-transparent">
         <div className="flex flex-col gap-4 mb-4">
@@ -1693,7 +1724,7 @@ function LeftSidebar({
 }
 
 // === Card grid (right) ===
-function CardGrid({ cards, onDoubleClick, onViewDetails, onAddCard }) {
+function CardGrid({ cards, onDoubleClick, onViewDetails, onAddCard, onAuction }) {
   // 🟢 1. เพิ่ม State ที่ตัวแม่ เพื่อจำว่า "การ์ดใบไหน" (index ไหน) กำลังซูมอยู่
   // เก็บเป็น string unique key (เช่น "cardID-index")
   const [activeZoomKey, setActiveZoomKey] = useState(null);
@@ -1729,10 +1760,9 @@ function CardGrid({ cards, onDoubleClick, onViewDetails, onAddCard }) {
             onDoubleClick={onDoubleClick}
             onViewDetails={onViewDetails}
             onAddCard={onAddCard}
-            
-            // 🟢 2. ส่งสถานะไปบอกลูกว่า "เธอต้องขยายไหม" และส่งฟังก์ชันกดไปให้
             isMobileZoomed={activeZoomKey === uniqueKey} 
             onMobileClick={() => handleMobileZoom(uniqueKey)}
+            onAuction={onAuction}
           />
         );
       })}
@@ -2453,6 +2483,11 @@ export default function App() {
                           onDoubleClick={handleCardDoubleClick}
                           onViewDetails={setZoomedCard}
                           onAddCard={addToMain}
+                          // 🟢 [เพิ่ม] ส่งฟังก์ชันเปิดประมูลเข้าไป
+                          onAuction={(card) => {
+                              setAuctionTargetCard(card);
+                              setIsAuctionModalOpen(true);
+                          }}
                         />
                         
                         {totalPages > 1 && (

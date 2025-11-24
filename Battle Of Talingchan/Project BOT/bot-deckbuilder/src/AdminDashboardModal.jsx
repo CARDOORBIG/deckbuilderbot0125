@@ -20,7 +20,6 @@ export default function AdminDashboardModal({ isOpen, onClose, adminEmail }) {
 
   if (!isOpen || adminEmail !== 'koritros619@gmail.com') return null;
 
-  // ฟังก์ชันกลางสำหรับเรียก RPC
   const callAdminRpc = async (rpcName, params) => {
     setIsProcessing(true);
     const { data, error } = await supabase.rpc(rpcName, params);
@@ -28,19 +27,30 @@ export default function AdminDashboardModal({ isOpen, onClose, adminEmail }) {
     
     if(error) alert("Error: " + error.message);
     else alert(data.message);
-    return !error;
   };
 
   return (
-    <div className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center z-[999] p-4">
-      <div className="bg-slate-900 border-2 border-red-600 rounded-xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
+    // Outer Overlay: เมื่อคลิกที่ฉากหลัง (นอก Modal) จะสั่งปิด
+    <div className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center z-[999] p-4" onClick={onClose}>
+      
+      {/* 🟢 [แก้ไข]: Modal Body: เมื่อคลิกใน Modal ให้หยุดการส่งต่อเหตุการณ์ (stopPropagation) */}
+      <div 
+        className="bg-slate-900 border-2 border-red-600 rounded-xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]" 
+        onClick={e => e.stopPropagation()} 
+      >
         
         {/* Header */}
         <div className="p-4 bg-gradient-to-r from-red-900/50 to-slate-900 border-b border-red-500/30 flex justify-between items-center shrink-0">
             <h2 className="text-xl font-bold text-red-400 flex items-center gap-2">
                 👑 ADMIN DASHBOARD
             </h2>
-            <button onClick={onClose} className="text-slate-400 hover:text-white w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center">✕</button>
+            {/* 🟢 ปุ่มกากบาท: เรียก onClose */}
+            <button 
+                onClick={onClose} 
+                className="text-slate-400 hover:text-white w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center hover:bg-red-600 transition-colors"
+            >
+                ✕
+            </button>
         </div>
 
         {/* Tabs */}
@@ -69,7 +79,7 @@ export default function AdminDashboardModal({ isOpen, onClose, adminEmail }) {
                         disabled={isProcessing}
                         className="w-full py-3 bg-gradient-to-r from-red-600 to-orange-600 text-white font-bold rounded-lg hover:brightness-110 disabled:opacity-50"
                     >
-                        {isProcessing ? 'Sending...' : '🚀 ส่งประกาศ (Broadcast)'}
+                        {isBroadcasting ? 'Sending...' : '🚀 ส่งประกาศ (Broadcast)'}
                     </button>
                 </div>
             )}
@@ -98,9 +108,11 @@ export default function AdminDashboardModal({ isOpen, onClose, adminEmail }) {
                 </div>
             )}
 
-            {/* Tab 3: Cleanup (ใหม่!) */}
+            {/* Tab 3: Cleanup (เพิ่มปุ่มล้างประวัติทั้งหมด) */}
             {activeTab === 'cleanup' && (
                 <div className="space-y-6 animate-fade-in">
+                    
+                    {/* ลบรายตัว */}
                     <div className="p-4 bg-slate-800/50 rounded-xl border border-slate-700 space-y-3">
                         <h4 className="text-white font-bold flex items-center gap-2">🗑️ ลบการประมูล (รายตัว)</h4>
                         <input value={auctionId} onChange={e=>setAuctionId(e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded p-2 text-sm text-white" placeholder="Auction ID (UUID)" />
@@ -115,6 +127,7 @@ export default function AdminDashboardModal({ isOpen, onClose, adminEmail }) {
                         </button>
                     </div>
 
+                    {/* ล้างบาง User */}
                     <div className="p-4 bg-red-950/20 rounded-xl border border-red-900/50 space-y-3">
                         <h4 className="text-red-400 font-bold flex items-center gap-2">☢️ ล้างบาง User (Nuclear)</h4>
                         <input value={wipeEmail} onChange={e=>setWipeEmail(e.target.value)} className="w-full bg-slate-900 border border-red-900 rounded p-2 text-sm text-white" placeholder="user@badguy.com" />
@@ -129,16 +142,18 @@ export default function AdminDashboardModal({ isOpen, onClose, adminEmail }) {
                         </button>
                     </div>
 
+                    {/* 🟢 ปุ่มใหม่: ล้างประวัติทั้งหมด */}
                     <div className="pt-4 border-t border-slate-700">
                         <button 
                             onClick={() => {
-                                if(confirm("ยืนยันลบประวัติเก่าที่จบไปแล้วเกิน 30 วัน?")) 
-                                callAdminRpc('admin_force_delete', { p_admin_email: adminEmail, p_target_input: '', p_action_type: 'clear_old' });
+                                if(confirm("🧨 คำเตือนขั้นสูงสุด!\n\nคุณกำลังจะลบ 'ประวัติการประมูลที่จบแล้ว' ทั้งหมดออกจากระบบ\nข้อมูลจะไม่สามารถกู้คืนได้\n\nยืนยันหรือไม่?")) 
+                                callAdminRpc('admin_force_delete', { p_admin_email: adminEmail, p_target_input: '', p_action_type: 'clear_all_completed' });
                             }}
-                            className="w-full py-3 border border-slate-600 text-slate-400 hover:bg-slate-800 hover:text-white rounded text-sm"
+                            className="w-full py-3 bg-red-900/50 hover:bg-red-800 text-red-200 font-bold rounded-lg border border-red-800 shadow-lg transition-all flex items-center justify-center gap-2"
                         >
-                            🧹 ล้างประวัติเก่า (30 วัน+)
+                            🧨 ล้างประวัติที่จบแล้ว (ทั้งหมด)
                         </button>
+                        <p className="text-[10px] text-slate-500 text-center mt-2">กดปุ่มนี้เพื่อเคลียร์ฐานข้อมูลให้โล่ง (เฉพาะรายการที่จบแล้ว)</p>
                     </div>
                 </div>
             )}

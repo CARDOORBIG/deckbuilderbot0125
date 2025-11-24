@@ -1,11 +1,13 @@
+/* สั่งให้ Root ขยายเต็มจอ ไม่มีการบีบตรงกลาง */
 #root {
   width: 100%;
-  max-width: 100%; /* 🟢 แก้จาก 1280px เป็น 100% ให้เต็มจอ */
-  margin: 0;       /* 🟢 ลบ auto ออก เพื่อไม่ให้จัดกึ่งกลางแบบบีบๆ */
-  padding: 0;      /* 🟢 ลบ padding 2rem ออก เพื่อให้ชิดขอบ */
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
   text-align: left;
 }
 
+/* โค้ด Logo เดิม (เก็บไว้ได้) */
 .logo {
   height: 6em;
   padding: 1.5em;
@@ -20,12 +22,8 @@
 }
 
 @keyframes logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
 @media (prefers-reduced-motion: no-preference) {
