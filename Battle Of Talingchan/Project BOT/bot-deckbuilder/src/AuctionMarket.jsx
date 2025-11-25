@@ -20,7 +20,8 @@ import {
     ShieldCheckIcon, ChatBubbleIcon, SendIcon, 
     TrashIcon, UsersIcon, DeckIcon, StoreIcon, 
     HomeIcon, MessageIcon, NeonLightningIcon, 
-    ImageIcon, ArchiveIcon 
+    ImageIcon, ArchiveIcon,
+    ChevronLeftIcon 
 } from './components/Icons';
 
 // === Helper Functions ===
@@ -1048,12 +1049,16 @@ export default function AuctionMarket() {
                                 {/* === Info Section === */}
                                 <div className="p-3 flex-1 flex flex-col gap-1">
                                     <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-800 pb-1 mb-1">
-                                        <div className="flex items-center gap-1 min-w-0">
-                                            <p className="text-[10px] text-slate-500">Seller:</p>
-                                            <p className="text-[10px] font-bold text-slate-700 dark:text-slate-300 truncate max-w-[80px]">{item.seller_name}</p>
-                                        </div>
-                                        <RatingBadge score={sellerScore} />
-                                    </div>
+    <div className="flex items-center gap-1 min-w-0">
+        <p className="text-[10px] text-slate-500">Seller:</p>
+        <p className="text-[10px] font-bold text-slate-700 dark:text-slate-300 truncate max-w-[80px]">{item.seller_name}</p>
+    </div>
+    
+    {/* 🟢 2. ใส่ div ครอบเพื่อกันคลิกทะลุ */}
+    <div onClick={e => e.stopPropagation()}> 
+        <RatingBadge score={sellerScore} />
+    </div>
+</div>
 
                                     <div className="flex justify-center mb-1">
                                         <div className="scale-90 origin-center"><TimeLeft endTime={item.end_time} /></div>
