@@ -10,45 +10,27 @@ import {
 import { Chart as ChartJS, RadialLinearScale, PointElement, LineElement, Filler, Tooltip, Legend } from 'chart.js';
 import { Radar } from 'react-chartjs-2';
 import html2canvas from 'html2canvas';
-import { googleLogout } from '@react-oauth/google'; // ต้อง import เพื่อให้ logout ได้
-import NotificationCenter from './NotificationCenter'; // 👈 เพิ่มบรรทัดนี้
+import { googleLogout } from '@react-oauth/google'; 
+import NotificationCenter from './NotificationCenter'; 
+
+// --- Imported Components ---
+import SettingsDrawer from './components/SettingsDrawer';
+import ProfileSetupModal from './components/ProfileSetupModal';
+import RatingBadge from './components/RatingBadge'; // Note: RatingBadge might not be used here, but kept for consistency/future use.
+import { 
+    MenuIcon, ShoppingBagIcon, UserCogIcon, CloseIcon, 
+    SunIcon, MoonIcon, MessageIcon, StoreIcon, HomeIcon, 
+    UsersIcon, DeckIcon, ClearIcon, HeartIcon, CameraIcon, 
+    PencilIcon, ReplyIcon, TrashIcon, MoreVertIcon, EyeIcon,
+    CopyIcon, ImportIcon, UploadIcon // Added these as they are used locally
+} from './components/Icons';
 
 ChartJS.register(RadialLinearScale, PointElement, LineElement, Filler, Tooltip, Legend);
 
-// === Icons ===
-const Svg = ({ p, ...r }) => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...r}>{p}</svg>;
-const ImportIcon = () => <Svg p={<><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></>} />;
-const ChevronLeftIcon = () => <Svg width="24" height="24" p={<polyline points="15 18 9 12 15 6"></polyline>} />;
-const EyeIcon = () => <Svg p={<><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></>} />;
-const CopyIcon = () => <Svg p={<><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></>} />;
-const ClearIcon = () => <Svg p={<><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /><line x1="10" y1="11" x2="10" y2="17" /><line x1="14" y1="11" x2="14" y2="17" /></>} />;
-const HeartIcon = ({ filled }) => <Svg fill={filled ? 'currentColor' : 'none'} p={<path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>} />;
-const CameraIcon = () => <Svg p={<><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></>} />;
-const PencilIcon = () => <Svg width="12" height="12" p={<path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path>} />;
-const ReplyIcon = () => <Svg width="12" height="12" p={<><polyline points="9 17 4 12 9 7"></polyline><path d="M20 18v-2a4 4 0 0 0-4-4H4"></path></>} />;
-const TrashIcon = () => <Svg width="12" height="12" p={<><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></>} />;
-const MenuIcon = () => <Svg width="24" height="24" p={<><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></>} />;
-const UserCogIcon = () => <Svg width="24" height="24" p={<><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle><circle cx="12" cy="12" r="3"></circle></>} />;
-const CloseIcon = () => <Svg width="24" height="24" p={<><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></>} />;
-const SunIcon = () => <Svg p={<><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></>} />;
-const MoonIcon = () => <Svg p={<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>} />;
-const MessageIcon = () => <Svg p={<><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></>} />;
-const ImageIcon = () => <Svg p={<><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></>} />;
-const MoreVertIcon = () => <Svg width="20" height="20" p={<><circle cx="12" cy="5" r="1" /><circle cx="12" cy="12" r="1" /><circle cx="12" cy="19" r="1" /></>} />;
-// 🟢 แก้ไข: เปลี่ยนรูปบ้าน เป็นรูปค้อนประมูล
-const StoreIcon = () => (
-  <Svg width="24" height="24" p={<><path d="m14 13-7.5 7.5c-.83.83-2.17.83-3 0 0 0 0 0 0 0a2.12 2.12 0 0 1 0-3L11 10"/><path d="m16 16 6-6"/><path d="m8 8 6-6"/><path d="m9 7 8-8"/><path d="m21 11-8-8"/></>} />
-);
-// 🟢 [เพิ่ม] ไอคอนรูปบ้าน
-const HomeIcon = () => <Svg width="24" height="24" p={<><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></>} />;
-// 🟢 เพิ่มไอคอนเหล่านี้ลงไปใน PublicDecks.jsx (รวมกับไอคอนอื่นๆ)
-
-const UsersIcon = () => <Svg width="24" height="24" p={<><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></>} />;
-
-const DeckIcon = () => <Svg width="24" height="24" p={<><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><line x1="10" y1="9" x2="8" y2="9"></line></>} />;
-// === UI Components ===
+// === Local Components ===
 const Button = ({ className = "", children, ...props }) => ( <button className={`flex items-center justify-center gap-2 px-4 py-2 rounded-lg shadow-lg border border-amber-400/20 bg-amber-200/20 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 hover:bg-amber-200/50 dark:hover:bg-amber-700/50 dark:hover:text-white hover:border-amber-400/60 active:scale-[.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed ${className}`} {...props} > {children} </button> );
 const CardShell = ({ children, className = "", ...props }) => ( <div className={`bg-white dark:bg-slate-900/70 backdrop-blur-sm p-4 rounded-xl border border-slate-200 dark:border-emerald-500/20 shadow-lg transition-all hover:border-amber-400/50 hover:shadow-amber-500/10 ${className}`} {...props}> {children} </div> );
+
 const Modal = ({ isOpen, title, children, onClose, onConfirm, confirmText = "Confirm", confirmIcon = <ClearIcon/>, maxWidth = 'max-w-md' }) => { 
   if (!isOpen) return null; 
   return createPortal( 
@@ -65,114 +47,38 @@ const Modal = ({ isOpen, title, children, onClose, onConfirm, confirmText = "Con
   ); 
 };
 
-// === Helper Components for Profile/Settings (Duplicated from App.jsx for standalone PublicDecks) ===
-const resizeImage = (file) => {
-    return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const img = new Image();
-        img.onload = () => {
-          const canvas = document.createElement('canvas');
-          const ctx = canvas.getContext('2d');
-          const MAX_SIZE = 256;
-          let width = img.width;
-          let height = img.height;
-          if (width > height) { if (width > MAX_SIZE) { height *= MAX_SIZE / width; width = MAX_SIZE; } } 
-          else { if (height > MAX_SIZE) { width *= MAX_SIZE / height; height = MAX_SIZE; } }
-          canvas.width = width;
-          canvas.height = height;
-          ctx.drawImage(img, 0, 0, width, height);
-          resolve(canvas.toDataURL('image/jpeg', 0.8));
-        };
-        img.src = e.target.result;
-      };
-      reader.readAsDataURL(file);
-    });
-};
-
-const ProfileSetupModal = ({ isOpen, onClose, userProfile, onSave }) => {
-    const [nickname, setNickname] = useState(userProfile?.name || "");
-    const [avatarUrl, setAvatarUrl] = useState(userProfile?.picture || "");
-    const [useGoogleAvatar, setUseGoogleAvatar] = useState(true);
-    const fileInputRef = useRef(null);
-  
-    useEffect(() => { if (isOpen) { setNickname(userProfile?.name || ""); setAvatarUrl(userProfile?.picture || ""); setUseGoogleAvatar(true); } }, [isOpen, userProfile]);
-    const handleFileChange = async (e) => { if (e.target.files && e.target.files[0]) { const resized = await resizeImage(e.target.files[0]); setAvatarUrl(resized); setUseGoogleAvatar(false); } };
-    const handleSave = () => { onSave({ displayName: nickname, avatarUrl: useGoogleAvatar ? userProfile.picture : avatarUrl, }); };
-    if (!isOpen) return null;
-  
-    return createPortal(
-      <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-[500] p-4">
-        <div className="bg-slate-100 dark:bg-slate-900 border-2 border-slate-300 dark:border-emerald-500/50 rounded-2xl shadow-2xl p-8 w-full max-w-md flex flex-col gap-6">
-          <div className="text-center"><h2 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-amber-500 to-emerald-600 dark:from-amber-300 dark:to-emerald-400 mb-2">ยินดีต้อนรับ!</h2><p className="text-slate-600 dark:text-gray-400">ตั้งค่าโปรไฟล์ของคุณเพื่อให้ชุมชนรู้จัก</p></div>
-          <div className="space-y-4"><div className="flex flex-col items-center gap-3"><div className="w-24 h-24 rounded-full overflow-hidden border-4 border-emerald-500 shadow-lg relative group"><img src={useGoogleAvatar ? userProfile.picture : avatarUrl} alt="Avatar Preview" className="w-full h-full object-cover" onError={(e) => (e.target.src = "https://placehold.co/100x100/1e293b/ffffff?text=User")} />{!useGoogleAvatar && (<div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer" onClick={() => fileInputRef.current.click()}><div className="text-white text-xs">เปลี่ยนรูป</div></div>)}</div><div className="flex gap-2 text-sm"><button onClick={() => setUseGoogleAvatar(true)} className={`px-3 py-1 rounded-full border ${useGoogleAvatar ? "bg-emerald-600 border-emerald-500 text-white" : "border-slate-400 dark:border-slate-600 text-slate-600 dark:text-gray-400 hover:bg-slate-200 dark:hover:bg-slate-800"}`}>รูป Google</button><button onClick={() => fileInputRef.current.click()} className={`px-3 py-1 rounded-full border ${!useGoogleAvatar ? "bg-emerald-600 border-emerald-500 text-white" : "border-slate-400 dark:border-slate-600 text-slate-600 dark:text-gray-400 hover:bg-slate-200 dark:hover:bg-slate-800"}`}><div className="flex items-center gap-1"><ImageIcon /> อัปโหลดรูป</div></button><input type="file" ref={fileInputRef} hidden accept="image/*" onChange={handleFileChange} /></div></div><div className="space-y-3"><div><label className="text-sm text-slate-600 dark:text-gray-400 mb-1 block">นามแฝง (Display Name)</label><input type="text" value={nickname} onChange={(e) => setNickname(e.target.value)} className="w-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg px-4 py-2 text-slate-900 dark:text-white focus:border-emerald-500 outline-none" placeholder="ชื่อเท่ๆ ของคุณ" /></div></div></div>
-          <div className="flex gap-3 mt-2"><Button onClick={onClose} className="flex-1 bg-slate-200 dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-600 dark:text-gray-400 hover:bg-slate-300 dark:hover:bg-slate-700">ข้ามไปก่อน</Button><Button onClick={handleSave} className="flex-1 bg-gradient-to-r from-emerald-600 to-teal-600 border-none text-white hover:shadow-lg hover:scale-105">บันทึกโปรไฟล์</Button></div>
-        </div>
-      </div>, document.body
-    );
-};
-
+// === New FeedbackModal (Moved to top level to avoid re-renders/duplication inside functions) ===
 const FeedbackModal = ({ isOpen, onClose, userProfile, showAlert }) => {
-    const [text, setText] = useState("");
-    const [type, setType] = useState("suggestion");
-    const [isSubmitting, setIsSubmitting] = useState(false);
-    if (!isOpen) return null;
-    const handleSubmit = async () => {
-      if (!text.trim()) return showAlert("ข้อความว่างเปล่า", "กรุณากรอกข้อความก่อนส่งครับ");
-      setIsSubmitting(true);
-      try {
-        await addDoc(collection(db, "feedbacks"), {
-          text: text.trim(), type: type,
-          user: userProfile ? { name: userProfile.name, email: userProfile.email, uid: userProfile.email } : "Anonymous",
-          createdAt: serverTimestamp(), status: "new", version: "1.0"
-        });
-        showAlert("ขอบคุณครับ! 🙏", "เราได้รับข้อมูลของท่านแล้ว ทีมงานจะนำไปปรับปรุงให้ดียิ่งขึ้น");
-        setText(""); onClose();
-      } catch (e) { console.error("Feedback error: ", e); showAlert("เกิดข้อผิดพลาด", "ไม่สามารถส่งข้อมูลได้ โปรดลองใหม่ภายหลัง"); } finally { setIsSubmitting(false); }
-    };
-    return createPortal(
-      <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-[650] p-4">
-        <div className="bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-emerald-500/30 rounded-xl shadow-2xl p-6 w-full max-w-md">
-          <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2"><MessageIcon /> ติดต่อผู้พัฒนา / แจ้งปัญหา</h2>
-          <div className="space-y-4">
-            <div><label className="text-sm text-slate-600 dark:text-gray-400 mb-1 block">หัวข้อเรื่อง</label><select value={type} onChange={(e) => setType(e.target.value)} className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 outline-none"><option value="suggestion">💡 เสนอแนะ / ฟีดแบค</option><option value="bug">🐛 แจ้งบั๊ก / ปัญหาการใช้งาน</option><option value="other">💬 อื่นๆ</option></select></div>
-            <div><label className="text-sm text-slate-600 dark:text-gray-400 mb-1 block">รายละเอียด</label><textarea rows="4" value={text} onChange={(e) => setText(e.target.value)} placeholder="เล่าให้เราฟังหน่อยครับ..." className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-emerald-500 outline-none resize-none" /></div>
-          </div>
-          <div className="flex justify-end gap-3 mt-6"><Button onClick={onClose} className="bg-slate-200 dark:bg-slate-800 border-slate-300 dark:border-slate-600 text-slate-600 dark:text-gray-400 hover:bg-slate-300 dark:hover:bg-slate-700">ยกเลิก</Button><Button onClick={handleSubmit} disabled={isSubmitting} className="bg-emerald-600 text-white hover:bg-emerald-500 border-none shadow-lg">{isSubmitting ? "กำลังส่ง..." : "ส่งข้อความ"}</Button></div>
+  const [text, setText] = useState("");
+  const [type, setType] = useState("suggestion");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  if (!isOpen) return null;
+  const handleSubmit = async () => {
+    if (!text.trim()) return showAlert("ข้อความว่างเปล่า", "กรุณากรอกข้อความก่อนส่งครับ");
+    setIsSubmitting(true);
+    try {
+      await addDoc(collection(db, "feedbacks"), {
+        text: text.trim(), type: type,
+        user: userProfile ? { name: userProfile.name, email: userProfile.email, uid: userProfile.email } : "Anonymous",
+        createdAt: serverTimestamp(), status: "new", version: "1.0"
+      });
+      showAlert("ขอบคุณครับ! 🙏", "เราได้รับข้อมูลของท่านแล้ว ทีมงานจะนำไปปรับปรุงให้ดียิ่งขึ้น");
+      setText(""); onClose();
+    } catch (e) { console.error("Feedback error: ", e); showAlert("เกิดข้อผิดพลาด", "ไม่สามารถส่งข้อมูลได้ โปรดลองใหม่ภายหลัง"); } finally { setIsSubmitting(false); }
+  };
+  return createPortal(
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-[650] p-4">
+      <div className="bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-emerald-500/30 rounded-xl shadow-2xl p-6 w-full max-w-md">
+        <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2"><MessageIcon /> ติดต่อผู้พัฒนา / แจ้งปัญหา</h2>
+        <div className="space-y-4">
+          <div><label className="text-sm text-slate-600 dark:text-gray-400 mb-1 block">หัวข้อเรื่อง</label><select value={type} onChange={(e) => setType(e.target.value)} className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 outline-none"><option value="suggestion">💡 เสนอแนะ / ฟีดแบค</option><option value="bug">🐛 แจ้งบั๊ก / ปัญหาการใช้งาน</option><option value="other">💬 อื่นๆ</option></select></div>
+          <div><label className="text-sm text-slate-600 dark:text-gray-400 mb-1 block">รายละเอียด</label><textarea rows="4" value={text} onChange={(e) => setText(e.target.value)} placeholder="เล่าให้เราฟังหน่อยครับ..." className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-emerald-500 outline-none resize-none" /></div>
         </div>
-      </div>, document.body
-    );
+        <div className="flex justify-end gap-3 mt-6"><Button onClick={onClose} className="bg-slate-200 dark:bg-slate-800 border-slate-300 dark:border-slate-600 text-slate-600 dark:text-gray-400 hover:bg-slate-300 dark:hover:bg-slate-700">ยกเลิก</Button><Button onClick={handleSubmit} disabled={isSubmitting} className="bg-emerald-600 text-white hover:bg-emerald-500 border-none shadow-lg">{isSubmitting ? "กำลังส่ง..." : "ส่งข้อความ"}</Button></div>
+      </div>
+    </div>, document.body
+  );
 };
-  
-const SettingsDrawer = ({ isOpen, onClose, userProfile, onEditProfile, onLogout, theme, setTheme, onOpenFeedback }) => {
-    return (
-      <>
-        <div className={`fixed inset-0 bg-black/60 backdrop-blur-sm z-[600] transition-opacity duration-300 ${isOpen ? "opacity-100" : "opacity-0 pointer-events-none"}`} onClick={onClose} />
-        <div className={`fixed top-0 left-0 h-full w-80 bg-white dark:bg-slate-900 border-r border-slate-300 dark:border-emerald-700/30 shadow-2xl z-[610] transform transition-transform duration-300 ease-out flex flex-col ${isOpen ? "translate-x-0" : "-translate-x-full"}`}>
-          <div className="p-6 border-b border-slate-200 dark:border-emerald-700/20 flex items-center justify-between"><h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2"><UserCogIcon /> ตั้งค่าผู้ใช้</h2><button onClick={onClose} className="text-slate-500 dark:text-gray-400 hover:text-black dark:hover:text-white"><CloseIcon /></button></div>
-          <div className="p-6 flex flex-col items-center gap-4">
-            <img src={userProfile?.picture} alt={userProfile?.name} className="w-24 h-24 rounded-full border-4 border-emerald-500 shadow-lg object-cover" />
-            <div className="text-center"><h3 className="text-xl font-bold text-slate-900 dark:text-white">{userProfile?.name}</h3><p className="text-sm text-slate-500 dark:text-gray-400">{userProfile?.email}</p></div>
-            <Button onClick={() => { onEditProfile(); onClose(); }} className="w-full mt-4 bg-slate-200 dark:bg-slate-800 border-slate-300 dark:border-slate-600 text-emerald-700 dark:text-emerald-400 hover:bg-slate-300 dark:hover:bg-slate-700">แก้ไขโปรไฟล์</Button><button 
-                onClick={() => { onOpenMyDecks(); onClose(); }}
-                className="w-full py-3 bg-amber-100 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 font-bold rounded-xl shadow-sm hover:scale-105 transition-transform flex items-center justify-center gap-2"
-            >
-                <DeckIcon /> My Decks
-            </button>
-            <div className="mt-4 w-full"><label className="text-sm font-semibold text-slate-500 dark:text-gray-400">เลือกธีม</label><div className="mt-2 grid grid-cols-2 gap-2"><Button onClick={() => setTheme("light")} className={`text-sm ${theme === "light" ? "bg-amber-500/50 border-amber-400" : "bg-slate-200 dark:bg-slate-800 border-slate-300 dark:border-slate-600 text-slate-600 dark:text-gray-400"}`}><SunIcon /> สว่าง</Button><Button onClick={() => setTheme("dark")} className={`text-sm ${theme === "dark" ? "bg-amber-500/50 border-amber-400" : "bg-slate-200 dark:bg-slate-800 border-slate-300 dark:border-slate-600 text-slate-600 dark:text-gray-400"}`}><MoonIcon /> มืด</Button></div></div>
-            {/* ปุ่มติดต่อผู้พัฒนา */}
-            <div className="w-full pt-4 mt-4 border-t border-slate-200 dark:border-emerald-700/20">
-                <Button onClick={() => { onOpenFeedback(); onClose(); }} className="w-full bg-amber-100 dark:bg-amber-900/20 border-amber-300 dark:border-amber-500/30 text-amber-800 dark:text-amber-400 hover:bg-amber-200 dark:hover:bg-amber-800/30">
-                    <MessageIcon /> ติดต่อ / แจ้งปัญหา
-                </Button>
-            </div>
-          </div>
-          <div className="mt-auto p-6 border-t border-slate-200 dark:border-emerald-700/20"><Button onClick={onLogout} className="w-full bg-red-200 dark:bg-red-900/30 border-red-300 dark:border-red-500/30 text-red-700 dark:text-red-400 hover:bg-red-300 dark:hover:bg-red-900/50 dark:hover:text-white">ออกจากระบบ</Button></div>
-        </div>
-      </>
-    );
-};
-
 
 // === Utils ===
 function useLocalStorage(key, initial) { const [v, s] = useState(() => { try { const raw = localStorage.getItem(key); return raw ? JSON.parse(raw) : initial; } catch { return initial; } }); useEffect(() => { try { localStorage.setItem(key, JSON.stringify(v)); } catch {} }, [key, v]); return [v, s]; }

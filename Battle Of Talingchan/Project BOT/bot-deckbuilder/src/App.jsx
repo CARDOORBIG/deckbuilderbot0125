@@ -6,33 +6,46 @@ import { Chart as ChartJS, RadialLinearScale, PointElement, LineElement, Filler,
 import { Radar } from 'react-chartjs-2';
 import { GoogleLogin, googleLogout } from '@react-oauth/google';
 import { jwtDecode } from 'jwt-decode';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { db } from './firebase';
+import { auth } from './firebase';
+import { signInWithPopup, FacebookAuthProvider } from "firebase/auth";
 import { 
   collection, doc, writeBatch, serverTimestamp, getDoc, setDoc,
-  query, where, getDocs, addDoc // <--- เพิ่มตัวนี้นะ
+  query, where, getDocs, addDoc 
 } from 'firebase/firestore';
-import { useNavigate, useLocation } from 'react-router-dom';
-ChartJS.register(RadialLinearScale, PointElement, LineElement, Filler, Tooltip, Legend);
+import { supabase } from './supabaseClient';
+
+// Import Components
 import CreateAuctionModal from './CreateAuctionModal';
 import NotificationCenter from './NotificationCenter';
+import SettingsDrawer from './components/SettingsDrawer';
+import ProfileSetupModal from './components/ProfileSetupModal';
+import RatingBadge from './components/RatingBadge';
+import { FacebookIcon } from './components/Icons';
+import { 
+    MenuIcon, GavelIcon, ShoppingBagIcon, UserCogIcon, 
+    CloseIcon, SunIcon, MoonIcon, HistoryIcon, 
+    PackageIcon, BanIcon, CrownIcon, FlagIcon, 
+    ShieldCheckIcon, ChatBubbleIcon, SendIcon, 
+    TrashIcon, UsersIcon, DeckIcon, StoreIcon, 
+    HomeIcon, MessageIcon, NeonLightningIcon, 
+    ImageIcon, ArchiveIcon 
+} from './components/Icons';
 
-// === Icons ===
+ChartJS.register(RadialLinearScale, PointElement, LineElement, Filler, Tooltip, Legend);
+
+// === Local Icons (Only used in App.jsx) ===
 const Svg = ({ p, ...r }) => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...r}>{p}</svg>;
 const ImportIcon = () => <Svg p={<><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></>} />;
 const ExportIcon = () => <Svg p={<><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></>} />;
-const TrashIcon = () => <Svg p={<><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /><line x1="10" y1="11" x2="10" y2="17" /><line x1="14" y1="11" x2="14" y2="17" /></>} />;
-const CloseIcon = () => <Svg width="24" height="24" p={<><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></>} />;
 const DBLoadIcon = () => <Svg p={<><path d="M21 2v6h-6" /><path d="M3 12a9 9 0 0 1 15-6.7L21 8" /><path d="M3 22v-6h6" /><path d="M21 12a9 9 0 0 1-15 6.7L3 16" /></>} />;
 const EyeIcon = () => <Svg p={<><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></>} />;
 const CopyIcon = () => <Svg p={<><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></>} />;
 const PlusIcon = () => <Svg width="20" height="20" strokeWidth="2.5" p={<><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></>} />;
-const CardsIcon = () => <Svg width="24" height="24" p={<><rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect><path d="M16 2H8a2 2 0 0 0-2 2v3h12V4a2 2 0 0 0-2-2z"></path></>} />;
-const DeckIcon = () => <Svg width="24" height="24" p={<><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><line x1="10" y1="9" x2="8" y2="9"></line></>} />;
 const ChevronLeftIcon = () => <Svg width="24" height="24" p={<polyline points="15 18 9 12 15 6"></polyline>} />;
 const ChevronRightIcon = () => <Svg width="24" height="24" p={<polyline points="9 18 15 12 9 6"></polyline>} />;
 const ChevronUpIcon = () => <Svg width="24" height="24" p={<polyline points="18 15 12 9 6 15"></polyline>} />;
-const UsersIcon = () => <Svg width="24" height="24" p={<><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></>} />;
 const UploadIcon = () => <Svg p={<><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></>} />;
 const ShareIconNew = () => (
   <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -41,19 +54,7 @@ const ShareIconNew = () => (
     <line x1="10" y1="14" x2="21" y2="3"></line>
   </svg>
 );
-const MenuIcon = () => <Svg width="24" height="24" p={<><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></>} />;
-const UserCogIcon = () => <Svg width="24" height="24" p={<><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle><circle cx="12" cy="12" r="3"></circle></>} />;
-const ImageIcon = () => <Svg p={<><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></>} />;
-const SunIcon = () => <Svg p={<><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></>} />;
-const MoonIcon = () => <Svg p={<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>} />;
-const ClearIcon = TrashIcon;
-const MessageIcon = () => <Svg p={<><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></>} />;
-// 🟢 [เพิ่ม] ไอคอนค้อนประมูล
-const GavelIcon = () => <Svg p={<><path d="m14 13-7.5 7.5c-.83.83-2.17.83-3 0 0 0 0 0 0 0a2.12 2.12 0 0 1 0-3L11 10"/><path d="m16 16 6-6"/><path d="m8 8 6-6"/><path d="m9 7 8-8"/><path d="m21 11-8-8"/></>} />;
-// 🟢 แก้ไข: เปลี่ยนรูปบ้าน เป็นรูปค้อนประมูล
-const StoreIcon = () => (
-  <Svg width="24" height="24" p={<><path d="m14 13-7.5 7.5c-.83.83-2.17.83-3 0 0 0 0 0 0 0a2.12 2.12 0 0 1 0-3L11 10"/><path d="m16 16 6-6"/><path d="m8 8 6-6"/><path d="m9 7 8-8"/><path d="m21 11-8-8"/></>} />
-);
+const FilterIcon = () => <Svg p={<polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>} />;
 
 // === UI helpers ===
 const Button = ({ className = "", children, ...props }) => (
@@ -64,17 +65,14 @@ const Button = ({ className = "", children, ...props }) => (
     {children}
   </button>
 );
+
 const Pill = ({ children, className = "" }) => (
-  <span
-    className={`text-xs font-semibold px-2.5 py-1 rounded-full ${className}`}
-  >
+  <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${className}`}>
     {children}
   </span>
 );
-const CardShell = forwardRef(function CardShell(
-  { children, className = "", ...props },
-  ref
-) {
+
+const CardShell = forwardRef(function CardShell({ children, className = "", ...props }, ref) {
   return (
     <div
       ref={ref}
@@ -85,139 +83,45 @@ const CardShell = forwardRef(function CardShell(
     </div>
   );
 });
+
 const ColorPip = ({ color }) => {
-  const c = {
-    Red: "bg-red-500",
-    Green: "bg-green-500",
-    Purple: "bg-purple-500",
-    Blue: "bg-blue-500",
-    Yellow: "bg-yellow-500",
-    Black: "bg-gray-800",
-    White: "bg-slate-200",
-  };
-  return (
-    <span
-      className={`w-3 h-3 rounded-full ${c[color] || "bg-slate-400"}`}
-      title={color}
-    ></span>
-  );
+  const c = { Red: "bg-red-500", Green: "bg-green-500", Purple: "bg-purple-500", Blue: "bg-blue-500", Yellow: "bg-yellow-500", Black: "bg-gray-800", White: "bg-slate-200" };
+  return <span className={`w-3 h-3 rounded-full ${c[color] || "bg-slate-400"}`} title={color}></span>;
 };
-const Modal = ({
-  isOpen,
-  title,
-  children,
-  onClose,
-  onConfirm,
-  confirmText = "Confirm",
-  confirmIcon = <TrashIcon />,
-  maxWidth = "max-w-md",
-}) =>
-  !isOpen
-    ? null
-    : createPortal(
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[400] p-4">
-          <div
-            className={`bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-emerald-500/30 rounded-xl shadow-2xl p-6 w-full m-4 ${maxWidth}`}
-          >
-            <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4">
-              {title}
-            </h2>
-            <div className="text-slate-700 dark:text-gray-300 mb-6">
-              {children}
-            </div>
-            <div className="flex justify-end gap-3">
-              <Button
-                onClick={onClose}
-                className="bg-slate-200 dark:bg-slate-700/50 border-slate-300 dark:border-slate-600 text-slate-700 dark:text-gray-300 hover:bg-slate-300 dark:hover:bg-slate-600"
-              >
-                {onConfirm ? "Cancel" : "Close"}
-              </Button>
-              {onConfirm && (
-                <Button
-                  onClick={onConfirm}
-                  className="bg-emerald-200 dark:bg-emerald-900/50 border-emerald-300 dark:border-emerald-500/30 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-300 dark:hover:bg-emerald-800/50 dark:hover:text-white"
-                >
-                  {confirmIcon} {confirmText}
-                </Button>
-              )}
-            </div>
-          </div>
-        </div>,
-        document.body
-      );
+
+const Modal = ({ isOpen, title, children, onClose, onConfirm, confirmText = "Confirm", confirmIcon = <TrashIcon />, maxWidth = "max-w-md" }) =>
+  !isOpen ? null : createPortal(
+    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[400] p-4">
+      <div className={`bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-emerald-500/30 rounded-xl shadow-2xl p-6 w-full m-4 ${maxWidth}`}>
+        <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4">{title}</h2>
+        <div className="text-slate-700 dark:text-gray-300 mb-6">{children}</div>
+        <div className="flex justify-end gap-3">
+          <Button onClick={onClose} className="bg-slate-200 dark:bg-slate-700/50 border-slate-300 dark:border-slate-600 text-slate-700 dark:text-gray-300 hover:bg-slate-300 dark:hover:bg-slate-600">{onConfirm ? "Cancel" : "Close"}</Button>
+          {onConfirm && <Button onClick={onConfirm} className="bg-emerald-200 dark:bg-emerald-900/50 border-emerald-300 dark:border-emerald-500/30 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-300 dark:hover:bg-emerald-800/50 dark:hover:text-white">{confirmIcon} {confirmText}</Button>}
+        </div>
+      </div>
+    </div>, document.body
+  );
+
 const ImportDeckModal = ({ isOpen, onClose, onImport }) => {
   const [code, setCode] = useState("");
-  const handleImportClick = () => {
-    onImport(code);
-    setCode("");
-  };
+  const handleImportClick = () => { onImport(code); setCode(""); };
   if (!isOpen) return null;
   return createPortal(
     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[210] p-4">
       <div className="bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-emerald-500/30 rounded-xl shadow-2xl p-6 w-full max-w-md">
-        <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4">
-          Import Deck Code
-        </h2>
-        <textarea
-          value={code}
-          onChange={(e) => setCode(e.target.value)}
-          placeholder="วางรหัสเด็คที่นี่..."
-          rows="4"
-          className="w-full px-3 py-2 border border-slate-300 dark:border-emerald-500/30 rounded-lg focus:ring-2 focus:ring-amber-500 focus:outline-none transition bg-white dark:bg-slate-700/50 placeholder-gray-400 text-slate-900 dark:text-white mb-6 resize-none"
-        />
+        <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4">Import Deck Code</h2>
+        <textarea value={code} onChange={(e) => setCode(e.target.value)} placeholder="วางรหัสเด็คที่นี่..." rows="4" className="w-full px-3 py-2 border border-slate-300 dark:border-emerald-500/30 rounded-lg focus:ring-2 focus:ring-amber-500 focus:outline-none transition bg-white dark:bg-slate-700/50 placeholder-gray-400 text-slate-900 dark:text-white mb-6 resize-none" />
         <div className="flex justify-end gap-3">
-          <Button
-            onClick={onClose}
-            className="bg-slate-200 dark:bg-slate-700/50 border-slate-300 dark:border-slate-600 text-slate-700 dark:text-gray-300 hover:bg-slate-300 dark:hover:bg-slate-600"
-          >
-            Cancel
-          </Button>
-          <Button
-            onClick={handleImportClick}
-            className="bg-emerald-200 dark:bg-emerald-900/50 border-emerald-300 dark:border-emerald-500/30 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-300 dark:hover:bg-emerald-800/50 dark:hover:text-white"
-          >
-            <ImportIcon /> Import
-          </Button>
+          <Button onClick={onClose} className="bg-slate-200 dark:bg-slate-700/50 border-slate-300 dark:border-slate-600 text-slate-700 dark:text-gray-300 hover:bg-slate-300 dark:hover:bg-slate-600">Cancel</Button>
+          <Button onClick={handleImportClick} className="bg-emerald-200 dark:bg-emerald-900/50 border-emerald-300 dark:border-emerald-500/30 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-300 dark:hover:bg-emerald-800/50 dark:hover:text-white"><ImportIcon /> Import</Button>
         </div>
       </div>
-    </div>,
-    document.body
+    </div>, document.body
   );
 };
 
-// === Helper: Image Resizer ===
-const resizeImage = (file) => {
-  return new Promise((resolve) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-        const MAX_SIZE = 256;
-        let width = img.width;
-        let height = img.height;
-        if (width > height) { if (width > MAX_SIZE) { height *= MAX_SIZE / width; width = MAX_SIZE; } } 
-        else { if (height > MAX_SIZE) { width *= MAX_SIZE / height; height = MAX_SIZE; } }
-        canvas.width = width;
-        canvas.height = height;
-        ctx.drawImage(img, 0, 0, width, height);
-        resolve(canvas.toDataURL('image/jpeg', 0.8));
-      };
-      img.src = e.target.result;
-    };
-    reader.readAsDataURL(file);
-  });
-};
-
-// === Profile Setup Modal ===
-const ProfileSetupModal = ({ isOpen, onClose, userProfile, onSave }) => {
-  const [nickname, setNickname] = useState(userProfile?.name || "");
-  const [avatarUrl, setAvatarUrl] = useState(userProfile?.picture || "");
-  const [useGoogleAvatar, setUseGoogleAvatar] = useState(true);
-  const fileInputRef = useRef(null);
-  // 🟢 [เพิ่ม] FeedbackModal Component
-  const FeedbackModal = ({ isOpen, onClose, userProfile, showAlert }) => {
+const FeedbackModal = ({ isOpen, onClose, userProfile, showAlert }) => {
   const [text, setText] = useState("");
   const [type, setType] = useState("suggestion");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -226,725 +130,45 @@ const ProfileSetupModal = ({ isOpen, onClose, userProfile, onSave }) => {
 
   const handleSubmit = async () => {
     if (!text.trim()) return showAlert("ข้อความว่างเปล่า", "กรุณากรอกข้อความก่อนส่งครับ");
-    
     setIsSubmitting(true);
     try {
       await addDoc(collection(db, "feedbacks"), {
-        text: text.trim(),
-        type: type,
-        user: userProfile ? { 
-          name: userProfile.name, 
-          email: userProfile.email, 
-          uid: userProfile.email 
-        } : "Anonymous",
-        createdAt: serverTimestamp(),
-        status: "new",
-        version: "1.0"
+        text: text.trim(), type: type,
+        user: userProfile ? { name: userProfile.name, email: userProfile.email, uid: userProfile.email } : "Anonymous",
+        createdAt: serverTimestamp(), status: "new", version: "1.0"
       });
-      
       showAlert("ขอบคุณครับ! 🙏", "เราได้รับข้อมูลของท่านแล้ว ทีมงานจะนำไปปรับปรุงให้ดียิ่งขึ้น");
-      setText("");
-      onClose();
-    } catch (e) {
-      console.error("Feedback error: ", e);
-      showAlert("เกิดข้อผิดพลาด", "ไม่สามารถส่งข้อมูลได้ โปรดลองใหม่ภายหลัง");
-    } finally {
-      setIsSubmitting(false);
-    }
+      setText(""); onClose();
+    } catch (e) { console.error("Feedback error: ", e); showAlert("เกิดข้อผิดพลาด", "ไม่สามารถส่งข้อมูลได้ โปรดลองใหม่ภายหลัง"); } finally { setIsSubmitting(false); }
   };
 
   return createPortal(
     <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-[650] p-4">
       <div className="bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-emerald-500/30 rounded-xl shadow-2xl p-6 w-full max-w-md">
-        <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
-          <MessageIcon /> ติดต่อผู้พัฒนา / แจ้งปัญหา
-        </h2>
-        
+        <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2"><MessageIcon /> ติดต่อผู้พัฒนา / แจ้งปัญหา</h2>
         <div className="space-y-4">
           <div>
             <label className="text-sm text-slate-600 dark:text-gray-400 mb-1 block">หัวข้อเรื่อง</label>
-            <select 
-              value={type} 
-              onChange={(e) => setType(e.target.value)}
-              className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 outline-none"
-            >
+            <select value={type} onChange={(e) => setType(e.target.value)} className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 outline-none">
               <option value="suggestion">💡 เสนอแนะ / ฟีดแบค</option>
               <option value="bug">🐛 แจ้งบั๊ก / ปัญหาการใช้งาน</option>
               <option value="other">💬 อื่นๆ</option>
             </select>
           </div>
-
           <div>
             <label className="text-sm text-slate-600 dark:text-gray-400 mb-1 block">รายละเอียด</label>
-            <textarea
-              rows="4"
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              placeholder="เล่าให้เราฟังหน่อยครับ..."
-              className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-emerald-500 outline-none resize-none"
-            />
+            <textarea rows="4" value={text} onChange={(e) => setText(e.target.value)} placeholder="เล่าให้เราฟังหน่อยครับ..." className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-emerald-500 outline-none resize-none" />
           </div>
         </div>
-
         <div className="flex justify-end gap-3 mt-6">
-          <Button 
-            onClick={onClose} 
-            className="bg-slate-200 dark:bg-slate-800 border-slate-300 dark:border-slate-600 text-slate-600 dark:text-gray-400 hover:bg-slate-300 dark:hover:bg-slate-700"
-          >
-            ยกเลิก
-          </Button>
-          <Button 
-            onClick={handleSubmit} 
-            disabled={isSubmitting}
-            className="bg-emerald-600 text-white hover:bg-emerald-500 border-none shadow-lg"
-          >
-            {isSubmitting ? "กำลังส่ง..." : "ส่งข้อความ"}
-          </Button>
+          <Button onClick={onClose} className="bg-slate-200 dark:bg-slate-800 border-slate-300 dark:border-slate-600 text-slate-600 dark:text-gray-400 hover:bg-slate-300 dark:hover:bg-slate-700">ยกเลิก</Button>
+          <Button onClick={handleSubmit} disabled={isSubmitting} className="bg-emerald-600 text-white hover:bg-emerald-500 border-none shadow-lg">{isSubmitting ? "กำลังส่ง..." : "ส่งข้อความ"}</Button>
         </div>
       </div>
-    </div>,
-    document.body
-  );
-};
-  useEffect(() => {
-    if (isOpen) {
-      setNickname(userProfile?.name || "");
-      setAvatarUrl(userProfile?.picture || "");
-      setUseGoogleAvatar(true);
-    }
-  }, [isOpen, userProfile]);
-
-  const handleFileChange = async (e) => {
-    if (e.target.files && e.target.files[0]) {
-      const resized = await resizeImage(e.target.files[0]);
-      setAvatarUrl(resized);
-      setUseGoogleAvatar(false);
-    }
-  };
-
-  const handleSave = () => {
-    onSave({
-      displayName: nickname,
-      avatarUrl: useGoogleAvatar ? userProfile.picture : avatarUrl,
-    });
-  };
-
-  if (!isOpen) return null;
-
-  return createPortal(
-    <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-[500] p-4">
-      <div className="bg-slate-100 dark:bg-slate-900 border-2 border-slate-300 dark:border-emerald-500/50 rounded-2xl shadow-2xl p-8 w-full max-w-md flex flex-col gap-6">
-        <div className="text-center">
-          <h2 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-amber-500 to-emerald-600 dark:from-amber-300 dark:to-emerald-400 mb-2">
-            ยินดีต้อนรับ!
-          </h2>
-          <p className="text-slate-600 dark:text-gray-400">
-            ตั้งค่าโปรไฟล์ของคุณเพื่อให้ชุมชนรู้จัก
-          </p>
-        </div>
-
-        <div className="space-y-4">
-          <div className="flex flex-col items-center gap-3">
-            <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-emerald-500 shadow-lg relative group">
-              <img
-                src={useGoogleAvatar ? userProfile.picture : avatarUrl}
-                alt="Avatar Preview"
-                className="w-full h-full object-cover"
-                onError={(e) =>
-                  (e.target.src =
-                    "https://placehold.co/100x100/1e293b/ffffff?text=User")
-                }
-              />
-              {!useGoogleAvatar && (
-                <div
-                  className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
-                  onClick={() => fileInputRef.current.click()}
-                >
-                  <div className="text-white text-xs">เปลี่ยนรูป</div>
-                </div>
-              )}
-            </div>
-            <div className="flex gap-2 text-sm">
-              <button
-                onClick={() => setUseGoogleAvatar(true)}
-                className={`px-3 py-1 rounded-full border ${
-                  useGoogleAvatar
-                    ? "bg-emerald-600 border-emerald-500 text-white"
-                    : "border-slate-400 dark:border-slate-600 text-slate-600 dark:text-gray-400 hover:bg-slate-200 dark:hover:bg-slate-800"
-                }`}
-              >
-                รูป Google
-              </button>
-              <button
-                onClick={() => fileInputRef.current.click()}
-                className={`px-3 py-1 rounded-full border ${
-                  !useGoogleAvatar
-                    ? "bg-emerald-600 border-emerald-500 text-white"
-                    : "border-slate-400 dark:border-slate-600 text-slate-600 dark:text-gray-400 hover:bg-slate-200 dark:hover:bg-slate-800"
-                }`}
-              >
-                <div className="flex items-center gap-1">
-                  <ImageIcon /> อัปโหลดรูป
-                </div>
-              </button>
-              <input
-                type="file"
-                ref={fileInputRef}
-                hidden
-                accept="image/*"
-                onChange={handleFileChange}
-              />
-            </div>
-          </div>
-
-          <div className="space-y-3">
-            <div>
-              <label className="text-sm text-slate-600 dark:text-gray-400 mb-1 block">
-                นามแฝง (Display Name)
-              </label>
-              <input
-                type="text"
-                value={nickname}
-                onChange={(e) => setNickname(e.target.value)}
-                className="w-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg px-4 py-2 text-slate-900 dark:text-white focus:border-emerald-500 outline-none"
-                placeholder="ชื่อเท่ๆ ของคุณ"
-              />
-            </div>
-          </div>
-        </div>
-
-        <div className="flex gap-3 mt-2">
-          <Button
-            onClick={onClose}
-            className="flex-1 bg-slate-200 dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-600 dark:text-gray-400 hover:bg-slate-300 dark:hover:bg-slate-700"
-          >
-            ข้ามไปก่อน
-          </Button>
-          <Button
-            onClick={handleSave}
-            className="flex-1 bg-gradient-to-r from-emerald-600 to-teal-600 border-none text-white hover:shadow-lg hover:scale-105"
-          >
-            บันทึกโปรไฟล์
-          </Button>
-        </div>
-      </div>
-    </div>,
-    document.body
+    </div>, document.body
   );
 };
 
-// === Settings Sidebar ===
-const SettingsDrawer = ({ isOpen, onClose, userProfile, onEditProfile, onLogout, theme, setTheme, onOpenFeedback, onOpenAdmin, onOpenMyDecks }) => {
-
-  return (
-    <>
-      <div
-        className={`fixed inset-0 bg-black/60 backdrop-blur-sm z-[600] transition-opacity duration-300 ${
-          isOpen ? "opacity-100" : "opacity-0 pointer-events-none"
-        }`}
-        onClick={onClose}
-      />
-      <div
-        className={`fixed top-0 left-0 h-full w-80 bg-white dark:bg-slate-900 border-r border-slate-300 dark:border-emerald-700/30 shadow-2xl z-[610] transform transition-transform duration-300 ease-out flex flex-col ${
-          isOpen ? "translate-x-0" : "-translate-x-full"
-        }`}
-      >
-        <div className="p-6 border-b border-slate-200 dark:border-emerald-700/20 flex items-center justify-between">
-          <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
-            <UserCogIcon /> ตั้งค่าผู้ใช้
-          </h2>
-          <button
-            onClick={onClose}
-            className="text-slate-500 dark:text-gray-400 hover:text-black dark:hover:text-white"
-          >
-            <CloseIcon />
-          </button>
-        </div>
-
-        <div className="p-6 flex flex-col items-center gap-4">
-          <img
-            src={userProfile?.picture}
-            alt={userProfile?.name}
-            className="w-24 h-24 rounded-full border-4 border-emerald-500 shadow-lg object-cover"
-          />
-          
-          <div className="text-center">
-            <h3 className="text-xl font-bold text-slate-900 dark:text-white">
-              {userProfile?.name}
-            </h3>
-            <p className="text-sm text-slate-500 dark:text-gray-400">
-              {userProfile?.email}
-            </p>
-          </div>
-
-          <Button
-            onClick={() => {
-              onEditProfile();
-              onClose();
-            }}
-            className="w-full mt-4 bg-slate-200 dark:bg-slate-800 border-slate-300 dark:border-slate-600 text-emerald-700 dark:text-emerald-400 hover:bg-slate-300 dark:hover:bg-slate-700"
-          >
-            แก้ไขโปรไฟล์
-          </Button>
-          <button 
-                onClick={() => { onOpenMyDecks(); onClose(); }}
-                className="w-full py-3 bg-amber-100 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 font-bold rounded-xl shadow-sm hover:scale-105 transition-transform flex items-center justify-center gap-2"
-            >
-                <DeckIcon /> My Decks
-            </button>
-          {/* === [เพิ่ม] ส่วนสลับ Theme === */}
-          <div className="mt-4 w-full">
-            <label className="text-sm font-semibold text-slate-500 dark:text-gray-400">
-              เลือกธีม
-            </label>
-            <div className="mt-2 grid grid-cols-2 gap-2">
-              <Button
-                onClick={() => setTheme("light")}
-                className={`text-sm ${
-                  theme === "light"
-                    ? "bg-amber-500/50 border-amber-400"
-                    : "bg-slate-200 dark:bg-slate-800 border-slate-300 dark:border-slate-600 text-slate-600 dark:text-gray-400"
-                }`}
-              >
-                <SunIcon /> สว่าง
-              </Button>
-              <Button
-                onClick={() => setTheme("dark")}
-                className={`text-sm ${
-                  theme === "dark"
-                    ? "bg-amber-500/50 border-amber-400"
-                    : "bg-slate-200 dark:bg-slate-800 border-slate-300 dark:border-slate-600 text-slate-600 dark:text-gray-400"
-                }`}
-              >
-                <MoonIcon /> มืด
-              </Button>
-            </div>
-          </div>
-          {/* จบส่วนธีม */}
-        </div>
-                <div className="w-full pt-4 mt-4 border-t border-slate-200 dark:border-emerald-700/20">
-            <Button
-                onClick={() => {
-                    onOpenFeedback();
-                    onClose();
-                }}
-                className="w-full bg-amber-100 dark:bg-amber-900/20 border-amber-300 dark:border-amber-500/30 text-amber-800 dark:text-amber-400 hover:bg-amber-200 dark:hover:bg-amber-800/30"
-            >
-                <MessageIcon /> ติดต่อ / แจ้งปัญหา
-            </Button>
-          </div>
-        <div className="mt-auto p-6 border-t border-slate-200 dark:border-emerald-700/20">
-          <Button
-            onClick={onLogout}
-            className="w-full bg-red-200 dark:bg-red-900/30 border-red-300 dark:border-red-500/30 text-red-700 dark:text-red-400 hover:bg-red-300 dark:hover:bg-red-900/50 dark:hover:text-white"
-          >
-            ออกจากระบบ
-          </Button>
-        </div>
-      </div>
-    </>
-  );
-};
-
-// === Rules & utils ===
-const RULES = { main: { size: 50, maxCopiesPerName: 4, requireOnlyRank1Exactly: 1 }, life: { size: 5, uniqueNames: true, maxCopiesPerName: 1 }, };
-const nameKey = (n) => (n || "").trim().toLowerCase();
-function countBy(arr, keyFn) { return arr.reduce((m, x) => { const k = keyFn(x); m[k] = (m[k] || 0) + 1; return m; }, {}); }
-
-function useLocalStorage(key, initial) { 
-  const [v, s] = useState(() => { 
-    try { 
-      const raw = localStorage.getItem(key); 
-      if (!raw || raw === "[]" || raw === "null") return initial;
-      return JSON.parse(raw); 
-    } catch { return initial; } 
-  }); 
-  useEffect(() => { 
-    try { localStorage.setItem(key, JSON.stringify(v)); } catch {} 
-  }, [key, v]); 
-  return [v, s]; 
-}
-
-function validate(mainDeck, lifeDeck) { const problems = []; const ok = { main: true, life: true }; if (mainDeck.length !== RULES.main.size) { problems.push(`Main Deck ต้องมี ${RULES.main.size} ใบ (ปัจจุบัน ${mainDeck.length})`); ok.main = false; } const byNameMain = countBy(mainDeck, (c) => nameKey(c.name)); const overCopies = Object.entries(byNameMain).filter(([, n]) => n > RULES.main.maxCopiesPerName); if (overCopies.length) { overCopies.forEach(([k, n]) => problems.push(`การ์ด “${k}” ใน Main Deck ซ้ำเกิน ${RULES.main.maxCopiesPerName} ใบ (มี ${n} ใบ)`)); ok.main = false; } const onlyRank1Count = mainDeck.filter((c) => c.onlyRank === 1).length; if (mainDeck.length > 0 && onlyRank1Count > 0 && onlyRank1Count !== RULES.main.requireOnlyRank1Exactly) { problems.push(`Main Deck สามารถมี “Only #1” ได้แค่ ${RULES.main.requireOnlyRank1Exactly} ใบ (ปัจจุบัน ${onlyRank1Count})`); ok.main = false; } if (lifeDeck.length !== RULES.life.size) { problems.push(`Life Deck ต้องมี ${RULES.life.size} ใบ (ปัจจุบัน ${lifeDeck.length})`); ok.life = false; } if (RULES.life.uniqueNames) { const byNameLife = countBy(lifeDeck, (c) => nameKey(c.name)); const duplicateLife = Object.entries(byNameLife).filter(([, n]) => n > 1); if (duplicateLife.length) { duplicateLife.forEach(([k]) => problems.push(`การ์ดใน Life Deck ต้องชื่อไม่ซ้ำกัน: “${k}”`)); ok.life = false; } } return { problems, ok }; }
-const avg = (arr) => { const valid = arr.filter(n => typeof n === 'number' && !isNaN(n)); if (valid.length === 0) return '0.00'; return (valid.reduce((a, b) => a + b, 0) / valid.length).toFixed(2); };
-const encodeDeckCode = (mainDeck, lifeDeck) => { const mainIds = mainDeck.map(c => c.id); const lifeIds = lifeDeck.map(c => c.id); const dataString = JSON.stringify({ m: mainIds, l: lifeIds }); try { return btoa(dataString).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, ''); } catch (e) { console.error("Encoding failed:", e); return ""; } };
-const decodeDeckCode = (code, allCards) => { const trimmedCode = (code || "").trim(); if (!trimmedCode) return null; try { let base64 = trimmedCode.replace(/-/g, '+').replace(/_/g, '/'); while (base64.length % 4 !== 0) { base64 += '='; } const dataString = atob(base64); const data = JSON.parse(dataString); if (!data || !Array.isArray(data.m) || !Array.isArray(data.l)) { throw new Error("Invalid deck code format"); } const findCard = (id) => allCards.find(c => c.id === id); const main = data.m.map(findCard).filter(card => card !== undefined); const life = data.l.map(findCard).filter(card => card !== undefined); return { main, life }; } catch (e) { console.error("Decoding failed:", e); return null; } };
-
-// === Drag & Drop and Animation Components ===
-const DND_TYPES = { CARD: "CARD" };
-const encodePath = (p) => p.split('/').map(encodeURIComponent).join('/');
-const DndStateContext = createContext({ isDragging: false });
-const DndStateProvider = ({ children }) => { const { isDragging } = useDragLayer((monitor) => ({ isDragging: monitor.isDragging() })); return <DndStateContext.Provider value={{ isDragging }}>{children}</DndStateContext.Provider>; };
-const useIsDragging = () => useContext(DndStateContext);
-function CustomDragLayer() { const { isDragging, item, currentOffset } = useDragLayer((monitor) => ({ item: monitor.getItem(), isDragging: monitor.isDragging(), currentOffset: monitor.getSourceClientOffset(), })); if (!isDragging || !currentOffset) return null; const { card } = item;
-  const encodedImagePath = encodePath(card.imagePath);
-  const fileId = card.id.replace(/\s*(\(.*\)|- Only#1)$/, ''); // <-- 📍 แก้ไข
-  const imgPng = `/cards/${encodedImagePath}/${encodeURIComponent(fileId)}.png`;
-  return ( <div style={{ position: 'fixed', pointerEvents: 'none', zIndex: 1000, left: 0, top: 0, transform: `translate(${currentOffset.x}px, ${currentOffset.y}px)` }}> <img src={imgPng} alt={card.name} className="w-40 h-auto rounded-lg shadow-2xl" /> </div> ); }
-function FlyingCard({ card, startRect, endRect, onComplete }) { const [isAnimating, setIsAnimating] = useState(false); const hasCompleted = useRef(false); useEffect(() => { const timeoutId = setTimeout(() => setIsAnimating(true), 10); return () => clearTimeout(timeoutId); }, []); if (!card || !startRect || !endRect) return null; const handleTransitionEnd = () => { if (!hasCompleted.current) { hasCompleted.current = true; onComplete(); } }; const style = { position: 'fixed', zIndex: 1000, top: `${startRect.top}px`, left: `${startRect.left}px`, width: `${startRect.width}px`, height: `${startRect.height}px`, transition: 'all 0.5s ease-in-out' }; if (isAnimating) { style.top = `${endRect.top + endRect.height / 2 - 35}px`; style.left = `${endRect.left + endRect.width / 2 - 25}px`; style.width = '50px'; style.height = '70px'; style.opacity = 0; style.transform = 'rotate(15deg)'; } const encodedImagePath = encodePath(card.imagePath);
-  const fileId = card.id.replace(/\s*(\(.*\)|- Only#1)$/, ''); // <-- 📍 แก้ไข
-  const imgSrc = `/cards/${encodedImagePath}/${encodeURIComponent(fileId)}.png`;
-  return (
-    <div style={style} onTransitionEnd={handleTransitionEnd}> <img src={imgSrc} alt={card.name} className="w-full h-full rounded-lg shadow-2xl" /> </div> ); }
-
-// 🟢 [ใหม่] Component ลูกไฟวิ่ง (Effect 1 วินาที)
-const FlyingLight = ({ startRect, endRect, onComplete }) => {
-  const [style, setStyle] = useState({
-    position: 'fixed',
-    top: startRect.top + startRect.height / 2,
-    left: startRect.left + startRect.width / 2,
-    opacity: 1,
-    transform: 'translate(-50%, -50%) scale(1)',
-  });
-
-  useEffect(() => {
-    // เริ่ม Animation ในเฟรมถัดไป
-    requestAnimationFrame(() => {
-      setStyle({
-        position: 'fixed',
-        top: endRect.top + endRect.height / 2,   // วิ่งไปกลางปุ่มเป้าหมาย
-        left: endRect.left + endRect.width / 2, // วิ่งไปกลางปุ่มเป้าหมาย
-        opacity: 0,                             // ค่อยๆ จางหาย
-        transform: 'translate(-50%, -50%) scale(0.2)', // หดเล็กลง
-        transition: 'all 1s cubic-bezier(0.25, 0.46, 0.45, 0.94)' // ⏳ กินเวลา 1 วินาที (ช้าๆ ตามขอ)
-      });
-    });
-
-    // ลบตัวเองเมื่อจบ
-    const timer = setTimeout(onComplete, 1000);
-    return () => clearTimeout(timer);
-  }, []);
-
-  return (
-    <div 
-      className="z-[9999] w-6 h-6 rounded-full bg-amber-400 shadow-[0_0_15px_4px_rgba(251,191,36,0.8)] pointer-events-none"
-      style={style}
-    />
-  );
-};
-
-// === Card component (draggable) ===
-// 🟢 รับ props เพิ่ม: isMobileZoomed และ onMobileClick
-// 👇 เติม , onAuction เข้าไปตรงนี้ครับ
-const CardItem = forwardRef(function CardItem({ card, onDoubleClick, onViewDetails, onAddCard, isMobileZoomed, onMobileClick, onAuction }, ref) { 
-    const cardItemRef = useRef(null); 
-    const { isDragging: isAnythingDragging } = useIsDragging(); 
-    const [{ isDragging }, dragRef] = useDrag({ type: DND_TYPES.CARD, item: { card }, collect: (m) => ({ isDragging: m.isDragging() }) }); 
-    
-    // ❌ ลบ State ภายในทิ้ง (เพราะเราใช้ props จากแม่แทนแล้ว)
-    // const [isMobileZoomed, setIsMobileZoomed] = useState(false); <--- ลบบรรทัดนี้
-
-    const encodedImagePath = encodePath(card.imagePath); 
-    const fileId = card.id.replace(' - Only#1', ''); 
-    const imgPng = `/cards/${encodedImagePath}/${encodeURIComponent(fileId)}.png`; 
-    const imgJpg = `/cards/${encodedImagePath}/${encodeURIComponent(fileId)}.jpg`; 
-    
-    const hoverClasses = !isAnythingDragging ? 'lg:hover:scale-[1.25] lg:hover:z-[80]' : ''; 
-
-    // Logic สำหรับ Mobile Zoom (รับค่าจาก props isMobileZoomed)
-    const mobileZoomClasses = isMobileZoomed ? 'scale-[1.15] z-[10] shadow-2xl border-amber-500/50' : '';
-    
-    const handleClick = () => {
-        // เช็คว่าเป็นมือถือ/แท็บเล็ตไหม
-        if (window.innerWidth < 1024) { 
-            // เรียกฟังก์ชันที่แม่ส่งมา (เพื่อแจ้งว่าฉันถูกกดนะ แม่ช่วยจัดการหน่อย)
-            onMobileClick();
-        }
-    };
-
-    return ( 
-        <CardShell 
-            ref={cardItemRef} 
-            onClick={handleClick}
-            className={`
-                flex flex-col card group relative 
-                ${isDragging ? 'opacity-0' : ''} 
-                transition-transform duration-200 ease-in-out 
-                ${hoverClasses} 
-                ${mobileZoomClasses} 
-                p-0.5 lg:p-4
-            `}
-        > 
-            {/* ปุ่ม Action */}
-            <div className="absolute top-1 right-1 z-10 flex flex-col gap-1 lg:gap-2 lg:top-2 lg:right-2"> 
-                <button 
-                    onClick={(e) => { e.stopPropagation(); onViewDetails(card); }} 
-                    className="p-1 lg:p-1.5 bg-slate-100/80 dark:bg-slate-900/80 rounded-full text-amber-600 dark:text-amber-300 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-slate-300 dark:hover:bg-slate-700 hover:text-black dark:hover:text-white" title="ดูรายละเอียด"
-                > 
-                    <EyeIcon /> 
-                </button> 
-                <button 
-                    // 🟢 แก้ไข: ส่ง e.currentTarget (ตัวปุ่มเอง) กลับไปให้ addToMain
-                    onClick={(e) => { e.stopPropagation(); onAddCard(card, e.currentTarget); }} 
-                    className="p-1 lg:p-1.5 bg-emerald-600/80 rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-emerald-500 active:scale-95" title="เพิ่มลงเด็ค"
-                > 
-                    <PlusIcon /> 
-                </button> 
-                <button 
-                    onClick={(e) => { e.stopPropagation(); onAuction(card); }} 
-                    className="p-1 lg:p-1.5 bg-amber-500/90 rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-amber-600 active:scale-95 shadow-md" 
-                    title="เปิดประมูล"
-                > 
-                    <GavelIcon /> 
-                </button>
-            </div> 
-
-            <img 
-                ref={dragRef} 
-                src={imgPng} 
-                alt={card.name} 
-                onDoubleClick={() => onDoubleClick(card, cardItemRef.current)} 
-                onError={(e) => { 
-                    if (!e.currentTarget.src.endsWith('.jpg')) e.currentTarget.src = imgJpg; 
-                    else { 
-                        e.currentTarget.onerror = null; 
-                        e.currentTarget.src = `https://placehold.co/300x420/1e293b/94a3b8?text=${encodeURIComponent(card.name)}`; 
-                    } 
-                }} 
-                className="w-full h-auto rounded-[4px] lg:rounded-md mb-0 lg:mb-3 object-cover aspect-[5/7] bg-slate-200 dark:bg-slate-700 shadow hover:shadow-xl transition-shadow cursor-grab active:cursor-grabbing" 
-                loading="lazy" 
-            /> 
-
-            {/* ส่วนรายละเอียด (Desktop Only) */}
-            <div className="hidden lg:flex flex-grow flex-col justify-between"> 
-                <div> 
-                    <div className="flex justify-between items-start gap-2"> 
-                        <p className="font-bold text-xl text-slate-900 dark:text-white pr-2 line-clamp-2">{card.name}</p> 
-                        <div className="flex items-center gap-2 shrink-0"> 
-                            {card.colorType && <ColorPip color={card.colorType} />} 
-                            <Pill className="bg-slate-200 dark:bg-slate-600 text-slate-700 dark:text-gray-200">{card.type}</Pill> 
-                        </div> 
-                    </div> 
-                    {card.rarity && <Pill className="mt-2 bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300">{card.rarity}</Pill>} 
-                    {card.onlyRank === 1 && <Pill className="mt-2 ml-1 bg-amber-500/10 text-amber-600 dark:text-amber-300 border border-amber-500/20">Only #1</Pill>} 
-                </div> 
-            </div> 
-
-            {/* Popup Hover Detail (Desktop Only) */}
-            <div className="hidden lg:block absolute top-full mt-1 left-0 right-0 z-[60] p-4 bg-white dark:bg-slate-900 rounded-lg shadow-2xl border border-amber-500/50 space-y-2 opacity-0 group-hover:opacity-100 transition-all duration-300 ease-in-out pointer-events-none group-hover:pointer-events-auto max-h-96 overflow-y-auto"> 
-                <div className="grid grid-cols-3 gap-2 text-center"> 
-                    <div><span className="text-base text-emerald-600 dark:text-emerald-400">Cost</span><p className="font-bold text-2xl text-slate-900 dark:text-white">{card.cost ?? '-'}</p></div> 
-                    <div><span className="text-base text-red-600 dark:text-red-400">Power</span><p className="font-bold text-2xl text-slate-900 dark:text-white">{card.power ?? '-'}</p></div> 
-                    <div><span className="text-base text-amber-600 dark:text-amber-400">Gem</span><p className="font-bold text-2xl text-slate-900 dark:text-white">{card.gem ?? '-'}</p></div> 
-                </div> 
-                <div className="pt-2"> 
-                    <p className="text-base text-slate-500 dark:text-gray-400">ฝ่าย: <span className="font-semibold text-slate-700 dark:text-gray-200">{card.faction ?? 'ไม่มี'}</span></p> 
-                    <p className="text-base text-slate-700 dark:text-gray-300 font-light mt-1 break-words">{card.text || 'ไม่มีเอฟเฟ็ค'}</p> 
-                    {card.flavor && ( 
-                        <p className="text-sm text-amber-700/70 dark:text-amber-200/70 italic mt-2 font-light break-words">"{card.flavor}"</p> 
-                    )} 
-                </div> 
-            </div> 
-        </CardShell> 
-    ); 
-});
-
-// === Deck Tray (droppable) ===
-const DeckTray = forwardRef(function DeckTray(
-  { title, deck, onDropCard, onRemoveCard, capacity, highlight, onViewDeck },
-  ref
-) {
-  const [{ isOver }, dropRef] = useDrop({
-    accept: DND_TYPES.CARD,
-    drop: (item) => onDropCard(item.card),
-    collect: (monitor) => ({ isOver: monitor.isOver() }),
-  });
-  const groupedDeck = useMemo(() => {
-    return Object.values(
-      deck.reduce((m, card) => {
-        const key = nameKey(card.name);
-        if (!m[key]) m[key] = { card, count: 0 };
-        m[key].count++;
-        return m;
-      }, {})
-    ).sort((a, b) => a.card.name.localeCompare(b.card.name, "th"));
-  }, [deck]);
-  const cardsPerRow = 12;
-  const numRows =
-    groupedDeck.length > 0
-      ? Math.floor((groupedDeck.length - 1) / cardsPerRow) + 1
-      : 1;
-  const containerHeight = numRows * 40 + 40;
-  return (
-    <div
-      ref={ref}
-      className={`p-2 rounded-md border-2 ${
-        isOver || highlight
-          ? "border-amber-400"
-          : "border-slate-300 dark:border-slate-600"
-      } transition-colors bg-slate-100 dark:bg-slate-900/50`}
-    >
-      <div ref={dropRef}>
-        <div className="flex items-center justify-between mb-2 gap-2">
-          <h3 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider shrink-0">
-            {title}
-          </h3>
-          {onViewDeck && deck.length > 0 && (
-            <button
-              onClick={onViewDeck}
-              className="text-xs text-amber-600 dark:text-amber-400 hover:text-amber-500 dark:hover:text-amber-200 hover:underline transition"
-            >
-              ดูเด็ค
-            </button>
-          )}
-          <div className="flex-grow text-right">
-            {typeof capacity === "number" && (
-              <span className="text-xs text-slate-600 dark:text-slate-300">
-                {deck.length}
-                {capacity ? ` / ${capacity}` : ""}
-              </span>
-            )}
-          </div>
-        </div>
-        <div className="relative w-full transition-all" style={{ height: `${containerHeight}px` }}>
-          {groupedDeck.length === 0 ? (
-            <div className="absolute inset-0 flex items-center justify-center text-slate-400 dark:text-slate-500 text-xs">
-              ลากการ์ดมาวางที่นี่
-            </div>
-          ) : (
-            <div className="absolute inset-0">
-              {groupedDeck.map(({ card, count }, index) => {
-                const encodedImagePath = encodePath(card.imagePath);
-                const fileId = card.id.replace(" - Only#1", "");
-                const thumbPng = `/cards/${encodedImagePath}/${encodeURIComponent(
-                  fileId
-                )}.png`;
-                const rowIndex = Math.floor(index / cardsPerRow);
-                const colIndex = index % cardsPerRow;
-                return (
-                  <div
-                    key={`${card.id}-${index}`}
-                    className="absolute transition-all duration-200 ease-in-out group hover:-translate-y-2 hover:z-50"
-                    style={{
-                      left: `${colIndex * 22}px`,
-                      top: `${rowIndex * 40}px`,
-                      zIndex: colIndex,
-                      width: "56px",
-                    }}
-                    title={`คลิกเพื่อลบ ${card.name}`}
-                    onClick={() => onRemoveCard(card)}
-                  >
-                    <img
-                      src={thumbPng}
-                      alt={card.name}
-                      className="w-full h-auto rounded-md shadow-lg border-2 border-slate-300 dark:border-slate-600 group-hover:border-red-500 cursor-pointer"
-                      onError={(e) => {
-                        if (!e.currentTarget.src.endsWith(".jpg")) {
-                          e.currentTarget.src = e.currentTarget.src.replace(
-                            ".png",
-                            ".jpg"
-                          );
-                        }
-                      }}
-                    />
-                    {count > 1 && (
-                      <div className="absolute -top-2 -right-2 w-5 h-5 flex items-center justify-center bg-amber-500 text-white text-xs font-bold rounded-full border-2 border-white dark:border-slate-800">
-                        {count}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-});
-
-const FeedbackModal = ({ isOpen, onClose, userProfile, showAlert }) => {
-  const [text, setText] = useState("");
-  const [type, setType] = useState("suggestion"); // suggestion, bug, other
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
-  if (!isOpen) return null;
-
-  const handleSubmit = async () => {
-    if (!text.trim()) return showAlert("ข้อความว่างเปล่า", "กรุณากรอกข้อความก่อนส่งครับ");
-    
-    setIsSubmitting(true);
-    try {
-      await addDoc(collection(db, "feedbacks"), {
-        text: text.trim(),
-        type: type,
-        user: userProfile ? { 
-          name: userProfile.name, 
-          email: userProfile.email, 
-          uid: userProfile.email // ใช้อีเมลแทน ID ชั่วคราวตามโครงสร้างเดิม
-        } : "Anonymous",
-        createdAt: serverTimestamp(),
-        status: "new", // สถานะสำหรับ Admin (new, read, fixed)
-        version: "1.0" // ใส่เลขเวอร์ชันแอปเผื่อไว้ดูว่าบั๊กมาจากเวอร์ชันไหน
-      });
-      
-      showAlert("ขอบคุณครับ! 🙏", "เราได้รับข้อมูลของท่านแล้ว ทีมงานจะนำไปปรับปรุงให้ดียิ่งขึ้น");
-      setText("");
-      onClose();
-    } catch (e) {
-      console.error("Feedback error: ", e);
-      showAlert("เกิดข้อผิดพลาด", "ไม่สามารถส่งข้อมูลได้ โปรดลองใหม่ภายหลัง");
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  return createPortal(
-    <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-[650] p-4">
-      <div className="bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-emerald-500/30 rounded-xl shadow-2xl p-6 w-full max-w-md">
-        <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
-          <MessageIcon /> ติดต่อผู้พัฒนา / แจ้งปัญหา
-        </h2>
-        
-        <div className="space-y-4">
-          <div>
-            <label className="text-sm text-slate-600 dark:text-gray-400 mb-1 block">หัวข้อเรื่อง</label>
-            <select 
-              value={type} 
-              onChange={(e) => setType(e.target.value)}
-              className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 outline-none"
-            >
-              <option value="suggestion">💡 เสนอแนะ / ฟีดแบค</option>
-              <option value="bug">🐛 แจ้งบั๊ก / ปัญหาการใช้งาน</option>
-              <option value="other">💬 อื่นๆ</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="text-sm text-slate-600 dark:text-gray-400 mb-1 block">รายละเอียด</label>
-            <textarea
-              rows="4"
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              placeholder="เล่าให้เราฟังหน่อยครับ..."
-              className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-emerald-500 outline-none resize-none"
-            />
-          </div>
-        </div>
-
-        <div className="flex justify-end gap-3 mt-6">
-          <Button 
-            onClick={onClose} 
-            className="bg-slate-200 dark:bg-slate-800 border-slate-300 dark:border-slate-600 text-slate-600 dark:text-gray-400 hover:bg-slate-300 dark:hover:bg-slate-700"
-          >
-            ยกเลิก
-          </Button>
-          <Button 
-            onClick={handleSubmit} 
-            disabled={isSubmitting}
-            className="bg-emerald-600 text-white hover:bg-emerald-500 border-none shadow-lg"
-          >
-            {isSubmitting ? "กำลังส่ง..." : "ส่งข้อความ"}
-          </Button>
-        </div>
-      </div>
-    </div>,
-    document.body
-  );
-};
-
-// === CardDetailModal ===
-// ✅ CardDetailModal เวอร์ชันมีปุ่มประมูล
 function CardDetailModal({ card, onClose, onSell }) {
   if (!card) return null;
   const encodedImagePath = encodePath(card.imagePath);
@@ -954,46 +178,17 @@ function CardDetailModal({ card, onClose, onSell }) {
 
   return createPortal(
     <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-[300] p-4" onClick={onClose}>
-      <img 
-        src={imgPng} 
-        alt={card.name}
-        className="max-w-full max-h-full h-auto w-auto object-contain rounded-xl shadow-2xl" 
-        onClick={(e) => e.stopPropagation()} 
-        onError={(e) => { if (!e.currentTarget.src.endsWith('.jpg')) e.currentTarget.src = imgJpg; }} 
-      />
-      
-      {/* ปุ่มปิด */}
-      <button onClick={onClose} className="absolute top-4 right-4 text-white bg-slate-800/50 rounded-full p-2 hover:bg-slate-700">
-        <CloseIcon />
-      </button>
-
-      {/* 👇 ปุ่มเปิดประมูล (ที่ขาดหายไป) */}
-      <button 
-        onClick={(e) => { 
-            e.stopPropagation(); 
-            if(onSell) onSell(card); // เรียกฟังก์ชันขาย
-        }} 
-        className="absolute bottom-6 right-6 flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-amber-500 to-orange-600 text-white rounded-full font-bold shadow-xl hover:scale-105 transition-transform z-[310]"
-      >
-         <span className="text-xl">🔨</span>
-         <span>เปิดประมูล</span>
-      </button>
-
+      <img src={imgPng} alt={card.name} className="max-w-full max-h-full h-auto w-auto object-contain rounded-xl shadow-2xl" onClick={(e) => e.stopPropagation()} onError={(e) => { if (!e.currentTarget.src.endsWith('.jpg')) e.currentTarget.src = imgJpg; }} />
+      <button onClick={onClose} className="absolute top-4 right-4 text-white bg-slate-800/50 rounded-full p-2 hover:bg-slate-700"><CloseIcon /></button>
+      <button onClick={(e) => { e.stopPropagation(); if(onSell) onSell(card); }} className="absolute bottom-6 right-6 flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-amber-500 to-orange-600 text-white rounded-full font-bold shadow-xl hover:scale-105 transition-transform z-[310]"><span className="text-xl">🔨</span><span>เปิดประมูล</span></button>
     </div>, document.body
   );
 }
-// === DeckViewModal ===
+
 function DeckViewModal({ isOpen, onClose, deck, rules, onAddCard, onRemoveCard, title }) {
   const groupedDeck = useMemo(() => {
     if (!deck) return [];
-    return Object.values(
-      deck.reduce((m, card) => {
-        const key = nameKey(card.name);
-        if (!m[key]) m[key] = { card, count: 0 };
-        m[key].count++;
-        return m;
-      }, {})
-    ).sort((a, b) => a.card.name.localeCompare(b.card.name, 'th'));
+    return Object.values(deck.reduce((m, card) => { const key = nameKey(card.name); if (!m[key]) m[key] = { card, count: 0 }; m[key].count++; return m; }, {})).sort((a, b) => a.card.name.localeCompare(b.card.name, 'th'));
   }, [deck]);
 
   if (!isOpen) return null;
@@ -1002,25 +197,19 @@ function DeckViewModal({ isOpen, onClose, deck, rules, onAddCard, onRemoveCard, 
     <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-[400] p-4">
       <div className="bg-slate-100 dark:bg-slate-900/70 border border-slate-300 dark:border-emerald-500/30 rounded-xl shadow-2xl w-full h-full flex flex-col">
         <header className="flex items-center justify-between p-4 border-b border-slate-300 dark:border-emerald-500/20 shrink-0">
-          <h2 className="text-2xl font-bold text-slate-900 dark:text-white">
-            {title} ({deck.length} / {rules.size})
-          </h2>
+          <h2 className="text-2xl font-bold text-slate-900 dark:text-white">{title} ({deck.length} / {rules.size})</h2>
           <Button onClick={onClose}>Close</Button>
         </header>
         <div className="flex-grow overflow-y-auto p-4">
-          {groupedDeck.length === 0 ? (
-            <div className="flex items-center justify-center h-full">
-              <p className="text-slate-500 dark:text-slate-400">เด็คนี้ว่างเปล่า</p>
-            </div>
-          ) : (
+          {groupedDeck.length === 0 ? <div className="flex items-center justify-center h-full"><p className="text-slate-500 dark:text-slate-400">เด็คนี้ว่างเปล่า</p></div> : (
             <div className="flex flex-wrap justify-center gap-4">
-              {groupedDeck.map(({ card, count }, index) => { // <-- [เพิ่ม] index
+              {groupedDeck.map(({ card, count }, index) => {
                 const encodedImagePath = encodePath(card.imagePath);
                 const fileId = card.id.replace(' - Only#1', '');
-                const thumbPng = `${CARD_BASE_URL}/${encodedImagePath}/${encodeURIComponent(fileId)}.png`;
+                const thumbPng = `/cards/${encodedImagePath}/${encodeURIComponent(fileId)}.png`;
                 const isAtMaxCopies = rules.maxCopiesPerName && count >= rules.maxCopiesPerName;
                 return (
-                  <div key={`${card.id}-${index}`} className="w-40 flex flex-col items-center"> {/* <-- [แก้ไข] key */}
+                  <div key={`${card.id}-${index}`} className="w-40 flex flex-col items-center">
                     <img src={thumbPng} alt={card.name} className="w-full rounded-lg shadow-md mb-2" />
                     <div className="w-full flex items-center justify-around gap-2 bg-slate-200 dark:bg-slate-800/50 p-1 rounded-md">
                       <button onClick={() => onRemoveCard(card)} className="flex items-center justify-center w-7 h-7 bg-red-700/70 dark:bg-red-800/70 rounded-full hover:bg-red-600 dark:hover:bg-red-700 transition active:scale-95 text-white font-bold text-xl">-</button>
@@ -1034,14 +223,10 @@ function DeckViewModal({ isOpen, onClose, deck, rules, onAddCard, onRemoveCard, 
           )}
         </div>
       </div>
-    </div>,
-    document.body
+    </div>, document.body
   );
 }
 
-// =================================================================
-// === 📍 [Fixed] DeckAnalysisModal (Full Screen on Mobile) ===
-// =================================================================
 function DeckAnalysisModal({ isOpen, onClose, mainDeck, lifeDeck, showAlert, theme, showChart }) { 
     const analysis = useMemo(() => {
         if (!mainDeck || mainDeck.length === 0) return null;
@@ -1051,13 +236,11 @@ function DeckAnalysisModal({ isOpen, onClose, mainDeck, lifeDeck, showAlert, the
         const magics = mainDeck.filter(c => c.type === 'Magic').sort((a, b) => a.name.localeCompare(b.name, 'th'));
         const constructs = mainDeck.filter(c => c.type === 'Construction').sort((a, b) => a.name.localeCompare(b.name, 'th'));
         const otherCards = mainDeck.filter(c => c.onlyRank !== 1 && !['Avatar', 'Magic', 'Construction'].includes(c.type)).sort((a, b) => (typeOrder[a.type] || 99) - (typeOrder[b.type] || 99) || a.name.localeCompare(b.name, 'th'));
-        
         const avgCost = avg(mainDeck.map(c => c.cost)); 
         const avgPower = avg(mainDeck.map(c => c.power)); 
         const avgGem = avg(mainDeck.map(c => c.gem));
         const typeCounts = countBy(mainDeck, c => c.type); 
         const cardTypes = Object.entries(typeCounts).sort(([a], [b]) => (typeOrder[a] || 99) - (typeOrder[b] || 99));
-        
         const maxStatValue = 100;
         const earlyGameScore = (mainDeck.filter(c => (c.cost ?? 0) <= 2).length / (mainDeck.length * 0.5)) * maxStatValue; 
         const midGameScore = (mainDeck.filter(c => (c.cost ?? 0) >= 3 && (c.cost ?? 0) <= 5).length / (mainDeck.length * 0.4)) * maxStatValue; 
@@ -1065,73 +248,23 @@ function DeckAnalysisModal({ isOpen, onClose, mainDeck, lifeDeck, showAlert, the
         const offenseScore = (parseFloat(avgPower) / 6) * maxStatValue; 
         const defenseScore = (mainDeck.filter(c => c.type !== 'Magic').length / 40) * maxStatValue; 
         const utilityScore = ((typeCounts['Magic'] || 0) / 15) * maxStatValue; 
-        
         const radarData = { 
             labels: ['ความไวต้นเกม', 'กลางเกม', 'ท้ายเกม', 'พลังโจมตี', 'การป้องกัน', 'การสนับสนุน'], 
-            datasets: [{ 
-                label: 'ศักยภาพเด็ค', 
-                data: [earlyGameScore, midGameScore, lateGameScore, offenseScore, defenseScore, utilityScore].map(v => Math.round(Math.min(100, Math.max(0, v || 0)))), 
-                backgroundColor: 'rgba(52, 211, 153, 0.2)', 
-                borderColor: 'rgb(52, 211, 153)', 
-                pointBackgroundColor: 'rgb(52, 211, 153)', 
-                pointBorderColor: '#000000ff', 
-                pointHoverBackgroundColor: '#000000ff', 
-                pointHoverBorderColor: 'rgb(52, 211, 153)' 
-            }]
+            datasets: [{ label: 'ศักยภาพเด็ค', data: [earlyGameScore, midGameScore, lateGameScore, offenseScore, defenseScore, utilityScore].map(v => Math.round(Math.min(100, Math.max(0, v || 0)))), backgroundColor: 'rgba(52, 211, 153, 0.2)', borderColor: 'rgb(52, 211, 153)', pointBackgroundColor: 'rgb(52, 211, 153)', pointBorderColor: '#000000ff', pointHoverBackgroundColor: '#000000ff', pointHoverBorderColor: 'rgb(52, 211, 153)' }]
         };
-        
         const deckCode = encodeDeckCode(mainDeck, lifeDeck);
-        
         return { avgCost, avgPower, avgGem, cardTypes, radarData, deckCode, only1Card, avatars, magics, constructs, otherCards };
-    
     }, [mainDeck, lifeDeck, theme]);
 
     const isDark = theme === 'dark';
-
-    const radarOptions = {
-        scales: {
-            r: {
-                angleLines: { color: isDark ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.2)' },
-                grid: { color: isDark ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.2)' },
-                pointLabels: { color: isDark ? 'rgb(209, 213, 219)' : 'rgb(30, 41, 59)', font: { size: 12 } },
-                ticks: {
-                    color: isDark ? 'rgb(156, 163, 175)' : 'rgb(100, 116, 139)',
-                    backdropColor: isDark ? 'rgba(0, 0, 0, 0.5)' : 'rgba(255, 255, 255, 0.75)',
-                    stepSize: 20,
-                    maxTicksLimit: 6,
-                },
-                min: 0, max: 100,
-            },
-        },
-        plugins: { legend: { display: false }, tooltip: { enabled: true } },
-        maintainAspectRatio: false
-    };
-
-    const handleCopyCode = () => { 
-        if (analysis?.deckCode) { 
-            navigator.clipboard.writeText(analysis.deckCode)
-            .then(() => showAlert("Success!", `✅ คัดลอกรหัสเด็คลง Clipboard แล้ว!`))
-            .catch(err => { console.error('Failed to copy code: ', err); showAlert("Error", "ไม่สามารถคัดลอกรหัสเด็คได้"); }); 
-        } 
-    };
-    
+    const radarOptions = { scales: { r: { angleLines: { color: isDark ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.2)' }, grid: { color: isDark ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.2)' }, pointLabels: { color: isDark ? 'rgb(209, 213, 219)' : 'rgb(30, 41, 59)', font: { size: 12 } }, ticks: { color: isDark ? 'rgb(156, 163, 175)' : 'rgb(100, 116, 139)', backdropColor: isDark ? 'rgba(0, 0, 0, 0.5)' : 'rgba(255, 255, 255, 0.75)', stepSize: 20, maxTicksLimit: 6 }, min: 0, max: 100 } }, plugins: { legend: { display: false }, tooltip: { enabled: true } }, maintainAspectRatio: false };
+    const handleCopyCode = () => { if (analysis?.deckCode) navigator.clipboard.writeText(analysis.deckCode).then(() => showAlert("Success!", `✅ คัดลอกรหัสเด็คลง Clipboard แล้ว!`)).catch(err => { console.error('Failed to copy code: ', err); showAlert("Error", "ไม่สามารถคัดลอกรหัสเด็คได้"); }); };
     const renderCardSection = (title, cards) => {
         if (!cards || cards.length === 0) return null;
-        
-        const groupedCards = Object.values(
-            cards.reduce((m, card) => {
-                const key = card.id; 
-                if (!m[key]) m[key] = { card, count: 0 };
-                m[key].count++;
-                return m;
-            }, {})
-        ).sort((a, b) => a.card.name.localeCompare(b.card.name, 'th'));
-
+        const groupedCards = Object.values(cards.reduce((m, card) => { const key = card.id; if (!m[key]) m[key] = { card, count: 0 }; m[key].count++; return m; }, {})).sort((a, b) => a.card.name.localeCompare(b.card.name, 'th'));
         return (
             <div className="mt-6">
-                <h4 className="text-lg font-semibold text-emerald-600 dark:text-emerald-300 border-b border-emerald-500/20 pb-1 mb-3">
-                    {title} ({cards.length} ใบ)
-                </h4>
+                <h4 className="text-lg font-semibold text-emerald-600 dark:text-emerald-300 border-b border-emerald-500/20 pb-1 mb-3">{title} ({cards.length} ใบ)</h4>
                 <div className="grid grid-cols-[repeat(auto-fit,minmax(4.5rem,1fr))] md:grid-cols-[repeat(auto-fit,minmax(5rem,1fr))] gap-2 justify-center">
                     {groupedCards.map(({ card, count }, index) => {
                         const encodedImagePath = encodePath(card.imagePath);
@@ -1139,17 +272,8 @@ function DeckAnalysisModal({ isOpen, onClose, mainDeck, lifeDeck, showAlert, the
                         const thumbPng = `/cards/${encodedImagePath}/${encodeURIComponent(fileId)}.png`;
                         return (
                             <div key={`${card.id}-${index}`} className="relative w-18 md:w-20 group">
-                                <img 
-                                    src={thumbPng} 
-                                    alt={card.name} 
-                                    className="w-full rounded-md shadow transition-transform hover:scale-110 hover:z-10" 
-                                    onError={(e) => { e.currentTarget.src = e.currentTarget.src.replace('.png', '.jpg'); }} 
-                                />
-                                {count > 1 && (
-                                    <div className="absolute -top-2 -right-2 w-5 h-5 flex items-center justify-center bg-amber-500 text-white text-xs font-bold rounded-full border-2 border-white dark:border-slate-800">
-                                        {count}
-                                    </div>
-                                )}
+                                <img src={thumbPng} alt={card.name} className="w-full rounded-md shadow transition-transform hover:scale-110 hover:z-10" onError={(e) => { e.currentTarget.src = e.currentTarget.src.replace('.png', '.jpg'); }} />
+                                {count > 1 && <div className="absolute -top-2 -right-2 w-5 h-5 flex items-center justify-center bg-amber-500 text-white text-xs font-bold rounded-full border-2 border-white dark:border-slate-800">{count}</div>}
                             </div>
                         );
                     })}
@@ -1161,22 +285,13 @@ function DeckAnalysisModal({ isOpen, onClose, mainDeck, lifeDeck, showAlert, the
     if (!isOpen || !analysis) return null;
 
     return createPortal(
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-[250] p-0 md:p-4"> {/* 🟢 Mobile: p-0 */}
-            <div className={`
-                bg-slate-100 dark:bg-slate-900/80 
-                border-0 md:border border-slate-300 dark:border-emerald-500/30 
-                rounded-none md:rounded-xl 
-                shadow-2xl 
-                w-full h-full flex flex-col 
-                max-w-7xl md:max-h-[90vh] /* 🟢 Mobile: เต็มจอ h-full */
-            `}>
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-[250] p-0 md:p-4">
+            <div className="bg-slate-100 dark:bg-slate-900/80 border-0 md:border border-slate-300 dark:border-emerald-500/30 rounded-none md:rounded-xl shadow-2xl w-full h-full flex flex-col max-w-7xl md:max-h-[90vh]">
                 <header className="flex items-center justify-between p-4 border-b border-slate-300 dark:border-emerald-500/20 shrink-0">
                     <h2 className="text-xl md:text-2xl font-bold text-slate-900 dark:text-white truncate pr-2">ผลลัพธ์การสร้างเด็ค</h2>
                     <Button onClick={onClose}>Close</Button>
                 </header>
-                
                 <div className="flex-grow overflow-hidden grid grid-cols-1 md:grid-cols-3 gap-6 p-4 md:p-6">
-                    {/* Sidebar Stats */}
                     <div className="md:col-span-1 flex flex-col gap-6 overflow-y-auto pr-2">
                         <div>
                             <h3 className="text-xl font-semibold text-amber-600 dark:text-amber-300 border-b border-amber-500/20 pb-1 mb-3">สถิติเด็ค</h3>
@@ -1186,195 +301,55 @@ function DeckAnalysisModal({ isOpen, onClose, mainDeck, lifeDeck, showAlert, the
                                 <div><span className="text-sm text-gray-500 dark:text-gray-400">Avg Gem</span><p className="text-2xl font-bold text-amber-600 dark:text-amber-400">{analysis.avgGem}</p></div>
                             </div>
                         </div>
-
-                        {showChart && (
-                            <div className="aspect-square w-full max-w-[350px] mx-auto">
-                                <Radar data={analysis.radarData} options={radarOptions} />
-                            </div>
-                        )}
-
+                        {showChart && <div className="aspect-square w-full max-w-[350px] mx-auto"><Radar data={analysis.radarData} options={radarOptions} /></div>}
                         <div>
                             <h3 className="text-xl font-semibold text-amber-600 dark:text-amber-300 border-b border-amber-500/20 pb-1 mb-3">ประเภทการ์ด</h3>
                             <ul className="space-y-1 text-sm text-slate-700 dark:text-gray-300">
-                                {analysis.cardTypes.map(([type, count]) => (
-                                    <li key={type} className="flex justify-between">
-                                        <span>{type}</span>
-                                        <span className="text-slate-900 dark:text-white font-semibold">{count} ใบ</span>
-                                    </li>
-                                ))}
+                                {analysis.cardTypes.map(([type, count]) => <li key={type} className="flex justify-between"><span>{type}</span><span className="text-slate-900 dark:text-white font-semibold">{count} ใบ</span></li>)}
                             </ul>
                         </div>
-                        <div>
-                            <h3 className="text-xl font-semibold text-amber-600 dark:text-amber-300 border-b border-amber-500/20 pb-1 mb-3">รหัส Export</h3>
-                            <Button onClick={handleCopyCode} className="w-full">
-                                <CopyIcon /> คัดลอกรหัสเด็ค
-                            </Button>
-                        </div>
+                        <div><h3 className="text-xl font-semibold text-amber-600 dark:text-amber-300 border-b border-amber-500/20 pb-1 mb-3">รหัส Export</h3><Button onClick={handleCopyCode} className="w-full"><CopyIcon /> คัดลอกรหัสเด็ค</Button></div>
                     </div>
-
-                    {/* Card List */}
-                    <div className="md:col-span-2 overflow-y-auto pr-2 md:border-l border-slate-300 dark:border-emerald-500/20 md:pl-6"> {/* 🟢 Mobile: เอา border-l ออก */}
+                    <div className="md:col-span-2 overflow-y-auto pr-2 md:border-l border-slate-300 dark:border-emerald-500/20 md:pl-6">
                         <h3 className="text-xl font-semibold text-amber-600 dark:text-amber-300 border-b border-amber-500/20 pb-1 mb-4">การ์ดในเด็ค ({mainDeck.length} ใบ)</h3>
-                        {analysis.only1Card && (
-                            <div className="mb-6 flex flex-col items-center">
-                                <h4 className="text-lg font-semibold text-emerald-600 dark:text-emerald-300 mb-3">Only #1</h4>
-                                <div className="relative w-36 mx-auto">
-                                    <img src={`/cards/${encodePath(analysis.only1Card.imagePath)}/${encodeURIComponent(analysis.only1Card.id.replace(' - Only#1', ''))}.png`} alt={analysis.only1Card.name} className="w-full rounded-md shadow" onError={(e) => { e.currentTarget.src = e.currentTarget.src.replace('.png', '.jpg'); }} />
-                                </div>
-                            </div>
-                        )}
-                        {renderCardSection("Avatar Cards", analysis.avatars)}
-                        {renderCardSection("Magic Cards", analysis.magics)}
-                        {renderCardSection("Construct Cards", analysis.constructs)}
-                        {analysis.otherCards.length > 0 && renderCardSection("Other Cards", analysis.otherCards)}
-                        {lifeDeck.length > 0 && renderCardSection("Life Deck", lifeDeck)}
-                        
-                        {/* Spacer for Mobile scrolling */}
+                        {analysis.only1Card && <div className="mb-6 flex flex-col items-center"><h4 className="text-lg font-semibold text-emerald-600 dark:text-emerald-300 mb-3">Only #1</h4><div className="relative w-36 mx-auto"><img src={`/cards/${encodePath(analysis.only1Card.imagePath)}/${encodeURIComponent(analysis.only1Card.id.replace(' - Only#1', ''))}.png`} alt={analysis.only1Card.name} className="w-full rounded-md shadow" onError={(e) => { e.currentTarget.src = e.currentTarget.src.replace('.png', '.jpg'); }} /></div></div>}
+                        {renderCardSection("Avatar Cards", analysis.avatars)}{renderCardSection("Magic Cards", analysis.magics)}{renderCardSection("Construct Cards", analysis.constructs)}{analysis.otherCards.length > 0 && renderCardSection("Other Cards", analysis.otherCards)}{lifeDeck.length > 0 && renderCardSection("Life Deck", lifeDeck)}
                         <div className="h-20 md:h-0"></div>
                     </div>
                 </div>
             </div>
-        </div>,
-        document.body
+        </div>, document.body
     );
 }
 
-// ---------------------------------------------------------
-// 📱 DeckListModal - Redesigned for Mobile Compact View
-// ---------------------------------------------------------
-
-function DeckListModal({
-  isOpen,
-  onClose,
-  userProfile,
-  userDecks,
-  setUserDecks,
-  mainDeck,
-  lifeDeck,
-  setMainDeck,
-  setLifeDeck,
-  showAlert,
-  setModal,
-  closeModal,
-  encodeDeckCode,
-  decodeDeckCode,
-  allCards,
-  onShowCards
-}) {
+function DeckListModal({ isOpen, onClose, userProfile, userDecks, setUserDecks, mainDeck, lifeDeck, setMainDeck, setLifeDeck, showAlert, setModal, closeModal, encodeDeckCode, decodeDeckCode, allCards, onShowCards }) {
   const [importingSlot, setImportingSlot] = useState(null);
   const [importCode, setImportCode] = useState('');
 
   if (!isOpen || !userProfile) return null;
-
   const email = userProfile.email;
-
   const getUserSlots = () => {
-    const defaultSlots = [
-      { name: "Slot 1", main: [], life: [] },
-      { name: "Slot 2", main: [], life: [] }
-    ];
+    const defaultSlots = [{ name: "Slot 1", main: [], life: [] }, { name: "Slot 2", main: [], life: [] }];
     const userData = userDecks[email] || { slots: defaultSlots };
-    if (!userDecks[email]) {
-      setUserDecks(prev => ({ ...prev, [email]: userData }));
-    }
+    if (!userDecks[email]) setUserDecks(prev => ({ ...prev, [email]: userData }));
     return userData.slots;
   };
-
   const slots = getUserSlots();
-
-  const updateSlots = (newSlots) => {
-    setUserDecks(prev => ({
-      ...prev,
-      [email]: { ...prev[email], slots: newSlots }
-    }));
-  };
-
-  const handleNameChange = (index, newName) => {
-    const newSlots = [...slots];
-    newSlots[index].name = newName;
-    updateSlots(newSlots);
-  };
-
-  const handleSave = (index) => {
-    const newSlots = [...slots];
-    newSlots[index] = { ...newSlots[index], main: mainDeck, life: lifeDeck };
-    updateSlots(newSlots);
-    showAlert("Deck Saved!", `บันทึกเด็คปัจจุบันลงใน "${newSlots[index].name}" แล้ว`);
-  };
-
-  const handleLoad = (index) => {
-    const slot = slots[index];
-    if (slot.main.length === 0 && slot.life.length === 0) {
-      showAlert("Empty Slot", "Slot นี้ว่างเปล่า ไม่มีอะไรให้โหลด");
-      return;
-    }
-    setMainDeck(slot.main);
-    setLifeDeck(slot.life);
-    showAlert("Deck Loaded!", `โหลดเด็ค "${slot.name}" เรียบร้อย`);
-    onClose();
-  };
-
-  const handleExport = (index) => {
-    const slot = slots[index];
-    if (slot.main.length === 0 && slot.life.length === 0) {
-      showAlert("Empty Slot", "ไม่สามารถ Export Slot ที่ว่างเปล่าได้");
-      return;
-    }
-    const code = encodeDeckCode(slot.main, slot.life);
-    navigator.clipboard.writeText(code)
-      .then(() => showAlert("Success!", `✅ คัดลอกรหัส Export ของ "${slot.name}" แล้ว!`))
-      .catch(err => showAlert("Error", "ไม่สามารถคัดลอกรหัสได้"));
-  };
-
-  const handleImport = (index) => {
-    setImportingSlot(index);
-    setImportCode('');
-  };
-
-  const confirmInternalImport = () => {
-    const decoded = decodeDeckCode(importCode, allCards);
-    if (decoded) {
-      const newSlots = [...slots];
-      newSlots[importingSlot].main = decoded.main;
-      newSlots[importingSlot].life = decoded.life;
-      updateSlots(newSlots);
-      showAlert("Import Success", `นำเข้าเด็คลงใน "${slots[importingSlot].name}" สำเร็จ!`);
-    } else {
-      showAlert("Import Error", "รหัสเด็คไม่ถูกต้อง หรือไม่พบการ์ด");
-    }
-    setImportingSlot(null);
-  };
-
-  const handleClearSlot = (index) => {
-    setModal({
-        title: "Clear Slot",
-        message: `คุณต้องการล้างข้อมูลใน "${slots[index].name}" ใช่หรือไม่?`,
-        onConfirm: () => {
-            const newSlots = [...slots];
-            newSlots[index] = { ...newSlots[index], main: [], life: [] };
-            updateSlots(newSlots);
-            closeModal();
-            showAlert("Slot Cleared", "ล้างข้อมูลเรียบร้อยแล้ว");
-        },
-        confirmText: "Clear",
-        confirmIcon: <TrashIcon />
-    });
-  };
-
+  const updateSlots = (newSlots) => setUserDecks(prev => ({ ...prev, [email]: { ...prev[email], slots: newSlots } }));
+  const handleNameChange = (index, newName) => { const newSlots = [...slots]; newSlots[index].name = newName; updateSlots(newSlots); };
+  const handleSave = (index) => { const newSlots = [...slots]; newSlots[index] = { ...newSlots[index], main: mainDeck, life: lifeDeck }; updateSlots(newSlots); showAlert("Deck Saved!", `บันทึกเด็คปัจจุบันลงใน "${newSlots[index].name}" แล้ว`); };
+  const handleLoad = (index) => { const slot = slots[index]; if (slot.main.length === 0 && slot.life.length === 0) { showAlert("Empty Slot", "Slot นี้ว่างเปล่า ไม่มีอะไรให้โหลด"); return; } setMainDeck(slot.main); setLifeDeck(slot.life); showAlert("Deck Loaded!", `โหลดเด็ค "${slot.name}" เรียบร้อย`); onClose(); };
+  const handleExport = (index) => { const slot = slots[index]; if (slot.main.length === 0 && slot.life.length === 0) { showAlert("Empty Slot", "ไม่สามารถ Export Slot ที่ว่างเปล่าได้"); return; } const code = encodeDeckCode(slot.main, slot.life); navigator.clipboard.writeText(code).then(() => showAlert("Success!", `✅ คัดลอกรหัส Export ของ "${slot.name}" แล้ว!`)).catch(err => showAlert("Error", "ไม่สามารถคัดลอกรหัสได้")); };
+  const handleImport = (index) => { setImportingSlot(index); setImportCode(''); };
+  const confirmInternalImport = () => { const decoded = decodeDeckCode(importCode, allCards); if (decoded) { const newSlots = [...slots]; newSlots[importingSlot].main = decoded.main; newSlots[importingSlot].life = decoded.life; updateSlots(newSlots); showAlert("Import Success", `นำเข้าเด็คลงใน "${slots[importingSlot].name}" สำเร็จ!`); } else { showAlert("Import Error", "รหัสเด็คไม่ถูกต้อง หรือไม่พบการ์ด"); } setImportingSlot(null); };
+  const handleClearSlot = (index) => { setModal({ title: "Clear Slot", message: `คุณต้องการล้างข้อมูลใน "${slots[index].name}" ใช่หรือไม่?`, onConfirm: () => { const newSlots = [...slots]; newSlots[index] = { ...newSlots[index], main: [], life: [] }; updateSlots(newSlots); closeModal(); showAlert("Slot Cleared", "ล้างข้อมูลเรียบร้อยแล้ว"); }, confirmText: "Clear", confirmIcon: <TrashIcon /> }); };
   const handleShareDeck = async (index) => {
-    const slot = slots[index];
-    const only1Card = slot.main.find(c => c.onlyRank === 1);
-    
-    if (!only1Card) {
-      showAlert("ไม่สามารถแชร์ได้", "เด็คของคุณต้องมี 'Only #1' Card (การ์ดหลัก) ก่อนจึงจะแชร์ได้ค่ะ");
-      return;
-    }
-
+    const slot = slots[index]; const only1Card = slot.main.find(c => c.onlyRank === 1);
+    if (!only1Card) { showAlert("ไม่สามารถแชร์ได้", "เด็คของคุณต้องมี 'Only #1' Card (การ์ดหลัก) ก่อนจึงจะแชร์ได้ค่ะ"); return; }
     try {
       const q = query(collection(db, "publicDecks"), where("user.email", "==", userProfile.email));
       const querySnapshot = await getDocs(q);
       const existingDecks = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-
       const performShare = async (targetDeckId = null) => {
         closeModal();
         try {
@@ -1383,553 +358,123 @@ function DeckListModal({
           const deckId = newDeckRef.id;
           const allCardsInDeck = [...slot.main, ...slot.life];
           const factions = [...new Set(allCardsInDeck.map(c => c.faction).filter(Boolean))];
-          
-          const listData = {
-            deckName: slot.name,
-            only1CardData: { id: only1Card.id, name: only1Card.name, imagePath: only1Card.imagePath },
-            user: { name: userProfile.name, picture: userProfile.picture, email: userProfile.email },
-            sharedAt: serverTimestamp(),
-            likeCount: 0, likedBy: [], factions: factions, viewCount: 0
-          };
+          const listData = { deckName: slot.name, only1CardData: { id: only1Card.id, name: only1Card.name, imagePath: only1Card.imagePath }, user: { name: userProfile.name, picture: userProfile.picture, email: userProfile.email }, sharedAt: serverTimestamp(), likeCount: 0, likedBy: [], factions: factions, viewCount: 0 };
           const detailData = { mainDeck: slot.main.map(c => c.id), lifeDeck: slot.life.map(c => c.id) };
-
-          batch.set(newDeckRef, listData); 
-          batch.set(doc(db, "publicDeckDetails", deckId), detailData);
-          await batch.commit();
-
+          batch.set(newDeckRef, listData); batch.set(doc(db, "publicDeckDetails", deckId), detailData); await batch.commit();
           showAlert(targetDeckId ? "เขียนทับเรียบร้อย!" : "แชร์เด็คสำเร็จ!", `เด็ค "${slot.name}" ถูกแชร์แล้ว!`);
         } catch (e) { console.error(e); showAlert("Error", "แชร์ไม่สำเร็จ"); }
       };
-
       if (existingDecks.length >= 2) {
-        setModal({
-          isOpen: true, title: "โควตาเต็ม (Max 2 Decks)",
-          message: (
-            <div className="flex flex-col gap-3"><p>คุณแชร์ครบ 2 เด็คแล้ว เลือกเด็คที่ต้องการเขียนทับ:</p>
-              <div className="flex flex-col gap-2 mt-2">
-                {existingDecks.map(d => (
-                  <button key={d.id} onClick={() => performShare(d.id)} className="p-3 rounded border hover:bg-red-50 text-left font-bold">{d.deckName}</button>
-                ))}
-              </div>
-              <button onClick={closeModal} className="mt-2 text-sm underline self-center">ยกเลิก</button>
-            </div>
-          ), confirmText: null
-        });
-      } else {
-        setModal({ isOpen: true, title: "Confirm Share", message: `แชร์เด็ค "${slot.name}" สู่สาธารณะ?`, onConfirm: () => performShare(null), confirmText: "Share", confirmIcon: <UploadIcon /> });
-      }
+        setModal({ isOpen: true, title: "โควตาเต็ม (Max 2 Decks)", message: (<div className="flex flex-col gap-3"><p>คุณแชร์ครบ 2 เด็คแล้ว เลือกเด็คที่ต้องการเขียนทับ:</p><div className="flex flex-col gap-2 mt-2">{existingDecks.map(d => (<button key={d.id} onClick={() => performShare(d.id)} className="p-3 rounded border hover:bg-red-50 text-left font-bold">{d.deckName}</button>))}</div><button onClick={closeModal} className="mt-2 text-sm underline self-center">ยกเลิก</button></div>), confirmText: null });
+      } else { setModal({ isOpen: true, title: "Confirm Share", message: `แชร์เด็ค "${slot.name}" สู่สาธารณะ?`, onConfirm: () => performShare(null), confirmText: "Share", confirmIcon: <UploadIcon /> }); }
     } catch (e) { console.error(e); showAlert("Error", "ตรวจสอบข้อมูลไม่สำเร็จ"); }
   };
 
   return createPortal(
-    <>
-      <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-[220] p-4">
-        <div className="bg-slate-100 dark:bg-slate-900/90 border border-slate-300 dark:border-emerald-500/30 rounded-xl shadow-2xl w-full max-w-4xl max-h-[85vh] flex flex-col">
-          <header className="flex items-center justify-between p-4 border-b border-slate-300 dark:border-emerald-500/20 shrink-0">
-            <h2 className="text-2xl font-bold text-slate-900 dark:text-white">My Decks</h2>
-            <Button onClick={onClose} className="px-3 py-1 text-sm">Close</Button>
-          </header>
-          
-          <div className="flex-grow overflow-y-auto p-4">
-            <p className="text-sm text-slate-600 dark:text-gray-400 mb-4">
-              Account: <span className="font-bold text-amber-600 dark:text-amber-300">{userProfile.name}</span>
-            </p>
-            
-            {/* 🟢 Grid Layout ที่ปรับ Responsive */}
-            <div className="flex flex-col md:grid md:grid-cols-2 gap-4">
-              {slots.map((slot, index) => {
-                const deckSize = slot.main.length + slot.life.length;
-                const only1Card = slot.main.find(c => c.onlyRank === 1);
-                let coverImage = null;
-                if (only1Card) {
-                  const encodedImagePath = encodePath(only1Card.imagePath);
-                  const fileId = only1Card.id.replace(' - Only#1', '');
-                  coverImage = `/cards/${encodedImagePath}/${encodeURIComponent(fileId)}.png`;
-                }
-
-                return (
-                  <div key={index} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-3 shadow-sm hover:shadow-md transition-shadow">
-                    
-                    {/* 📱 Mobile: Flex Row / 💻 Desktop: Flex Col (บางส่วน) */}
-                    <div className="flex flex-row md:flex-col gap-3 h-full">
-                      
-                      {/* 🖼️ Cover Image */}
-                      <div className="shrink-0 w-20 h-28 md:w-full md:h-40 bg-slate-200 dark:bg-slate-900 rounded-lg overflow-hidden relative flex items-center justify-center">
-                        {coverImage ? (
-                          <img src={coverImage} alt="Cover" className="w-full h-full object-cover md:object-contain" />
-                        ) : (
-                          <span className="text-2xl">🃏</span>
-                        )}
-                         <div className="absolute bottom-0 right-0 bg-black/60 text-white text-[10px] px-1.5 py-0.5 rounded-tl-md">
-                            {deckSize} Cards
-                          </div>
-                      </div>
-
-                      {/* 📝 Info & Actions */}
-                      <div className="flex-grow flex flex-col justify-between min-w-0">
-                        <div className="mb-2">
-                           <input
-                            type="text"
-                            value={slot.name}
-                            onChange={(e) => handleNameChange(index, e.target.value)}
-                            className="w-full bg-transparent border-b border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white font-bold text-lg focus:border-emerald-500 outline-none py-1"
-                          />
-                        </div>
-
-                        {/* 🟢 Action Buttons Group */}
-                        <div className="flex flex-col gap-2">
-                            {/* Primary Actions (Load/Save) */}
-                            <div className="flex gap-2">
-                                <Button onClick={() => handleLoad(index)} disabled={deckSize === 0} className="flex-1 py-1.5 text-xs bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300 border-emerald-200">
-                                    Load
-                                </Button>
-                                <Button onClick={() => handleSave(index)} className="flex-1 py-1.5 text-xs bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 border-amber-200">
-                                    Save
-                                </Button>
-                            </div>
-
-                            {/* Secondary Actions (Icons Row) */}
-                            <div className="flex items-center justify-between gap-1 mt-1">
-                                <button onClick={() => onShowCards({ main: slot.main, life: slot.life })} disabled={deckSize === 0} className="p-2 rounded-lg text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/20 disabled:opacity-30" title="Show Cards"><EyeIcon /></button>
-                                <button onClick={() => handleImport(index)} className="p-2 rounded-lg text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-700" title="Import"><ImportIcon /></button>
-                                <button onClick={() => handleExport(index)} disabled={deckSize === 0} className="p-2 rounded-lg text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-700 disabled:opacity-30" title="Export"><ExportIcon /></button>
-                                <button onClick={() => handleShareDeck(index)} disabled={deckSize === 0} className="p-2 rounded-lg text-purple-600 hover:bg-purple-50 dark:text-purple-400 dark:hover:bg-purple-900/20 disabled:opacity-30" title="Share"><ShareIconNew /></button>
-                                <div className="w-px h-4 bg-slate-300 dark:bg-slate-600 mx-1"></div>
-                                <button onClick={() => handleClearSlot(index)} className="p-2 rounded-lg text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20" title="Clear"><TrashIcon /></button>
-                            </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Import Modal (Sub-modal) */}
-      {importingSlot !== null && createPortal(
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[230] p-4">
-          <div className="bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-emerald-500/30 rounded-xl shadow-2xl p-6 w-full max-w-md">
-            <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4">Import to "{slots[importingSlot].name}"</h2>
-            <textarea
-              value={importCode}
-              onChange={(e) => setImportCode(e.target.value)}
-              placeholder="วางรหัสเด็คที่นี่..."
-              rows="4"
-              className="w-full px-3 py-2 border border-slate-300 dark:border-emerald-500/30 rounded-lg focus:ring-2 focus:ring-amber-500 focus:outline-none bg-white dark:bg-slate-700/50 text-slate-900 dark:text-white mb-4 resize-none"
-            />
-            <div className="flex justify-end gap-3">
-              <Button onClick={() => setImportingSlot(null)} className="bg-slate-200 dark:bg-slate-700/50 text-slate-700 dark:text-gray-300">Cancel</Button>
-              <Button onClick={confirmInternalImport} className="bg-emerald-600 text-white hover:bg-emerald-500 border-none"><ImportIcon /> Import</Button>
-            </div>
-          </div>
-        </div>, document.body
-      )}
-    </>,
-    document.body
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-[220] p-4">
+      <div className="bg-slate-100 dark:bg-slate-900/90 border border-slate-300 dark:border-emerald-500/30 rounded-xl shadow-2xl w-full max-w-4xl max-h-[85vh] flex flex-col">
+        <header className="flex items-center justify-between p-4 border-b border-slate-300 dark:border-emerald-500/20 shrink-0"><h2 className="text-2xl font-bold text-slate-900 dark:text-white">My Decks</h2><Button onClick={onClose} className="px-3 py-1 text-sm">Close</Button></header>
+        <div className="flex-grow overflow-y-auto p-4"><p className="text-sm text-slate-600 dark:text-gray-400 mb-4">Account: <span className="font-bold text-amber-600 dark:text-amber-300">{userProfile.name}</span></p><div className="flex flex-col md:grid md:grid-cols-2 gap-4">{slots.map((slot, index) => { const deckSize = slot.main.length + slot.life.length; const only1Card = slot.main.find(c => c.onlyRank === 1); let coverImage = null; if (only1Card) { const encodedImagePath = encodePath(only1Card.imagePath); const fileId = only1Card.id.replace(' - Only#1', ''); coverImage = `/cards/${encodedImagePath}/${encodeURIComponent(fileId)}.png`; } return (<div key={index} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-3 shadow-sm hover:shadow-md transition-shadow"><div className="flex flex-row md:flex-col gap-3 h-full"><div className="shrink-0 w-20 h-28 md:w-full md:h-40 bg-slate-200 dark:bg-slate-900 rounded-lg overflow-hidden relative flex items-center justify-center">{coverImage ? (<img src={coverImage} alt="Cover" className="w-full h-full object-cover md:object-contain" />) : (<span className="text-2xl">🃏</span>)}<div className="absolute bottom-0 right-0 bg-black/60 text-white text-[10px] px-1.5 py-0.5 rounded-tl-md">{deckSize} Cards</div></div><div className="flex-grow flex flex-col justify-between min-w-0"><div className="mb-2"><input type="text" value={slot.name} onChange={(e) => handleNameChange(index, e.target.value)} className="w-full bg-transparent border-b border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white font-bold text-lg focus:border-emerald-500 outline-none py-1" /></div><div className="flex flex-col gap-2"><div className="flex gap-2"><Button onClick={() => handleLoad(index)} disabled={deckSize === 0} className="flex-1 py-1.5 text-xs bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300 border-emerald-200">Load</Button><Button onClick={() => handleSave(index)} className="flex-1 py-1.5 text-xs bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 border-amber-200">Save</Button></div><div className="flex items-center justify-between gap-1 mt-1"><button onClick={() => onShowCards({ main: slot.main, life: slot.life })} disabled={deckSize === 0} className="p-2 rounded-lg text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/20 disabled:opacity-30" title="Show Cards"><EyeIcon /></button><button onClick={() => handleImport(index)} className="p-2 rounded-lg text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-700" title="Import"><ImportIcon /></button><button onClick={() => handleExport(index)} disabled={deckSize === 0} className="p-2 rounded-lg text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-700 disabled:opacity-30" title="Export"><ExportIcon /></button><button onClick={() => handleShareDeck(index)} disabled={deckSize === 0} className="p-2 rounded-lg text-purple-600 hover:bg-purple-50 dark:text-purple-400 dark:hover:bg-purple-900/20 disabled:opacity-30" title="Share"><ShareIconNew /></button><div className="w-px h-4 bg-slate-300 dark:bg-slate-600 mx-1"></div><button onClick={() => handleClearSlot(index)} className="p-2 rounded-lg text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20" title="Clear"><TrashIcon /></button></div></div></div></div></div>); })}</div></div></div>
+      {importingSlot !== null && createPortal(<div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[230] p-4"><div className="bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-emerald-500/30 rounded-xl shadow-2xl p-6 w-full max-w-md"><h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4">Import to "{slots[importingSlot].name}"</h2><textarea value={importCode} onChange={(e) => setImportCode(e.target.value)} placeholder="วางรหัสเด็คที่นี่..." rows="4" className="w-full px-3 py-2 border border-slate-300 dark:border-emerald-500/30 rounded-lg focus:ring-2 focus:ring-amber-500 focus:outline-none bg-white dark:bg-slate-700/50 text-slate-900 dark:text-white mb-4 resize-none" /><div className="flex justify-end gap-3"><Button onClick={() => setImportingSlot(null)} className="bg-slate-200 dark:bg-slate-700/50 text-slate-700 dark:text-gray-300">Cancel</Button><Button onClick={confirmInternalImport} className="bg-emerald-600 text-white hover:bg-emerald-500 border-none"><ImportIcon /> Import</Button></div></div></div>, document.body)}
+    </div>, document.body
   );
 }
 
 // === Sidebar ===
-function LeftSidebar({
-  isSidebarOpen,
-  searchTerm,
-  setSearchTerm,
-  allCardTypes,
-  filterTypes,
-  setFilterTypes,
-  filterMagicType,
-  setFilterMagicType,
-  allColorTypes,
-  filterColors,
-  setFilterColors,
-  allRarities,
-  filterRarities,
-  setFilterRarities,
-  allSets,
-  selectedSets,
-  onSetSelectionChange,
-  statFilters,
-  onStatFilterChange,
-  mainDeck,
-  lifeDeck,
-  RULES,
-  addToMain,
-  addToLife,
-  removeFromMain,
-  removeFromLife,
-  handleImport,
-  handleExport,
-  handleClear,
-  handleReloadFromTxt,
-  mainDeckRef,
-  onViewDeck,
-  onAnalyzeDeck,
-  isLoadingAnalysis,
-}) {
+function LeftSidebar({ isSidebarOpen, searchTerm, setSearchTerm, allCardTypes, filterTypes, setFilterTypes, filterMagicType, setFilterMagicType, allColorTypes, filterColors, setFilterColors, allRarities, filterRarities, setFilterRarities, allSets, selectedSets, onSetSelectionChange, statFilters, onStatFilterChange, mainDeck, lifeDeck, RULES, addToMain, addToLife, removeFromMain, removeFromLife, handleImport, handleExport, handleClear, handleReloadFromTxt, mainDeckRef, onViewDeck, onAnalyzeDeck, isLoadingAnalysis }) {
   const allMagicTypes = ["Modification", "Land", "React", "Normal"];
-  const handleToggle = (setter, value) => {
-    setter((prev) =>
-      prev.includes(value)
-        ? prev.filter((item) => item !== value)
-        : [...prev, value]
-    );
-  };
+  const handleToggle = (setter, value) => setter((prev) => prev.includes(value) ? prev.filter((item) => item !== value) : [...prev, value]);
   return (
-    <aside
-      className={`
-        w-full h-full flex flex-col 
-        p-4 
-        bg-transparent
-        overflow-y-auto overflow-x-hidden /* ✅ ให้ scroll ทั้งก้อนที่ตรงนี้ */
-        scrollbar-thin scrollbar-thumb-slate-400 dark:scrollbar-thumb-slate-600
-        md:w-full md:shrink-0 md:border-r border-slate-300 dark:border-emerald-700/30 
-        z-30 
-        transition-opacity duration-300 
-        ${isSidebarOpen ? "opacity-100" : "opacity-0 md:opacity-100"}
-      `}
-    >
-      {/* 🟢 ส่วนรายการ Filter */}
-      <div className="space-y-4 pb-4"> {/* ลบ flex-1 overflow-y-auto ออก */}
-        <div>
-          <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-2">Filters</h2>
-          <input
-            type="search"
-            placeholder="ค้นหาชื่อการ์ด..."
-            className="w-full px-4 py-2 border border-slate-300 dark:border-emerald-500/30 rounded-lg focus:ring-2 focus:ring-amber-500 focus:outline-none transition bg-white/50 dark:bg-slate-700/50 placeholder-gray-500 dark:placeholder-gray-400 text-slate-900 dark:text-white"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </div>
-        
-        {/* Filters: Card Type */}
-        {allCardTypes.length > 0 && (
-          <div className="flex flex-wrap gap-2">
-            <button onClick={() => setFilterTypes([])} className={`px-3 py-1 text-sm rounded-full transition-colors ${filterTypes.length === 0 ? "bg-amber-500 text-white font-semibold shadow" : "bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-700 dark:text-gray-300"}`}>All</button>
-            {allCardTypes.map((type) => (
-              <button key={type} onClick={() => handleToggle(setFilterTypes, type)} className={`px-3 py-1 text-sm rounded-full transition-colors ${filterTypes.includes(type) ? "bg-amber-500 text-white font-semibold shadow" : "bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-700 dark:text-gray-300"}`}>{type}</button>
-            ))}
-          </div>
-        )}
-
-        {/* Filters: Magic Subtype */}
-        {filterTypes.includes("Magic") && (
-          <div className="pl-4 mt-2 border-l-2 border-slate-300 dark:border-slate-600">
-            <h3 className="text-sm font-semibold text-slate-500 dark:text-gray-400 mt-2 mb-2 uppercase tracking-wider">Magic Type</h3>
-            <div className="flex flex-wrap gap-2">
-              {["All", ...allMagicTypes].map((magicType) => (
-                <button key={magicType} onClick={() => setFilterMagicType(magicType)} className={`px-3 py-1 text-xs rounded-full transition-colors ${filterMagicType === magicType ? "bg-amber-600 text-white font-semibold shadow" : "bg-slate-300 dark:bg-slate-600 hover:bg-slate-400 dark:hover:bg-slate-500 text-slate-700 dark:text-gray-300"}`}>{magicType}</button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Filters: Color */}
-        {allColorTypes.length > 0 && (
-          <div>
-            <h3 className="text-sm font-semibold text-slate-500 dark:text-gray-400 mt-4 mb-2 uppercase tracking-wider">Color</h3>
-            <div className="flex flex-wrap gap-2">
-              <button onClick={() => setFilterColors([])} className={`px-3 py-1 text-sm rounded-full transition-colors ${filterColors.length === 0 ? "bg-amber-500 text-white font-semibold shadow" : "bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-700 dark:text-gray-300"}`}>All</button>
-              {allColorTypes.map((color) => (
-                <button key={color} onClick={() => handleToggle(setFilterColors, color)} className={`px-3 py-1 text-sm rounded-full transition-colors ${filterColors.includes(color) ? "bg-amber-500 text-white font-semibold shadow" : "bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-700 dark:text-gray-300"}`}>{color}</button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Filters: Rarity */}
-        {allRarities.length > 0 && (
-          <div>
-            <h3 className="text-sm font-semibold text-slate-500 dark:text-gray-400 mt-4 mb-2 uppercase tracking-wider">Rarity</h3>
-            <div className="flex flex-wrap gap-2">
-              <button onClick={() => setFilterRarities([])} className={`px-3 py-1 text-sm rounded-full transition-colors ${filterRarities.length === 0 ? "bg-amber-500 text-white font-semibold shadow" : "bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-700 dark:text-gray-300"}`}>All</button>
-              {allRarities.map((rarity) => (
-                <button key={rarity} onClick={() => handleToggle(setFilterRarities, rarity)} className={`px-3 py-1 text-sm rounded-full transition-colors ${filterRarities.includes(rarity) ? "bg-amber-500 text-white font-semibold shadow" : "bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-700 dark:text-gray-300"}`}>{rarity}</button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Filters: Sets */}
-        {allSets.length > 0 && (
-          <div>
-            <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2 mt-4">Sets</h3>
-            <div className="space-y-2 max-h-40 overflow-y-auto pr-2 border border-slate-200 dark:border-slate-700 rounded p-2">
-              {allSets.map((set) => (
-                <label key={set} className="flex items-center gap-2 text-slate-700 dark:text-gray-300 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 p-1 rounded">
-                  <input type="checkbox" checked={selectedSets.includes(set)} onChange={() => onSetSelectionChange(set)} className="w-4 h-4 rounded bg-slate-200 dark:bg-slate-600 border-slate-400 dark:border-slate-500 text-amber-500 focus:ring-amber-500" />
-                  {typeof set === "string" ? set.split("/")[1] || set : set}
-                </label>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Filters: Stats */}
-        <div>
-          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2 mt-4">Stats</h3>
-          <div className="grid grid-cols-3 gap-2 text-sm">
-            {["cost", "power", "gem"].map((stat) => (
-              <div key={stat}>
-                <label className="capitalize text-slate-500 dark:text-gray-400">{stat}</label>
-                
-                {/* 🟢 Min Dropdown */}
-                <select 
-                    value={statFilters[stat].min} 
-                    onChange={(e) => onStatFilterChange(stat, "min", e.target.value)} 
-                    className="w-full mt-1 px-2 py-1 border border-slate-300 dark:border-emerald-500/30 rounded-md bg-white/50 dark:bg-slate-700/50 text-slate-900 dark:text-white text-center appearance-none cursor-pointer"
-                >
-                    <option value="">Min</option>
-                    {[...Array(11).keys()].map(n => (
-                        <option key={n} value={n}>{n}</option>
-                    ))}
-                </select>
-
-                {/* 🟢 Max Dropdown */}
-                <select 
-                    value={statFilters[stat].max} 
-                    onChange={(e) => onStatFilterChange(stat, "max", e.target.value)} 
-                    className="w-full mt-1 px-2 py-1 border border-slate-300 dark:border-emerald-500/30 rounded-md bg-white/50 dark:bg-slate-700/50 text-slate-900 dark:text-white text-center appearance-none cursor-pointer"
-                >
-                    <option value="">Max</option>
-                    {[...Array(11).keys()].map(n => (
-                        <option key={n} value={n}>{n}</option>
-                    ))}
-                </select>
-              </div>
-            ))}
-          </div>
-        </div>
+    <aside className={`w-full h-full flex flex-col p-4 bg-transparent overflow-y-auto overflow-x-hidden scrollbar-thin scrollbar-thumb-slate-400 dark:scrollbar-thumb-slate-600 md:w-full md:shrink-0 md:border-r border-slate-300 dark:border-emerald-700/30 z-30 transition-opacity duration-300 ${isSidebarOpen ? "opacity-100" : "opacity-0 md:opacity-100"}`}>
+      <div className="space-y-4 pb-4">
+        <div><h2 className="text-xl font-bold text-slate-900 dark:text-white mb-2">Filters</h2><input type="search" placeholder="ค้นหาชื่อการ์ด..." className="w-full px-4 py-2 border border-slate-300 dark:border-emerald-500/30 rounded-lg focus:ring-2 focus:ring-amber-500 focus:outline-none transition bg-white/50 dark:bg-slate-700/50 placeholder-gray-500 dark:placeholder-gray-400 text-slate-900 dark:text-white" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} /></div>
+        {allCardTypes.length > 0 && (<div className="flex flex-wrap gap-2"><button onClick={() => setFilterTypes([])} className={`px-3 py-1 text-sm rounded-full transition-colors ${filterTypes.length === 0 ? "bg-amber-500 text-white font-semibold shadow" : "bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-700 dark:text-gray-300"}`}>All</button>{allCardTypes.map((type) => (<button key={type} onClick={() => handleToggle(setFilterTypes, type)} className={`px-3 py-1 text-sm rounded-full transition-colors ${filterTypes.includes(type) ? "bg-amber-500 text-white font-semibold shadow" : "bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-700 dark:text-gray-300"}`}>{type}</button>))}</div>)}
+        {filterTypes.includes("Magic") && (<div className="pl-4 mt-2 border-l-2 border-slate-300 dark:border-slate-600"><h3 className="text-sm font-semibold text-slate-500 dark:text-gray-400 mt-2 mb-2 uppercase tracking-wider">Magic Type</h3><div className="flex flex-wrap gap-2">{["All", ...allMagicTypes].map((magicType) => (<button key={magicType} onClick={() => setFilterMagicType(magicType)} className={`px-3 py-1 text-xs rounded-full transition-colors ${filterMagicType === magicType ? "bg-amber-600 text-white font-semibold shadow" : "bg-slate-300 dark:bg-slate-600 hover:bg-slate-400 dark:hover:bg-slate-500 text-slate-700 dark:text-gray-300"}`}>{magicType}</button>))}</div></div>)}
+        {allColorTypes.length > 0 && (<div><h3 className="text-sm font-semibold text-slate-500 dark:text-gray-400 mt-4 mb-2 uppercase tracking-wider">Color</h3><div className="flex flex-wrap gap-2"><button onClick={() => setFilterColors([])} className={`px-3 py-1 text-sm rounded-full transition-colors ${filterColors.length === 0 ? "bg-amber-500 text-white font-semibold shadow" : "bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-700 dark:text-gray-300"}`}>All</button>{allColorTypes.map((color) => (<button key={color} onClick={() => handleToggle(setFilterColors, color)} className={`px-3 py-1 text-sm rounded-full transition-colors ${filterColors.includes(color) ? "bg-amber-500 text-white font-semibold shadow" : "bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-700 dark:text-gray-300"}`}>{color}</button>))}</div></div>)}
+        {allRarities.length > 0 && (<div><h3 className="text-sm font-semibold text-slate-500 dark:text-gray-400 mt-4 mb-2 uppercase tracking-wider">Rarity</h3><div className="flex flex-wrap gap-2"><button onClick={() => setFilterRarities([])} className={`px-3 py-1 text-sm rounded-full transition-colors ${filterRarities.length === 0 ? "bg-amber-500 text-white font-semibold shadow" : "bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-700 dark:text-gray-300"}`}>All</button>{allRarities.map((rarity) => (<button key={rarity} onClick={() => handleToggle(setFilterRarities, rarity)} className={`px-3 py-1 text-sm rounded-full transition-colors ${filterRarities.includes(rarity) ? "bg-amber-500 text-white font-semibold shadow" : "bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-700 dark:text-gray-300"}`}>{rarity}</button>))}</div></div>)}
+        {allSets.length > 0 && (<div><h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2 mt-4">Sets</h3><div className="space-y-2 max-h-40 overflow-y-auto pr-2 border border-slate-200 dark:border-slate-700 rounded p-2">{allSets.map((set) => (<label key={set} className="flex items-center gap-2 text-slate-700 dark:text-gray-300 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 p-1 rounded"><input type="checkbox" checked={selectedSets.includes(set)} onChange={() => onSetSelectionChange(set)} className="w-4 h-4 rounded bg-slate-200 dark:bg-slate-600 border-slate-400 dark:border-slate-500 text-amber-500 focus:ring-amber-500" />{typeof set === "string" ? set.split("/")[1] || set : set}</label>))}</div></div>)}
+        <div><h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2 mt-4">Stats</h3><div className="grid grid-cols-3 gap-2 text-sm">{["cost", "power", "gem"].map((stat) => (<div key={stat}><label className="capitalize text-slate-500 dark:text-gray-400">{stat}</label><select value={statFilters[stat].min} onChange={(e) => onStatFilterChange(stat, "min", e.target.value)} className="w-full mt-1 px-2 py-1 border border-slate-300 dark:border-emerald-500/30 rounded-md bg-white/50 dark:bg-slate-700/50 text-slate-900 dark:text-white text-center appearance-none cursor-pointer"><option value="">Min</option>{[...Array(11).keys()].map(n => (<option key={n} value={n}>{n}</option>))}</select><select value={statFilters[stat].max} onChange={(e) => onStatFilterChange(stat, "max", e.target.value)} className="w-full mt-1 px-2 py-1 border border-slate-300 dark:border-emerald-500/30 rounded-md bg-white/50 dark:bg-slate-700/50 text-slate-900 dark:text-white text-center appearance-none cursor-pointer"><option value="">Max</option>{[...Array(11).keys()].map(n => (<option key={n} value={n}>{n}</option>))}</select></div>))}</div></div>
       </div>
-      {/* 🟢 ส่วน Bottom (Deck Trays & Buttons) - ตอนนี้รวมอยู่ใน Flow เดียวกันแล้ว */}
-      <div className="pt-4 pb-20 border-t border-slate-300 dark:border-emerald-700/30 bg-transparent">
-        <div className="flex flex-col gap-4 mb-4">
-          <DeckTray ref={mainDeckRef} title={`Main Deck`} deck={mainDeck} capacity={RULES.main.size} onDropCard={addToMain} onRemoveCard={removeFromMain} highlight onViewDeck={() => onViewDeck("main")} />
-          <DeckTray title={`Life Deck`} deck={lifeDeck} capacity={RULES.life.size} onDropCard={addToLife} onRemoveCard={removeFromLife} onViewDeck={() => onViewDeck("life")} />
-        </div>
-        <Button onClick={onAnalyzeDeck} disabled={isLoadingAnalysis} className="w-full bg-emerald-200 dark:bg-emerald-600/30 border-emerald-300 dark:border-emerald-500/30 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-300 dark:hover:bg-emerald-500/50 dark:hover:text-white">
-          {isLoadingAnalysis ? "กำลังประมวลผล..." : "สร้างเด็ค"}
-        </Button>
-        <div className="grid grid-cols-2 gap-2 pt-4 mt-4 border-t border-slate-300 dark:border-emerald-700/30">
-          <Button onClick={handleImport}><ImportIcon /> Import</Button>
-          <Button onClick={handleExport}><ExportIcon /> Export</Button>
-          <Button onClick={handleClear} className="col-span-2 bg-red-200 dark:bg-red-900/50 border-red-300 dark:border-red-500/30 text-red-700 dark:text-red-300 hover:bg-red-300 dark:hover:bg-red-800/50 dark:hover:text-white"><TrashIcon /> Clear Deck</Button>
-          <Button onClick={handleReloadFromTxt} className="col-span-2"><DBLoadIcon /> Reload from TXT</Button>
-        </div>
-      </div>
+      <div className="pt-4 pb-20 border-t border-slate-300 dark:border-emerald-700/30 bg-transparent"><div className="flex flex-col gap-4 mb-4"><DeckTray ref={mainDeckRef} title={`Main Deck`} deck={mainDeck} capacity={RULES.main.size} onDropCard={addToMain} onRemoveCard={removeFromMain} highlight onViewDeck={() => onViewDeck("main")} /><DeckTray title={`Life Deck`} deck={lifeDeck} capacity={RULES.life.size} onDropCard={addToLife} onRemoveCard={removeFromLife} onViewDeck={() => onViewDeck("life")} /></div><Button onClick={onAnalyzeDeck} disabled={isLoadingAnalysis} className="w-full bg-emerald-200 dark:bg-emerald-600/30 border-emerald-300 dark:border-emerald-500/30 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-300 dark:hover:bg-emerald-500/50 dark:hover:text-white">{isLoadingAnalysis ? "กำลังประมวลผล..." : "สร้างเด็ค"}</Button><div className="grid grid-cols-2 gap-2 pt-4 mt-4 border-t border-slate-300 dark:border-emerald-700/30"><Button onClick={handleImport}><ImportIcon /> Import</Button><Button onClick={handleExport}><ExportIcon /> Export</Button><Button onClick={handleClear} className="col-span-2 bg-red-200 dark:bg-red-900/50 border-red-300 dark:border-red-500/30 text-red-700 dark:text-red-300 hover:bg-red-300 dark:hover:bg-red-800/50 dark:hover:text-white"><TrashIcon /> Clear Deck</Button><Button onClick={handleReloadFromTxt} className="col-span-2"><DBLoadIcon /> Reload from TXT</Button></div></div>
     </aside>
   );
 }
 
 // === Card grid (right) ===
 function CardGrid({ cards, onDoubleClick, onViewDetails, onAddCard, onAuction }) {
-  // 🟢 1. เพิ่ม State ที่ตัวแม่ เพื่อจำว่า "การ์ดใบไหน" (index ไหน) กำลังซูมอยู่
-  // เก็บเป็น string unique key (เช่น "cardID-index")
   const [activeZoomKey, setActiveZoomKey] = useState(null);
-
-  const handleMobileZoom = (key) => {
-    // ถ้ากดซ้ำใบเดิม -> ให้ปิด (set null)
-    // ถ้ากดใบใหม่ -> ให้ set เป็น key ใหม่ (ใบเก่าจะปิดเองอัตโนมัติ)
-    setActiveZoomKey(prev => prev === key ? null : key);
-  };
-
-  if (cards.length === 0) {
-    return (
-      <CardShell>
-        <div className="text-center py-16 text-slate-600 dark:text-slate-300">
-          ไม่พบการ์ดตามเงื่อนไข
-        </div>
-      </CardShell>
-    );
-  }
-
-  return (
-    <div className="
-      grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 
-      gap-x-2 gap-y-4 
-      pb-32 
-    ">
-      {cards.map((card, index) => {
-        const uniqueKey = `${card.id}-${index}`;
-        return (
-          <CardItem
-            key={uniqueKey}
-            card={card}
-            onDoubleClick={onDoubleClick}
-            onViewDetails={onViewDetails}
-            onAddCard={onAddCard}
-            isMobileZoomed={activeZoomKey === uniqueKey} 
-            onMobileClick={() => handleMobileZoom(uniqueKey)}
-            onAuction={onAuction}
-          />
-        );
-      })}
-    </div>
-  );
+  const handleMobileZoom = (key) => setActiveZoomKey(prev => prev === key ? null : key);
+  if (cards.length === 0) return (<CardShell><div className="text-center py-16 text-slate-600 dark:text-slate-300">ไม่พบการ์ดตามเงื่อนไข</div></CardShell>);
+  return (<div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-x-2 gap-y-4 pb-32">{cards.map((card, index) => { const uniqueKey = `${card.id}-${index}`; return (<CardItem key={uniqueKey} card={card} onDoubleClick={onDoubleClick} onViewDetails={onViewDetails} onAddCard={onAddCard} isMobileZoomed={activeZoomKey === uniqueKey} onMobileClick={() => handleMobileZoom(uniqueKey)} onAuction={onAuction} />); })}</div>);
 }
 
-// 📍 [แก้ไข] วางทับตัวแปร CARD_PATHS เดิม
-
+// === Constants and Functions ===
 const CARD_PATHS = [
-  // --- Starter Decks (จากครั้งก่อน) ---
-  { 
-    path: "002.STARTER DECK (SD01 - SD07)/SD01 - ตัวตึงไกรลาส", 
-    file: "cardsSD01 - ตัวตึงไกรลาส.txt" 
-  },
-  { 
-    path: "002.STARTER DECK (SD01 - SD07)/SD02 - วีรบุรุษปากซอย", 
-    file: "cardsSD02 - วีรบุรุษปากซอย.txt" 
-  },
-  { 
-    path: "002.STARTER DECK (SD01 - SD07)/SD03 - นรกก็แค่น้ำพริก", 
-    file: "cardsSD03 - นรกก็แค่น้ำพริก.txt" 
-  },
-  { 
-    path: "002.STARTER DECK (SD01 - SD07)/SD04 - ทหารไก่ชนเขา", 
-    file: "cardsSD04 - ทหารไก่ชนเขา.txt" 
-  },
-  { 
-    path: "002.STARTER DECK (SD01 - SD07)/SD05 - กำเนิดจากน้ำ", 
-    file: "cardsSD05 - กำเนิดจากน้ำ.txt" 
-  },
-  { 
-    path: "002.STARTER DECK (SD01 - SD07)/SD06 - ๖ ประจัญบาน", 
-    file: "cardsSD06 - ๖ ประจัญบาน.txt" 
-  },
-  { 
-    path: "002.STARTER DECK (SD01 - SD07)/SD07 - VS 18 หัวเมือง", 
-    file: "cardsSD07 - VS 18 หัวเมือง.txt" 
-  },
-
-  // --- [ใหม่] Booster Set (BT01 - BT07) ---
-  // (ผมอิงจากรูปและ Path ที่คุณส่งมานะครับ)
-  { 
-    path: "003.BOOSTER (BT01 - BT08)/BT01 - Welcome ตลิ่งชัน", 
-    file: "cardsBT01 - Welcome ตลิ่งชัน.txt" // (❗️ ต้องแน่ใจว่าชื่อไฟล์ .txt ตรงกัน)
-  },
-  { 
-    path: "003.BOOSTER (BT01 - BT08)/BT02 - Attack on เพื่อนบ้าน", 
-    file: "cardsBT02 - Attack on เพื่อนบ้าน.txt" // (❗️ ต้องแน่ใจว่าชื่อไฟล์ .txt ตรงกัน)
-  },
-  { 
-    path: "003.BOOSTER (BT01 - BT08)/BT03 - อมนุษย์ Invasion", 
-    file: "cardsBT03 - อมนุษย์ Invasion.txt" // (❗️ ต้องแน่ใจว่าชื่อไฟล์ .txt ตรงกัน)
-  },
-  { 
-    path: "003.BOOSTER (BT01 - BT08)/BT04 - ความจริง Today", 
-    file: "cardsBT04 - ความจริง Today.txt" // (❗️ ต้องแน่ใจว่าชื่อไฟล์ .txt ตรงกัน)
-  },
-  { 
-    path: "003.BOOSTER (BT01 - BT08)/BT05 - Culture ช๊อค",
-    file: "cardsBT05 - Culture ช๊อค.txt"  // (❗️ ต้องแน่ใจว่าชื่อไฟล์ .txt ตรงกัน)
-  },
-  { 
-    path: "003.BOOSTER (BT01 - BT08)/BT06 - โลกา Amagedon", 
-    file: "cardsBT06 - โลกา Amagedon.txt" // (❗️ ต้องแน่ใจว่าชื่อไฟล์ .txt ตรงกัน)
-  },
-  { 
-    path: "003.BOOSTER (BT01 - BT08)/BT07 - Life of หน่วง", 
-    file: "cardsBT07 - Life of หน่วง.txt" // (❗️ ต้องแน่ใจว่าชื่อไฟล์ .txt ตรงกัน)
-  },
-  { 
-    path: "003.BOOSTER (BT01 - BT08)/BT08 - เพราะ Warrior is นักรบ", 
-    file: "cardsBT08 - เพราะ Warrior is นักรบ.txt" // (❗️ ต้องแน่ใจว่าชื่อไฟล์ .txt ตรงกัน)
-  },
-  {
-    path: "001.PROMO CARD (PRM0)/PRM0",
-    file: "cardsPRM0.txt"
-  },
-  {
-    path: "005.SELECTION (SL01)/SL01 - Selection",
-    file: "cardsSL01 - Selection.txt"
-  },
-  {
-    path: "004.COMMUNITY COLLECTION (CC01)/CC01 - Community Collection",
-    file: "cardsCC01 - Community Collection.txt"
-  },
-  {
-    path: "006.ODENYA (ODY1) - REPRINT/ODY1 - Odenya",
-    file: "cardsODY1 - Odenya.txt"
-  }
+  { path: "002.STARTER DECK (SD01 - SD07)/SD01 - ตัวตึงไกรลาส", file: "cardsSD01 - ตัวตึงไกรลาส.txt" },
+  { path: "002.STARTER DECK (SD01 - SD07)/SD02 - วีรบุรุษปากซอย", file: "cardsSD02 - วีรบุรุษปากซอย.txt" },
+  { path: "002.STARTER DECK (SD01 - SD07)/SD03 - นรกก็แค่น้ำพริก", file: "cardsSD03 - นรกก็แค่น้ำพริก.txt" },
+  { path: "002.STARTER DECK (SD01 - SD07)/SD04 - ทหารไก่ชนเขา", file: "cardsSD04 - ทหารไก่ชนเขา.txt" },
+  { path: "002.STARTER DECK (SD01 - SD07)/SD05 - กำเนิดจากน้ำ", file: "cardsSD05 - กำเนิดจากน้ำ.txt" },
+  { path: "002.STARTER DECK (SD01 - SD07)/SD06 - ๖ ประจัญบาน", file: "cardsSD06 - ๖ ประจัญบาน.txt" },
+  { path: "002.STARTER DECK (SD01 - SD07)/SD07 - VS 18 หัวเมือง", file: "cardsSD07 - VS 18 หัวเมือง.txt" },
+  { path: "003.BOOSTER (BT01 - BT08)/BT01 - Welcome ตลิ่งชัน", file: "cardsBT01 - Welcome ตลิ่งชัน.txt" },
+  { path: "003.BOOSTER (BT01 - BT08)/BT02 - Attack on เพื่อนบ้าน", file: "cardsBT02 - Attack on เพื่อนบ้าน.txt" },
+  { path: "003.BOOSTER (BT01 - BT08)/BT03 - อมนุษย์ Invasion", file: "cardsBT03 - อมนุษย์ Invasion.txt" },
+  { path: "003.BOOSTER (BT01 - BT08)/BT04 - ความจริง Today", file: "cardsBT04 - ความจริง Today.txt" },
+  { path: "003.BOOSTER (BT01 - BT08)/BT05 - Culture ช๊อค", file: "cardsBT05 - Culture ช๊อค.txt" },
+  { path: "003.BOOSTER (BT01 - BT08)/BT06 - โลกา Amagedon", file: "cardsBT06 - โลกา Amagedon.txt" },
+  { path: "003.BOOSTER (BT01 - BT08)/BT07 - Life of หน่วง", file: "cardsBT07 - Life of หน่วง.txt" },
+  { path: "003.BOOSTER (BT01 - BT08)/BT08 - เพราะ Warrior is นักรบ", file: "cardsBT08 - เพราะ Warrior is นักรบ.txt" },
+  { path: "001.PROMO CARD (PRM0)/PRM0", file: "cardsPRM0.txt" },
+  { path: "005.SELECTION (SL01)/SL01 - Selection", file: "cardsSL01 - Selection.txt" },
+  { path: "004.COMMUNITY COLLECTION (CC01)/CC01 - Community Collection", file: "cardsCC01 - Community Collection.txt" },
+  { path: "006.ODENYA (ODY1) - REPRINT/ODY1 - Odenya", file: "cardsODY1 - Odenya.txt" }
 ];
-async function fetchAllTxt() { 
-  let allCards = []; 
-  console.log("📦 Reloading cards from TXT..."); 
-  
-  // [สำคัญ] มันต้องวนลูป for...of... แบบนี้
-  for (const { path: pathString, file: filename } of CARD_PATHS) { 
-    
-    const encodedPath = encodePath(pathString); //
-    const url = `/cards/${encodedPath}/${encodeURIComponent(filename)}`; //
-    
-    try { 
-      const res = await fetch(url); 
-      if (!res.ok) { 
-        console.warn(`Could not fetch ${url}. Status: ${res.status}`); 
-        continue; 
-      } 
-      const txt = await res.text(); 
-      const data = JSON.parse(txt); //
-      if (Array.isArray(data)) { 
-        // นี่คือส่วนที่กำหนด Path ของ "รูปภาพ"
-        const withPath = data.map(card => ({ ...card, imagePath: pathString, onlyRank: card.id.includes('- Only#1') ? 1 : card.onlyRank })); //
-        allCards = allCards.concat(withPath); 
-        console.log(`  ✔ ${data.length} from ${pathString} (File: ${filename})`); 
-      } 
-    } catch (e) { 
-      console.error(`load fail ${url}`, e); 
-    } 
-  } 
-  console.log(`✅ โหลดการ์ดทั้งหมด ${allCards.length} ใบ`); 
-  return allCards; 
-}
 
-const getMagicSubType = (card) => { 
-  if (card.type !== 'Magic') { 
-    return null; 
-  } 
-  return card.magicType || 'Normal'; 
-};
+async function fetchAllTxt() { let allCards = []; console.log("📦 Reloading cards from TXT..."); for (const { path: pathString, file: filename } of CARD_PATHS) { const encodedPath = encodePath(pathString); const url = `/cards/${encodedPath}/${encodeURIComponent(filename)}`; try { const res = await fetch(url); if (!res.ok) { console.warn(`Could not fetch ${url}. Status: ${res.status}`); continue; } const txt = await res.text(); const data = JSON.parse(txt); if (Array.isArray(data)) { const withPath = data.map(card => ({ ...card, imagePath: pathString, onlyRank: card.id.includes('- Only#1') ? 1 : card.onlyRank })); allCards = allCards.concat(withPath); console.log(`  ✔ ${data.length} from ${pathString} (File: ${filename})`); } } catch (e) { console.error(`load fail ${url}`, e); } } console.log(`✅ โหลดการ์ดทั้งหมด ${allCards.length} ใบ`); return allCards; }
+const getMagicSubType = (card) => card.type !== 'Magic' ? null : (card.magicType || 'Normal');
+const nameKey = (n) => (n || "").trim().toLowerCase();
+function countBy(arr, keyFn) { return arr.reduce((m, x) => { const k = keyFn(x); m[k] = (m[k] || 0) + 1; return m; }, {}); }
+function useLocalStorage(key, initial) { const [v, s] = useState(() => { try { const raw = localStorage.getItem(key); if (!raw || raw === "[]" || raw === "null") return initial; return JSON.parse(raw); } catch { return initial; } }); useEffect(() => { try { localStorage.setItem(key, JSON.stringify(v)); } catch {} }, [key, v]); return [v, s]; }
+function validate(mainDeck, lifeDeck) { const problems = []; const ok = { main: true, life: true }; if (mainDeck.length !== RULES.main.size) { problems.push(`Main Deck ต้องมี ${RULES.main.size} ใบ (ปัจจุบัน ${mainDeck.length})`); ok.main = false; } const byNameMain = countBy(mainDeck, (c) => nameKey(c.name)); const overCopies = Object.entries(byNameMain).filter(([, n]) => n > RULES.main.maxCopiesPerName); if (overCopies.length) { overCopies.forEach(([k, n]) => problems.push(`การ์ด “${k}” ใน Main Deck ซ้ำเกิน ${RULES.main.maxCopiesPerName} ใบ (มี ${n} ใบ)`)); ok.main = false; } const onlyRank1Count = mainDeck.filter((c) => c.onlyRank === 1).length; if (mainDeck.length > 0 && onlyRank1Count > 0 && onlyRank1Count !== RULES.main.requireOnlyRank1Exactly) { problems.push(`Main Deck สามารถมี “Only #1” ได้แค่ ${RULES.main.requireOnlyRank1Exactly} ใบ (ปัจจุบัน ${onlyRank1Count})`); ok.main = false; } if (lifeDeck.length !== RULES.life.size) { problems.push(`Life Deck ต้องมี ${RULES.life.size} ใบ (ปัจจุบัน ${lifeDeck.length})`); ok.life = false; } if (RULES.life.uniqueNames) { const byNameLife = countBy(lifeDeck, (c) => nameKey(c.name)); const duplicateLife = Object.entries(byNameLife).filter(([, n]) => n > 1); if (duplicateLife.length) { duplicateLife.forEach(([k]) => problems.push(`การ์ดใน Life Deck ต้องชื่อไม่ซ้ำกัน: “${k}”`)); ok.life = false; } } return { problems, ok }; }
+const avg = (arr) => { const valid = arr.filter(n => typeof n === 'number' && !isNaN(n)); if (valid.length === 0) return '0.00'; return (valid.reduce((a, b) => a + b, 0) / valid.length).toFixed(2); };
+const encodeDeckCode = (mainDeck, lifeDeck) => { const mainIds = mainDeck.map(c => c.id); const lifeIds = lifeDeck.map(c => c.id); const dataString = JSON.stringify({ m: mainIds, l: lifeIds }); try { return btoa(dataString).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, ''); } catch (e) { console.error("Encoding failed:", e); return ""; } };
+const decodeDeckCode = (code, allCards) => { const trimmedCode = (code || "").trim(); if (!trimmedCode) return null; try { let base64 = trimmedCode.replace(/-/g, '+').replace(/_/g, '/'); while (base64.length % 4 !== 0) { base64 += '='; } const dataString = atob(base64); const data = JSON.parse(dataString); if (!data || !Array.isArray(data.m) || !Array.isArray(data.l)) { throw new Error("Invalid deck code format"); } const findCard = (id) => allCards.find(c => c.id === id); const main = data.m.map(findCard).filter(card => card !== undefined); const life = data.l.map(findCard).filter(card => card !== undefined); return { main, life }; } catch (e) { console.error("Decoding failed:", e); return null; } };
+const RULES = { main: { size: 50, maxCopiesPerName: 4, requireOnlyRank1Exactly: 1 }, life: { size: 5, uniqueNames: true, maxCopiesPerName: 1 }, };
+const DND_TYPES = { CARD: "CARD" };
+const encodePath = (p) => p.split('/').map(encodeURIComponent).join('/');
+const DndStateContext = createContext({ isDragging: false });
+const DndStateProvider = ({ children }) => { const { isDragging } = useDragLayer((monitor) => ({ isDragging: monitor.isDragging() })); return <DndStateContext.Provider value={{ isDragging }}>{children}</DndStateContext.Provider>; };
+const useIsDragging = () => useContext(DndStateContext);
+function CustomDragLayer() { const { isDragging, item, currentOffset } = useDragLayer((monitor) => ({ item: monitor.getItem(), isDragging: monitor.isDragging(), currentOffset: monitor.getSourceClientOffset(), })); if (!isDragging || !currentOffset) return null; const { card } = item; const encodedImagePath = encodePath(card.imagePath); const fileId = card.id.replace(/\s*(\(.*\)|- Only#1)$/, ''); const imgPng = `/cards/${encodedImagePath}/${encodeURIComponent(fileId)}.png`; return ( <div style={{ position: 'fixed', pointerEvents: 'none', zIndex: 1000, left: 0, top: 0, transform: `translate(${currentOffset.x}px, ${currentOffset.y}px)` }}> <img src={imgPng} alt={card.name} className="w-40 h-auto rounded-lg shadow-2xl" /> </div> ); }
+function FlyingCard({ card, startRect, endRect, onComplete }) { const [isAnimating, setIsAnimating] = useState(false); const hasCompleted = useRef(false); useEffect(() => { const timeoutId = setTimeout(() => setIsAnimating(true), 10); return () => clearTimeout(timeoutId); }, []); if (!card || !startRect || !endRect) return null; const handleTransitionEnd = () => { if (!hasCompleted.current) { hasCompleted.current = true; onComplete(); } }; const style = { position: 'fixed', zIndex: 1000, top: `${startRect.top}px`, left: `${startRect.left}px`, width: `${startRect.width}px`, height: `${startRect.height}px`, transition: 'all 0.5s ease-in-out' }; if (isAnimating) { style.top = `${endRect.top + endRect.height / 2 - 35}px`; style.left = `${endRect.left + endRect.width / 2 - 25}px`; style.width = '50px'; style.height = '70px'; style.opacity = 0; style.transform = 'rotate(15deg)'; } const encodedImagePath = encodePath(card.imagePath); const fileId = card.id.replace(/\s*(\(.*\)|- Only#1)$/, ''); const imgSrc = `/cards/${encodedImagePath}/${encodeURIComponent(fileId)}.png`; return ( <div style={style} onTransitionEnd={handleTransitionEnd}> <img src={imgSrc} alt={card.name} className="w-full h-full rounded-lg shadow-2xl" /> </div> ); }
+const FlyingLight = ({ startRect, endRect, onComplete }) => { const [style, setStyle] = useState({ position: 'fixed', top: startRect.top + startRect.height / 2, left: startRect.left + startRect.width / 2, opacity: 1, transform: 'translate(-50%, -50%) scale(1)', }); useEffect(() => { requestAnimationFrame(() => { setStyle({ position: 'fixed', top: endRect.top + endRect.height / 2, left: endRect.left + endRect.width / 2, opacity: 0, transform: 'translate(-50%, -50%) scale(0.2)', transition: 'all 1s cubic-bezier(0.25, 0.46, 0.45, 0.94)' }); }); const timer = setTimeout(onComplete, 1000); return () => clearTimeout(timer); }, []); return ( <div className="z-[9999] w-6 h-6 rounded-full bg-amber-400 shadow-[0_0_15px_4px_rgba(251,191,36,0.8)] pointer-events-none" style={style} /> ); };
+const CardItem = forwardRef(function CardItem({ card, onDoubleClick, onViewDetails, onAddCard, isMobileZoomed, onMobileClick, onAuction }, ref) { const cardItemRef = useRef(null); const { isDragging: isAnythingDragging } = useIsDragging(); const [{ isDragging }, dragRef] = useDrag({ type: DND_TYPES.CARD, item: { card }, collect: (m) => ({ isDragging: m.isDragging() }) }); const encodedImagePath = encodePath(card.imagePath); const fileId = card.id.replace(' - Only#1', ''); const imgPng = `/cards/${encodedImagePath}/${encodeURIComponent(fileId)}.png`; const imgJpg = `/cards/${encodedImagePath}/${encodeURIComponent(fileId)}.jpg`; const hoverClasses = !isAnythingDragging ? 'lg:hover:scale-[1.25] lg:hover:z-[80]' : ''; const mobileZoomClasses = isMobileZoomed ? 'scale-[1.15] z-[10] shadow-2xl border-amber-500/50' : ''; const handleClick = () => { if (window.innerWidth < 1024) { onMobileClick(); } }; return ( <CardShell ref={cardItemRef} onClick={handleClick} className={` flex flex-col card group relative ${isDragging ? 'opacity-0' : ''} transition-transform duration-200 ease-in-out ${hoverClasses} ${mobileZoomClasses} p-0.5 lg:p-4 `} > <div className="absolute top-1 right-1 z-10 flex flex-col gap-1 lg:gap-2 lg:top-2 lg:right-2"> <button onClick={(e) => { e.stopPropagation(); onViewDetails(card); }} className="p-1 lg:p-1.5 bg-slate-100/80 dark:bg-slate-900/80 rounded-full text-amber-600 dark:text-amber-300 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-slate-300 dark:hover:bg-slate-700 hover:text-black dark:hover:text-white" title="ดูรายละเอียด" > <EyeIcon /> </button> <button onClick={(e) => { e.stopPropagation(); onAddCard(card, e.currentTarget); }} className="p-1 lg:p-1.5 bg-emerald-600/80 rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-emerald-500 active:scale-95" title="เพิ่มลงเด็ค" > <PlusIcon /> </button> <button onClick={(e) => { e.stopPropagation(); onAuction(card); }} className="p-1 lg:p-1.5 bg-amber-500/90 rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-amber-600 active:scale-95 shadow-md" title="เปิดประมูล" > <GavelIcon /> </button> </div> <img ref={dragRef} src={imgPng} alt={card.name} onDoubleClick={() => onDoubleClick(card, cardItemRef.current)} onError={(e) => { if (!e.currentTarget.src.endsWith('.jpg')) e.currentTarget.src = imgJpg; else { e.currentTarget.onerror = null; e.currentTarget.src = `https://placehold.co/300x420/1e293b/94a3b8?text=${encodeURIComponent(card.name)}`; } }} className="w-full h-auto rounded-[4px] lg:rounded-md mb-0 lg:mb-3 object-cover aspect-[5/7] bg-slate-200 dark:bg-slate-700 shadow hover:shadow-xl transition-shadow cursor-grab active:cursor-grabbing" loading="lazy" /> <div className="hidden lg:flex flex-grow flex-col justify-between"> <div> <div className="flex justify-between items-start gap-2"> <p className="font-bold text-xl text-slate-900 dark:text-white pr-2 line-clamp-2">{card.name}</p> <div className="flex items-center gap-2 shrink-0"> {card.colorType && <ColorPip color={card.colorType} />} <Pill className="bg-slate-200 dark:bg-slate-600 text-slate-700 dark:text-gray-200">{card.type}</Pill> </div> </div> {card.rarity && <Pill className="mt-2 bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300">{card.rarity}</Pill>} {card.onlyRank === 1 && <Pill className="mt-2 ml-1 bg-amber-500/10 text-amber-600 dark:text-amber-300 border border-amber-500/20">Only #1</Pill>} </div> </div> <div className="hidden lg:block absolute top-full mt-1 left-0 right-0 z-[60] p-4 bg-white dark:bg-slate-900 rounded-lg shadow-2xl border border-amber-500/50 space-y-2 opacity-0 group-hover:opacity-100 transition-all duration-300 ease-in-out pointer-events-none group-hover:pointer-events-auto max-h-96 overflow-y-auto"> <div className="grid grid-cols-3 gap-2 text-center"> <div><span className="text-base text-emerald-600 dark:text-emerald-400">Cost</span><p className="font-bold text-2xl text-slate-900 dark:text-white">{card.cost ?? '-'}</p></div> <div><span className="text-base text-red-600 dark:text-red-400">Power</span><p className="font-bold text-2xl text-slate-900 dark:text-white">{card.power ?? '-'}</p></div> <div><span className="text-base text-amber-600 dark:text-amber-400">Gem</span><p className="font-bold text-2xl text-slate-900 dark:text-white">{card.gem ?? '-'}</p></div> </div> <div className="pt-2"> <p className="text-base text-slate-500 dark:text-gray-400">ฝ่าย: <span className="font-semibold text-slate-700 dark:text-gray-200">{card.faction ?? 'ไม่มี'}</span></p> <p className="text-base text-slate-700 dark:text-gray-300 font-light mt-1 break-words">{card.text || 'ไม่มีเอฟเฟ็ค'}</p> {card.flavor && ( <p className="text-sm text-amber-700/70 dark:text-amber-200/70 italic mt-2 font-light break-words">"{card.flavor}"</p> )} </div> </div> </CardShell> ); });
+const DeckTray = forwardRef(function DeckTray({ title, deck, onDropCard, onRemoveCard, capacity, highlight, onViewDeck }, ref) { const [{ isOver }, dropRef] = useDrop({ accept: DND_TYPES.CARD, drop: (item) => onDropCard(item.card), collect: (monitor) => ({ isOver: monitor.isOver() }), }); const groupedDeck = useMemo(() => { return Object.values(deck.reduce((m, card) => { const key = nameKey(card.name); if (!m[key]) m[key] = { card, count: 0 }; m[key].count++; return m; }, {})).sort((a, b) => a.card.name.localeCompare(b.card.name, "th")); }, [deck]); const cardsPerRow = 12; const numRows = groupedDeck.length > 0 ? Math.floor((groupedDeck.length - 1) / cardsPerRow) + 1 : 1; const containerHeight = numRows * 40 + 40; return ( <div ref={ref} className={`p-2 rounded-md border-2 ${isOver || highlight ? "border-amber-400" : "border-slate-300 dark:border-slate-600"} transition-colors bg-slate-100 dark:bg-slate-900/50`} > <div ref={dropRef}> <div className="flex items-center justify-between mb-2 gap-2"> <h3 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider shrink-0"> {title} </h3> {onViewDeck && deck.length > 0 && ( <button onClick={onViewDeck} className="text-xs text-amber-600 dark:text-amber-400 hover:text-amber-500 dark:hover:text-amber-200 hover:underline transition" > ดูเด็ค </button> )} <div className="flex-grow text-right"> {typeof capacity === "number" && ( <span className="text-xs text-slate-600 dark:text-slate-300"> {deck.length} {capacity ? ` / ${capacity}` : ""} </span> )} </div> </div> <div className="relative w-full transition-all" style={{ height: `${containerHeight}px` }}> {groupedDeck.length === 0 ? ( <div className="absolute inset-0 flex items-center justify-center text-slate-400 dark:text-slate-500 text-xs"> ลากการ์ดมาวางที่นี่ </div> ) : ( <div className="absolute inset-0"> {groupedDeck.map(({ card, count }, index) => { const encodedImagePath = encodePath(card.imagePath); const fileId = card.id.replace(" - Only#1", ""); const thumbPng = `/cards/${encodedImagePath}/${encodeURIComponent(fileId)}.png`; const rowIndex = Math.floor(index / cardsPerRow); const colIndex = index % cardsPerRow; return ( <div key={`${card.id}-${index}`} className="absolute transition-all duration-200 ease-in-out group hover:-translate-y-2 hover:z-50" style={{ left: `${colIndex * 22}px`, top: `${rowIndex * 40}px`, zIndex: colIndex, width: "56px", }} title={`คลิกเพื่อลบ ${card.name}`} onClick={() => onRemoveCard(card)} > <img src={thumbPng} alt={card.name} className="w-full h-auto rounded-md shadow-lg border-2 border-slate-300 dark:border-slate-600 group-hover:border-red-500 cursor-pointer" onError={(e) => { if (!e.currentTarget.src.endsWith(".jpg")) { e.currentTarget.src = e.currentTarget.src.replace(".png", ".jpg"); } }} /> {count > 1 && ( <div className="absolute -top-2 -right-2 w-5 h-5 flex items-center justify-center bg-amber-500 text-white text-xs font-bold rounded-full border-2 border-white dark:border-slate-800"> {count} </div> )} </div> ); })} </div> )} </div> </div> </div> ); });
 
 // === Main App ===
 export default function App() {
-  // ... hooks เดิม ...
   const [isAuctionModalOpen, setIsAuctionModalOpen] = useState(false);
   const [auctionTargetCard, setAuctionTargetCard] = useState(null);
-
-  const navigate = useNavigate(); // 🟢 2. เรียกใช้ hook
+  const navigate = useNavigate();
   const location = useLocation();
 
-  // =========================================================
-  // 🟢 3. ระบบตรวจจับ In-App Browser (LINE, FB, IG)
-  // =========================================================
   useEffect(() => {
     const ua = navigator.userAgent || navigator.vendor || window.opera;
-    // Regex ตรวจหาคำว่า Line, Facebook, Instagram
     const isInApp = /(Line|FBAN|FBAV|Instagram|Messenger)/i.test(ua);
-
-    // ถ้าเป็น In-App Browser และยังไม่ได้อยู่ที่หน้า /open-browser
     if (isInApp && location.pathname !== '/open-browser') {
-      // ส่งไปหน้า OpenBrowser เพื่อบังคับเด้งออก
       navigate('/open-browser', { replace: true });
     }
   }, [location, navigate]);
 
-  const [theme, setTheme] = useLocalStorage('bot-theme', 'dark'); // <--- [เพิ่ม] State สำหรับธีม
-  // ... (ต่อจาก useState ตัวอื่นๆ ใน function App) ...
-// 🟢 [เพิ่ม] State สำหรับลูกไฟ และ Ref ชี้ปุ่ม Toggle
+  const [theme, setTheme] = useLocalStorage('bot-theme', 'dark');
   const [flyingLights, setFlyingLights] = useState([]);
-  const toggleBtnRef = useRef(null); // เอาไว้เกาะตำแหน่งปุ่ม Hide Filter
+  const toggleBtnRef = useRef(null);
 
-  // ฟังก์ชันสร้างลูกไฟ
   const triggerLightEffect = (startElem) => {
     if (!startElem || !toggleBtnRef.current) return;
-    
     const startRect = startElem.getBoundingClientRect();
     const endRect = toggleBtnRef.current.getBoundingClientRect();
-    
     const newLight = { id: Date.now(), startRect, endRect };
     setFlyingLights(prev => [...prev, newLight]);
   };
@@ -1937,9 +482,7 @@ export default function App() {
   const removeLight = (id) => {
     setFlyingLights(prev => prev.filter(l => l.id !== id));
   };
-  // =========================================================
-  // 🟢 [เพิ่มส่วนนี้] State และ Ref สำหรับปุ่ม Scroll to Top
-  // =========================================================
+
   const [showScrollTop, setShowScrollTop] = useState(false);
   const scrollRef = useRef(null);
 
@@ -1956,56 +499,46 @@ export default function App() {
       scrollRef.current.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
-  // =========================================================
 
-  // ... (โค้ดส่วน useEffect หรืออื่นๆ ต่อไป) ...
-  const [mainDeck, setMainDeck] = useLocalStorage("bot-mainDeck-v32-final", []); 
-  const [lifeDeck, setLifeDeck] = useLocalStorage("bot-lifeDeck-v32-final", []); 
+  const [mainDeck, setMainDeck] = useLocalStorage("bot-mainDeck-v32-final", []);
+  const [lifeDeck, setLifeDeck] = useLocalStorage("bot-lifeDeck-v32-final", []);
   const [cardDb, setCardDb] = useLocalStorage("bot-cardDb-v32-final", []);
   const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
   const [userDecks, setUserDecks] = useLocalStorage("bot-userDecks-v1", {});
   const [isDeckListModalOpen, setIsDeckListModalOpen] = useState(false);
-
-  const [isAnimating, setIsAnimating] = useState(false); 
-  const [flyingCard, setFlyingCard] = useState(null); 
-  const mainDeckRef = useRef(null); 
-  const [zoomedCard, setZoomedCard] = useState(null); 
-  
-  // =================================================================
-  // === 📍 [3] แก้ไข State `analysisDeck`
-  // =================================================================
-  const [analysisDeck, setAnalysisDeck] = useState({ deck: null, showChart: true }); // null | { main, life }
-  
-  const [isLoadingAnalysis, setIsLoadingAnalysis] = useState(false); 
-  
+  const [isAnimating, setIsAnimating] = useState(false);
+  const [flyingCard, setFlyingCard] = useState(null);
+  const mainDeckRef = useRef(null);
+  const [zoomedCard, setZoomedCard] = useState(null);
+  const [analysisDeck, setAnalysisDeck] = useState({ deck: null, showChart: true });
+  const [isLoadingAnalysis, setIsLoadingAnalysis] = useState(false);
   const [activeView, setActiveView] = useState('cards');
-  const [searchTerm, setSearchTerm] = useState(""); 
-  const [filterTypes, setFilterTypes] = useState([]); 
-  const [filterMagicType, setFilterMagicType] = useState("All"); 
-  const [filterColors, setFilterColors] = useState([]); 
-  const [filterRarities, setFilterRarities] = useState([]); 
-  const [selectedSets, setSelectedSets] = useState([]); 
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filterTypes, setFilterTypes] = useState([]);
+  const [filterMagicType, setFilterMagicType] = useState("All");
+  const [filterColors, setFilterColors] = useState([]);
+  const [filterRarities, setFilterRarities] = useState([]);
+  const [selectedSets, setSelectedSets] = useState([]);
   const [statFilters, setStatFilters] = useState({ cost: { min: '', max: '' }, power: { min: '', max: '' }, gem: { min: '', max: '' } });
-  const allCardTypes = useMemo(() => Array.from(new Set(cardDb.map(c => c.type).filter(Boolean))).sort(), [cardDb]); 
-  const allColorTypes = useMemo(() => Array.from(new Set(cardDb.map(c => c.colorType).filter(Boolean))).sort(), [cardDb]); 
-  const allRarities = useMemo(() => Array.from(new Set(cardDb.map(c => c.rarity).filter(Boolean))).sort(), [cardDb]); 
+  const allCardTypes = useMemo(() => Array.from(new Set(cardDb.map(c => c.type).filter(Boolean))).sort(), [cardDb]);
+  const allColorTypes = useMemo(() => Array.from(new Set(cardDb.map(c => c.colorType).filter(Boolean))).sort(), [cardDb]);
+  const allRarities = useMemo(() => Array.from(new Set(cardDb.map(c => c.rarity).filter(Boolean))).sort(), [cardDb]);
   const allSets = useMemo(() => Array.from(new Set(cardDb.map(c => c.imagePath).filter(Boolean))).sort(), [cardDb]);
-  const [currentPage, setCurrentPage] = useState(1); 
+  const [currentPage, setCurrentPage] = useState(1);
   const PAGE_SIZE = 30;
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false); 
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const toggleSidebar = () => setIsSidebarOpen(prev => !prev);
-  const [modal, setModal] = useState({ isOpen: false, title: '', message: '', onConfirm: null }); 
-  const [isImportModalOpen, setIsImportModalOpen] = useState(false); 
-  const closeModal = () => setModal({ isOpen: false, title: '', message: '', onConfirm: null }); 
-  const showAlert = (title, message) => setModal({ isOpen: true, title, message, onConfirm: null }); 
+  const [modal, setModal] = useState({ isOpen: false, title: '', message: '', onConfirm: null });
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const closeModal = () => setModal({ isOpen: false, title: '', message: '', onConfirm: null });
+  const showAlert = (title, message) => setModal({ isOpen: true, title, message, onConfirm: null });
   const closeImportModal = () => setIsImportModalOpen(false);
-
   const [userProfile, setUserProfile] = useLocalStorage("bot-userProfile-v1", null);
-
+  const [userReputation, setUserReputation] = useState({});
   const [customProfile, setCustomProfile] = useState(null);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  
+
   const displayUser = useMemo(() => {
     if (!userProfile) return null;
     if (!customProfile) return userProfile;
@@ -2033,28 +566,65 @@ export default function App() {
     }
   };
 
+  const handleFacebookLogin = async () => {
+    try {
+      const provider = new FacebookAuthProvider();
+      const result = await signInWithPopup(auth, provider);
+      const user = result.user;
+
+      // จัดรูปแบบข้อมูลให้เหมือนกับ Google Login
+      const profileData = { 
+        name: user.displayName, 
+        email: user.email, 
+        picture: user.photoURL + "?height=500" // ขอรูปชัดๆ
+      };
+
+      setUserProfile(profileData);
+      
+      // สร้าง Slot เด็คถ้ายังไม่มี (Logic เดิม)
+      if (!userDecks[profileData.email]) {
+        setUserDecks(prev => ({
+          ...prev,
+          [profileData.email]: {
+            slots: [{ name: "Slot 1", main: [], life: [] }, { name: "Slot 2", main: [], life: [] }]
+          }
+        }));
+      }
+      
+      // ดึงข้อมูลโปรไฟล์เพิ่มเติมจาก Firestore
+      fetchUserProfile(profileData.email);
+
+    } catch (error) {
+      console.error("Facebook Login Error:", error);
+      // กรณีอีเมลซ้ำกับ Google จะต้องจัดการ Account Linking (แต่เบื้องต้นแจ้งเตือนก่อน)
+      if (error.code === 'auth/account-exists-with-different-credential') {
+        showAlert("Login Failed", "อีเมลนี้ลงทะเบียนด้วยวิธีอื่นไปแล้ว (เช่น Google)");
+      } else {
+        showAlert("Login Failed", "ไม่สามารถเข้าสู่ระบบด้วย Facebook ได้");
+      }
+    }
+  };
+
   const handleLoginSuccess = (credentialResponse) => {
     try {
       const decoded = jwtDecode(credentialResponse.credential);
       setUserProfile({ name: decoded.name, email: decoded.email, picture: decoded.picture });
-      
       if (!userDecks[decoded.email]) {
         setUserDecks(prev => ({
           ...prev,
           [decoded.email]: {
-            slots: [ { name: "Slot 1", main: [], life: [] }, { name: "Slot 2", main: [], life: [] } ]
+            slots: [{ name: "Slot 1", main: [], life: [] }, { name: "Slot 2", main: [], life: [] }]
           }
         }));
       }
       fetchUserProfile(decoded.email);
-
     } catch (error) { console.error("Failed to decode JWT:", error); }
   };
 
   const handleLoginError = () => { showAlert("Login Failed", "ไม่สามารถเข้าสู่ระบบได้"); };
 
   const handleLogout = () => {
-    googleLogout(); 
+    googleLogout();
     setUserProfile(null);
     setCustomProfile(null);
     setIsDeckListModalOpen(false);
@@ -2065,102 +635,127 @@ export default function App() {
     if (!userProfile) return;
     try {
       const batch = writeBatch(db);
-      
-      // 1. อัปเดตข้อมูล User หลัก
-      batch.set(doc(db, "users", userProfile.email), { 
-        displayName: data.displayName, 
-        avatarUrl: data.avatarUrl, 
-        isSetup: true, 
-        updatedAt: serverTimestamp() 
+      batch.set(doc(db, "users", userProfile.email), {
+        displayName: data.displayName,
+        avatarUrl: data.avatarUrl,
+        isSetup: true,
+        updatedAt: serverTimestamp()
       }, { merge: true });
-      
-      // 2. อัปเดตหน้าปกเด็ค (Public Decks) ของเรา
       const decksSnap = await getDocs(query(collection(db, "publicDecks"), where("user.email", "==", userProfile.email)));
       decksSnap.forEach(doc => batch.update(doc.ref, { "user.name": data.displayName, "user.picture": data.avatarUrl }));
-
-      // 3. อัปเดตคอมเม้นท์ทั้งหมด (ใช้วิธีเดินหาทีละเด็ค เพื่อความชัวร์และไม่ง้อ Index)
       const allDecksSnap = await getDocs(collection(db, "publicDecks"));
       const currentName = customProfile?.displayName || userProfile.name;
-      const oldNameTarget = "Siwakorn Reangchinda"; // ชื่อเก่าที่ต้องการแก้ (Fallback)
-
+      const oldNameTarget = "Siwakorn Reangchinda";
       for (const deckDoc of allDecksSnap.docs) {
-         const commentsSnap = await getDocs(collection(db, "publicDecks", deckDoc.id, "comments"));
-         commentsSnap.forEach(cDoc => {
-           const cData = cDoc.data();
-           // เช็คว่าเป็นคอมเม้นท์ของเราหรือไม่ (เช็คอีเมล, ชื่อปัจจุบัน, หรือชื่อเก่า)
-           if (cData.userId === userProfile.email || cData.userName === currentName || cData.userName === oldNameTarget) {
-             batch.update(cDoc.ref, { 
-               userId: userProfile.email, // ยึดเป็นของเรา
-               userName: data.displayName, 
-               userPicture: data.avatarUrl 
-             });
-           }
-         });
+        const commentsSnap = await getDocs(collection(db, "publicDecks", deckDoc.id, "comments"));
+        commentsSnap.forEach(cDoc => {
+          const cData = cDoc.data();
+          if (cData.userId === userProfile.email || cData.userName === currentName || cData.userName === oldNameTarget) {
+            batch.update(cDoc.ref, {
+              userId: userProfile.email,
+              userName: data.displayName,
+              userPicture: data.avatarUrl
+            });
+          }
+        });
       }
-
       await batch.commit();
-      setCustomProfile(p => ({ ...p, ...data, isSetup: true })); 
-      setIsProfileModalOpen(false); 
+      setCustomProfile(p => ({ ...p, ...data, isSetup: true }));
+      setIsProfileModalOpen(false);
       showAlert("Success", "บันทึกข้อมูลเรียบร้อย!");
-    } catch (e) { 
-      console.error(e); 
-      showAlert("Error", "บันทึกไม่สำเร็จ"); 
+    } catch (e) {
+      console.error(e);
+      showAlert("Error", "บันทึกไม่สำเร็จ");
     }
   };
+
   useEffect(() => {
-    const root = document.documentElement; // (แท็ก <html>)
+    const root = document.documentElement;
     if (theme === 'dark') {
       root.classList.add('dark');
     } else {
       root.classList.remove('dark');
     }
   }, [theme]);
+
   useEffect(() => { if (cardDb.length === 0) { handleReloadFromTxt(); } }, []);
   useEffect(() => { setCurrentPage(1); }, [searchTerm, filterTypes, filterMagicType, filterColors, filterRarities, selectedSets, statFilters]);
   useEffect(() => {
     if (userProfile?.email) fetchUserProfile(userProfile.email);
   }, []);
 
-  // =================================================================
-  // === 📍 [4] แก้ไข handleAnalyzeDeck ให้ตั้ง `showChart: true`
-  // =================================================================
-  const handleAnalyzeDeck = () => { 
-    if (mainDeck.length === 0) { showAlert("ไม่มีการ์ดในเด็ค", "โปรดใส่การ์ดใน Main Deck ก่อนทำการสร้างเด็ค"); return; } 
-    setIsLoadingAnalysis(true); 
-    setTimeout(() => { 
-      setIsLoadingAnalysis(false); 
-      setAnalysisDeck({ deck: { main: mainDeck, life: lifeDeck }, showChart: true }); 
-    }, 500); 
+  useEffect(() => {
+    if (userProfile?.email) {
+      const fetchStats = async () => {
+        const { data } = await supabase
+          .from('user_stats')
+          .select('user_email, total_score')
+          .eq('user_email', userProfile.email)
+          .single();
+        if (data) {
+          setUserReputation({ [data.user_email]: data });
+        }
+      };
+      fetchStats();
+    }
+  }, [userProfile]);
+
+  const handleAnalyzeDeck = () => {
+    if (mainDeck.length === 0) { showAlert("ไม่มีการ์ดในเด็ค", "โปรดใส่การ์ดใน Main Deck ก่อนทำการสร้างเด็ค"); return; }
+    setIsLoadingAnalysis(true);
+    setTimeout(() => {
+      setIsLoadingAnalysis(false);
+      setAnalysisDeck({ deck: { main: mainDeck, life: lifeDeck }, showChart: true });
+    }, 500);
   };
-  
+
   const handleReloadFromTxt = async () => { const all = await fetchAllTxt(); if (all.length > 0) setCardDb(all); };
   const handleSetSelectionChange = (set) => { setSelectedSets(prev => prev.includes(set) ? prev.filter(s => s !== set) : [...prev, set]); };
   const handleStatFilterChange = (stat, field, value) => { const numValue = value === '' ? '' : Math.max(0, parseInt(value, 10)); setStatFilters(prev => ({ ...prev, [stat]: { ...prev[stat], [field]: numValue } })); };
 
-  const filteredCardDb = useMemo(() => { if (cardDb.length === 0) return []; return cardDb.filter((c) => { const term = searchTerm.toLowerCase(); if (!((c.name?.toLowerCase().includes(term) || (c.text || "").toLowerCase().includes(term)))) return false; if (selectedSets.length > 0 && !selectedSets.includes(c.imagePath)) return false; if (statFilters.cost.min !== '' && (c.cost ?? 0) < statFilters.cost.min) return false; if (statFilters.cost.max !== '' && (c.cost ?? 0) > statFilters.cost.max) return false; if (statFilters.power.min !== '' && (c.power ?? 0) < statFilters.power.min) return false; if (statFilters.power.max !== '' && (c.power ?? 0) > statFilters.power.max) return false; if (statFilters.gem.min !== '' && (c.gem ?? 0) < statFilters.gem.min) return false; if (statFilters.gem.max !== '' && (c.gem ?? 0) > statFilters.gem.max) return false; if (filterColors.length > 0 && !filterColors.includes(c.colorType)) return false; if (filterRarities.length > 0 && !filterRarities.includes(c.rarity)) return false; if (filterTypes.length > 0 && !filterTypes.includes(c.type)) return false; if (c.type === 'Magic' && filterTypes.includes('Magic') && filterMagicType !== 'All') { if (getMagicSubType(c) !== filterMagicType) { return false; } } return true; }); }, [cardDb, searchTerm, filterTypes, filterMagicType, filterColors, filterRarities, selectedSets, statFilters]);
-  const totalPages = Math.ceil(filteredCardDb.length / PAGE_SIZE); const startIndex = (currentPage - 1) * PAGE_SIZE; const endIndex = startIndex + PAGE_SIZE; const paginatedCards = filteredCardDb.slice(startIndex, endIndex);
+  const filteredCardDb = useMemo(() => {
+    if (cardDb.length === 0) return [];
+    return cardDb.filter((c) => {
+      const term = searchTerm.toLowerCase();
+      if (!((c.name?.toLowerCase().includes(term) || (c.text || "").toLowerCase().includes(term)))) return false;
+      if (selectedSets.length > 0 && !selectedSets.includes(c.imagePath)) return false;
+      if (statFilters.cost.min !== '' && (c.cost ?? 0) < statFilters.cost.min) return false;
+      if (statFilters.cost.max !== '' && (c.cost ?? 0) > statFilters.cost.max) return false;
+      if (statFilters.power.min !== '' && (c.power ?? 0) < statFilters.power.min) return false;
+      if (statFilters.power.max !== '' && (c.power ?? 0) > statFilters.power.max) return false;
+      if (statFilters.gem.min !== '' && (c.gem ?? 0) < statFilters.gem.min) return false;
+      if (statFilters.gem.max !== '' && (c.gem ?? 0) > statFilters.gem.max) return false;
+      if (filterColors.length > 0 && !filterColors.includes(c.colorType)) return false;
+      if (filterRarities.length > 0 && !filterRarities.includes(c.rarity)) return false;
+      if (filterTypes.length > 0 && !filterTypes.includes(c.type)) return false;
+      if (c.type === 'Magic' && filterTypes.includes('Magic') && filterMagicType !== 'All') { if (getMagicSubType(c) !== filterMagicType) { return false; } } return true;
+    });
+  }, [cardDb, searchTerm, filterTypes, filterMagicType, filterColors, filterRarities, selectedSets, statFilters]);
+
+  const totalPages = Math.ceil(filteredCardDb.length / PAGE_SIZE);
+  const startIndex = (currentPage - 1) * PAGE_SIZE;
+  const endIndex = startIndex + PAGE_SIZE;
+  const paginatedCards = filteredCardDb.slice(startIndex, endIndex);
   const [viewingDeck, setViewingDeck] = useState(null);
 
-  const addToMain = (card, sourceElem) => { // 🟢 รับ sourceElem เพิ่ม
+  const addToMain = (card, sourceElem) => {
     if (card.lifeEligible) { showAlert("ไม่สามารถเพิ่มได้", `การ์ด "${card.name}" เป็นการ์ดสำหรับ Life Deck เท่านั้น`); return; }
     if (card.onlyRank === 1 && mainDeck.some(c => c.onlyRank === 1)) { showAlert("Rule Violation", "You can only have one 'Only #1' card in your Main Deck."); return; }
     if (mainDeck.filter(c => nameKey(c.name) === nameKey(card.name)).length >= RULES.main.maxCopiesPerName) { showAlert("Rule Violation", `You cannot have more than ${RULES.main.maxCopiesPerName} copies of "${card.name}".`); return; }
     if (mainDeck.length >= RULES.main.size) { showAlert("Deck Full", "Your Main Deck has reached the 50-card limit."); return; }
-    
     setMainDeck(prev => [...prev, card]);
-
-    // 🟢 [เพิ่ม] เรียก Effect ลูกไฟ ถ้ามี Element ต้นทางส่งมา
     if (sourceElem) triggerLightEffect(sourceElem);
   };
+
   const removeFromMain = (card) => { const idx = mainDeck.findLastIndex(c => nameKey(c.name) === nameKey(card.name)); if (idx > -1) setMainDeck(prev => prev.filter((_, i) => i !== idx)); };
   const addToLife = (card) => { if (!card.lifeEligible) { showAlert("Invalid Card", `การ์ด "${card.name}" ไม่สามารถใส่ใน Life Deck ได้`); return; }; if (lifeDeck.length >= RULES.life.size) { showAlert("Deck Full", `Life Deck เต็มแล้ว (ใส่ได้ ${RULES.life.size} ใบ)`); return; }; if (!lifeDeck.some(c => nameKey(c.name) === nameKey(card.name))) { setLifeDeck(prev => [...prev, card]); } else { showAlert("Duplicate Card", `การ์ดชื่อ "${card.name}" มีใน Life Deck แล้ว (ชื่อห้ามซ้ำ)`); } };
   const removeFromLife = (card) => { const idx = lifeDeck.findIndex(c => c.id === card.id); if (idx > -1) setLifeDeck(prev => prev.filter((_, i) => i !== idx)); };
   const handleCardDoubleClick = (card, cardElement) => { if (isAnimating || !cardElement || !mainDeckRef.current) return; if (card.lifeEligible) { showAlert("ไม่สามารถเพิ่มได้", `การ์ด "${card.name}" เป็นการ์ดสำหรับ Life Deck เท่านั้น โปรดลากไปวางใน Life Deck`); return; } setIsAnimating(true); const startRect = cardElement.getBoundingClientRect(); const endRect = mainDeckRef.current.getBoundingClientRect(); setFlyingCard({ card, startRect, endRect }); };
   const handleAnimationComplete = () => { if (flyingCard) { addToMain(flyingCard.card); setFlyingCard(null); setIsAnimating(false); } };
-  const handleExportCode = () => { if (mainDeck.length === 0 && lifeDeck.length === 0) { showAlert("Empty Deck", "เด็คของคุณว่างเปล่า ไม่มีอะไรให้ Export"); return; } const code = encodeDeckCode(mainDeck, lifeDeck); navigator.clipboard.writeText(code) .then(() => showAlert("Success!", `✅ คัดลอกรหัสเด็คลง Clipboard แล้ว!`)) .catch(err => { console.error('Failed to copy code: ', err); showAlert("Error", "ไม่สามารถคัดลอกรหัสเด็คได้"); }); };
+  const handleExportCode = () => { if (mainDeck.length === 0 && lifeDeck.length === 0) { showAlert("Empty Deck", "เด็คของคุณว่างเปล่า ไม่มีอะไรให้ Export"); return; } const code = encodeDeckCode(mainDeck, lifeDeck); navigator.clipboard.writeText(code).then(() => showAlert("Success!", `✅ คัดลอกรหัสเด็คลง Clipboard แล้ว!`)).catch(err => { console.error('Failed to copy code: ', err); showAlert("Error", "ไม่สามารถคัดลอกรหัสเด็คได้"); }); };
   const handleImport = () => { setIsImportModalOpen(true); };
   const confirmImport = (code) => { closeImportModal(); if (!code) { return; } const decoded = decodeDeckCode(code, cardDb); if (decoded) { setMainDeck(decoded.main); setLifeDeck(decoded.life); showAlert("Import Success", "นำเข้าเด็คสำเร็จ!"); } else { showAlert("Import Error", "รหัสเด็คไม่ถูกต้อง หรือไม่พบการ์ดบางใบในฐานข้อมูลปัจจุบัน"); } };
-  const handleExport = handleExportCode; 
+  const handleExport = handleExportCode;
   const handleClear = () => { setModal({ isOpen: true, title: "Confirm Clear Deck", message: "คุณต้องการล้างเด็คทั้งหมด (Main และ Life) ใช่หรือไม่? การกระทำนี้ไม่สามารถย้อนกลับได้", onConfirm: () => { setMainDeck([]); setLifeDeck([]); closeModal(); }, confirmText: "Confirm Clear", confirmIcon: <TrashIcon /> }); };
 
   return (
@@ -2168,501 +763,123 @@ export default function App() {
       <DndStateProvider>
         <style>{`::-webkit-scrollbar{width:8px}::-webkit-scrollbar-track{background:#0f172a}::-webkit-scrollbar-thumb{background:#1e293b;border-radius:4px}::-webkit-scrollbar-thumb:hover{background:#334155}`}</style>
         <CustomDragLayer />
-        {flyingCard && (
-          <FlyingCard {...flyingCard} onComplete={handleAnimationComplete} />
-        )}
-
+        {flyingCard && <FlyingCard {...flyingCard} onComplete={handleAnimationComplete} />}
         <div className="h-screen flex flex-col text-slate-900 dark:text-gray-200 bg-slate-100 dark:bg-black">
           {!userProfile ? (
             <div className="flex-1 flex flex-row items-stretch overflow-hidden">
               <div className="w-full max-w-md md:w-96 shrink-0 flex flex-col items-center justify-start p-8 gap-6 bg-white/80 dark:bg-black/80 backdrop-blur-lg overflow-y-auto h-full border-r border-slate-300 dark:border-emerald-700/30">
-                <img
-                  src="/cards/LOGOBOT.png"
-                  alt="Logo"
-                  className="w-32 h-32 object-contain shrink-0"
-                  onError={(e) => {
-                    e.currentTarget.style.display = "none";
-                  }}
-                />
-                <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight bg-gradient-to-r from-amber-500 to-emerald-600 dark:from-amber-300 dark:to-emerald-400 bg-clip-text text-transparent text-center">
-                  Deck Builder
-                </h1>
+                <img src="/cards/LOGOBOT.png" alt="Logo" className="w-32 h-32 object-contain shrink-0" onError={(e) => { e.currentTarget.style.display = "none"; }} />
+                <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight bg-gradient-to-r from-amber-500 to-emerald-600 dark:from-amber-300 dark:to-emerald-400 bg-clip-text text-transparent text-center">Deck Builder</h1>
                 <div className="mt-4 scale-110 shrink-0">
-                  <GoogleLogin
-                    onSuccess={handleLoginSuccess}
-                    onError={handleLoginError}
-                    theme={theme === 'dark' ? "filled_black" : "outline"}
-                    size="large"
-                    shape="pill"
-                    text="signin_with"
-                    logo_alignment="left"
-                  />
+                  <GoogleLogin onSuccess={handleLoginSuccess} onError={handleLoginError} theme={theme === 'dark' ? "filled_black" : "outline"} size="large" shape="pill" text="signin_with" logo_alignment="left" />
                 </div>
+                <button
+                  onClick={handleFacebookLogin}
+                  className="mt-3 flex items-center gap-2 px-6 py-2.5 bg-[#1877F2] text-white font-bold rounded-full shadow-lg hover:bg-[#166fe5] transition-transform active:scale-95 w-[240px] justify-center"
+                >
+                  <div className="bg-white text-[#1877F2] rounded-full p-0.5">
+                    <FacebookIcon />
+                  </div>
+                  <span>Sign in with Facebook</span>
+                </button>
                 <div className="mt-12 pt-8 border-t border-slate-300 dark:border-emerald-700/30 w-full max-w-sm flex flex-col items-center">
-                  <h3 className="text-lg font-semibold text-amber-600 dark:text-amber-300 mb-4 text-center">
-                    สนับสนุนค่ากาแฟและค่าเซิร์ฟเวอร์ ❤️
-                  </h3>
-                  <img
-                    src="/assets/QRCODE.png"
-                    alt="QR Code"
-                    className="w-48 h-48 mx-auto rounded-lg border-4 border-emerald-500/30"
-                    onError={(e) => (e.currentTarget.style.display = "none")}
-                  />
-                  <video
-                    src="/assets/VDO.mov"
-                    autoPlay
-                    loop
-                    muted
-                    playsInline
-                    className="w-full h-auto max-w-[400px] mt-6 rounded-lg border-4 border-emerald-500/30"
-                    width="540"
-                    height="540"
-                    onError={(e) => (e.currentTarget.style.display = "none")}
-                  />
+                  <h3 className="text-lg font-semibold text-amber-600 dark:text-amber-300 mb-4 text-center">สนับสนุนค่ากาแฟและค่าเซิร์ฟเวอร์ ❤️</h3>
+                  <img src="/assets/QRCODE.png" alt="QR Code" className="w-48 h-48 mx-auto rounded-lg border-4 border-emerald-500/30" onError={(e) => (e.currentTarget.style.display = "none")} />
+                  <video src="/assets/VDO.mov" autoPlay loop muted playsInline className="w-full h-auto max-w-[400px] mt-6 rounded-lg border-4 border-emerald-500/30" width="540" height="540" onError={(e) => (e.currentTarget.style.display = "none")} />
                 </div>
               </div>
-              <div
-                className="flex-1 hidden md:block bg-slate-200 dark:bg-black/50"
-                style={{
-                  backgroundImage: "url('/assets/wallblueL.jpg')",
-                  backgroundRepeat: "repeat",
-                  backgroundSize: "auto",
-                  backgroundPosition: "top left",
-                }}
-              />
+              <div className="flex-1 hidden md:block bg-slate-200 dark:bg-black/50" style={{ backgroundImage: "url('/assets/wallblueL.jpg')", backgroundRepeat: "repeat", backgroundSize: "auto", backgroundPosition: "top left", }} />
             </div>
           ) : (
             <>
-              {/* ================================================================= */}
-              {/* 🎨 Header (ปรับสเกลใหม่สำหรับ Mobile) */}
-              {/* ================================================================= */}
               <header className="px-3 md:px-6 py-2 border-b border-slate-300 dark:border-emerald-700/30 bg-white/60 dark:bg-black/60 backdrop-blur-sm shrink-0 z-40">
                 <div className="flex items-center justify-between">
-                  
-                  {/* 🟢 ฝั่งซ้าย: เมนู + ชื่อเกม */}
                   <div className="flex items-center gap-1.5 md:gap-3 overflow-hidden">
-                    <button
-                      onClick={() => setIsSettingsOpen(true)}
-                      className="p-1.5 md:p-2 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-full text-slate-800 dark:text-white transition-colors shrink-0"
-                    >
+                    <button onClick={() => setIsSettingsOpen(true)} className="p-1.5 md:p-2 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-full text-slate-800 dark:text-white transition-colors shrink-0">
                       <MenuIcon />
                     </button>
-                    
-                    {/* 🔽 ปรับ Text ให้เล็กลงในมือถือ และใส่ truncate กันข้อความล้น */}
-                    <h1 className="text-lg sm:text-xl md:text-3xl font-extrabold tracking-tight bg-gradient-to-r from-amber-500 to-emerald-600 dark:from-amber-300 dark:to-emerald-400 bg-clip-text text-transparent truncate">
-                      Battle Of Talingchan
-                    </h1>
+                    <h1 className="text-lg sm:text-xl md:text-3xl font-extrabold tracking-tight bg-gradient-to-r from-amber-500 to-emerald-600 dark:from-amber-300 dark:to-emerald-400 bg-clip-text text-transparent truncate">Battle Of Talingchan</h1>
                   </div>
-
-                  {/* 🟢 ฝั่งขวา: จัดเรียงใหม่ (Market -> Public -> My Decks -> Bell -> Profile) */}
                   <div className="flex items-center gap-1.5 md:gap-3 shrink-0">
-                    
-                    {/* 1. Market */}
                     <Link to="/auction">
                       <Button className="!px-2 md:!px-4 bg-gradient-to-r from-rose-500 to-orange-600 text-white border-none shadow-md hover:shadow-lg hover:from-rose-400 hover:to-orange-500">
-                          <StoreIcon /> 
-                          <span className="hidden md:inline ml-1">Market</span>
+                        <StoreIcon /> <span className="hidden md:inline ml-1">Market</span>
                       </Button>
                     </Link>
-
-                    {/* 2. Public Decks */}
                     <Link to="/public-decks">
-                      <Button
-                        as="span"
-                        className="!px-2 md:!px-4 bg-gradient-to-r from-blue-500 to-purple-600 text-white border-none shadow-lg hover:from-blue-400 hover:to-purple-500"
-                      >
-                        <UsersIcon />{" "}
-                        <span className="hidden md:inline">Public</span>
+                      <Button as="span" className="!px-2 md:!px-4 bg-gradient-to-r from-blue-500 to-purple-600 text-white border-none shadow-lg hover:from-blue-400 hover:to-purple-500">
+                        <UsersIcon /> <span className="hidden md:inline">Public</span>
                       </Button>
                     </Link>
-
-                    {/* 4. Bell (Notification) */}
                     <NotificationCenter userEmail={userProfile?.email} />
-
-                    {/* 5. Profile Picture */}
-                    <img
-                      src={displayUser.picture}
-                      alt={displayUser.name}
-                      className="w-8 h-8 md:w-9 md:h-9 rounded-full border-2 border-emerald-500 object-cover ml-1 cursor-pointer hover:scale-105 transition-transform"
-                      title={`Logged in as ${displayUser.name}`}
-                      // เผื่ออยากให้กดรูปแล้วเปิดตั้งค่าได้ด้วย
-                      onClick={() => setIsSettingsOpen(true)} 
-                    />
-                    {/* ซ่อนชื่อบนมือถือ แสดงเฉพาะบนจอใหญ่ */}
-                    <span className="text-slate-900 dark:text-white hidden lg:block text-sm font-semibold max-w-[100px] truncate">
-                      {displayUser.name}
-                    </span>
+                    <img src={displayUser.picture} alt={displayUser.name} className="w-8 h-8 md:w-9 md:h-9 rounded-full border-2 border-emerald-500 object-cover ml-1 cursor-pointer hover:scale-105 transition-transform" title={`Logged in as ${displayUser.name}`} onClick={() => setIsSettingsOpen(true)} />
+                    <span className="text-slate-900 dark:text-white hidden lg:block text-sm font-semibold max-w-[100px] truncate">{displayUser.name}</span>
                   </div>
                 </div>
               </header>
-
               <main className="flex-1 flex flex-col md:flex-row overflow-hidden">
-                {/* ================================================================= */}
-                {/* 🌑 Backdrop (ฉากหลังสีดำ) - 🟢 แก้ไข: แสดงเฉพาะ Mobile (md:hidden) */}
-                {/* ================================================================= */}
-                <div
-                  className={`
-                    fixed inset-0 bg-black/60 backdrop-blur-sm z-[80]
-                    transition-opacity duration-300 ease-in-out
-                    ${isSidebarOpen ? "opacity-100" : "opacity-0 pointer-events-none"}
-                    md:hidden /* 👈 ซ่อนบนจอใหญ่ เพื่อไม่ให้จอมืด */
-                  `}
-                  onClick={() => isSidebarOpen && toggleSidebar()}
-                />
-
-                {/* ================================================================= */}
-                {/* 🚪 Sidebar Container */}
-                {/* ================================================================= */}
-                <div
-                  className={`
-                    /* Mobile: Fixed Drawer */
-                    fixed top-0 left-0 h-full 
-                    z-[150] /* 🟢 แก้จาก z-[90] เป็น z-[150] (ให้สูงกว่าการ์ดที่ซูมอยู่) */
-                    w-[300px]
-                    bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl
-                    border-r border-slate-300 dark:border-emerald-500/30
-                    shadow-2xl
-                    transition-transform duration-300 ease-in-out
-                    ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"}
-
-                    /* Desktop: Relative Split View */
-                    md:relative md:translate-x-0 md:z-0 md:shadow-none
-                    md:bg-transparent md:backdrop-blur-none
-                    transition-[width,opacity]
-                    ${isSidebarOpen ? "md:w-[360px] opacity-100" : "md:w-0 opacity-0 md:overflow-hidden"}
-                  `}
-                >
-                  {/* ปุ่มปิด (X) - 🟢 แสดงเฉพาะ Mobile */}
-                  <button 
-                    ref={toggleBtnRef} // 🟢 [สำคัญ] ผูก Ref ตรงนี้ (หรือจะผูกที่ Desktop ด้วยก็ได้ ถ้าอยากให้วิ่งไปหาตอนเล่นในคอม)
-                    onClick={toggleSidebar}
-                    className="md:hidden absolute top-3 right-3 p-2 text-slate-500 hover:text-red-500 dark:text-slate-400 dark:hover:text-red-400 transition-colors z-50"
-                    title="ปิดฟิลเตอร์"
-                  >
-                    <CloseIcon />
-                  </button>
-
-                  <LeftSidebar
-                    isSidebarOpen={isSidebarOpen}
-                    searchTerm={searchTerm}
-                    setSearchTerm={setSearchTerm}
-                    allCardTypes={allCardTypes}
-                    filterTypes={filterTypes}
-                    setFilterTypes={setFilterTypes}
-                    filterMagicType={filterMagicType}
-                    setFilterMagicType={setFilterMagicType}
-                    allColorTypes={allColorTypes}
-                    filterColors={filterColors}
-                    setFilterColors={setFilterColors}
-                    allRarities={allRarities}
-                    filterRarities={filterRarities}
-                    setFilterRarities={setFilterRarities}
-                    allSets={allSets}
-                    selectedSets={selectedSets}
-                    onSetSelectionChange={handleSetSelectionChange}
-                    statFilters={statFilters}
-                    onStatFilterChange={handleStatFilterChange}
-                    mainDeck={mainDeck}
-                    lifeDeck={lifeDeck}
-                    RULES={RULES}
-                    addToMain={addToMain}
-                    addToLife={addToLife}
-                    removeFromMain={removeFromMain}
-                    removeFromLife={removeFromLife}
-                    handleImport={handleImport}
-                    handleExport={handleExport}
-                    handleClear={handleClear}
-                    handleReloadFromTxt={handleReloadFromTxt}
-                    mainDeckRef={mainDeckRef}
-                    onViewDeck={setViewingDeck}
-                    onAnalyzeDeck={handleAnalyzeDeck}
-                    isLoadingAnalysis={isLoadingAnalysis}
-                  />
+                <div className={`fixed inset-0 bg-black/60 backdrop-blur-sm z-[80] transition-opacity duration-300 ease-in-out ${isSidebarOpen ? "opacity-100" : "opacity-0 pointer-events-none"} md:hidden`} onClick={() => isSidebarOpen && toggleSidebar()} />
+                <div className={`fixed top-0 left-0 h-full z-[150] w-[300px] bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-r border-slate-300 dark:border-emerald-500/30 shadow-2xl transition-transform duration-300 ease-in-out ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"} md:relative md:translate-x-0 md:z-0 md:shadow-none md:bg-transparent md:backdrop-blur-none transition-[width,opacity] ${isSidebarOpen ? "md:w-[360px] opacity-100" : "md:w-0 opacity-0 md:overflow-hidden"}`}>
+                  <button ref={toggleBtnRef} onClick={toggleSidebar} className="md:hidden absolute top-3 right-3 p-2 text-slate-500 hover:text-red-500 dark:text-slate-400 dark:hover:text-red-400 transition-colors z-50" title="ปิดฟิลเตอร์"><CloseIcon /></button>
+                  <LeftSidebar isSidebarOpen={isSidebarOpen} searchTerm={searchTerm} setSearchTerm={setSearchTerm} allCardTypes={allCardTypes} filterTypes={filterTypes} setFilterTypes={setFilterTypes} filterMagicType={filterMagicType} setFilterMagicType={setFilterMagicType} allColorTypes={allColorTypes} filterColors={filterColors} setFilterColors={setFilterColors} allRarities={allRarities} filterRarities={filterRarities} setFilterRarities={setFilterRarities} allSets={allSets} selectedSets={selectedSets} onSetSelectionChange={handleSetSelectionChange} statFilters={statFilters} onStatFilterChange={handleStatFilterChange} mainDeck={mainDeck} lifeDeck={lifeDeck} RULES={RULES} addToMain={addToMain} addToLife={addToLife} removeFromMain={removeFromMain} removeFromLife={removeFromLife} handleImport={handleImport} handleExport={handleExport} handleClear={handleClear} handleReloadFromTxt={handleReloadFromTxt} mainDeckRef={mainDeckRef} onViewDeck={setViewingDeck} onAnalyzeDeck={handleAnalyzeDeck} isLoadingAnalysis={isLoadingAnalysis} />
                 </div>
-
-                {/* ================================================================= */}
-                {/* 📱 1. ปุ่ม Mobile Toggle */}
-                {/* ================================================================= */}
-                <button
-                  onClick={toggleSidebar}
-                  className={`
-                    md:hidden
-                    flex fixed 
-                    bottom-6 
-                    z-[160]                         /* 🟢 แก้เป็น z-[160] (สูงกว่า Sidebar) */
-                    items-center justify-center
-                    w-12 h-12 rounded-full 
-                    bg-white/90 dark:bg-slate-800/90
-                    backdrop-blur-md
-                    border border-slate-300 dark:border-emerald-500/50
-                    text-emerald-600 dark:text-emerald-400
-                    shadow-xl
-                    transition-all duration-300 ease-in-out
-                    ${isSidebarOpen ? "left-[310px]" : "left-4"}
-                  `}
-                >
-                  {isSidebarOpen ? <ChevronLeftIcon /> : <ChevronRightIcon />}
+                <button onClick={toggleSidebar} className={`md:hidden flex fixed bottom-6 z-[160] items-center justify-center w-12 h-12 rounded-full bg-white/90 dark:bg-slate-800/90 backdrop-blur-md border border-slate-300 dark:border-emerald-500/50 text-emerald-600 dark:text-emerald-400 shadow-xl transition-all duration-300 ease-in-out ${isSidebarOpen ? "left-[310px]" : "left-4"}`}>
+                  {isSidebarOpen ? <ChevronLeftIcon /> : <FilterIcon />}
                 </button>
-
-                {/* ================================================================= */}
-                {/* 💻 2. ปุ่ม Desktop Toggle */}
-                {/* ================================================================= */}
-                <button
-                  onClick={toggleSidebar}
-                  className={`
-                    hidden md:flex
-                    fixed 
-                    z-[160]                         /* 🟢 แก้เป็น z-[160] (สูงกว่า Sidebar) */
-                    top-1/2 -translate-y-1/2
-                    items-center justify-center
-                    w-8 h-24 rounded-r-2xl border-y border-r border-l-0
-                    bg-white/90 dark:bg-slate-900/90
-                    backdrop-blur-md
-                    border-slate-300 dark:border-emerald-700/50
-                    text-emerald-600 dark:text-emerald-400
-                    shadow-[4px_0_10px_-2px_rgba(0,0,0,0.1)]
-                    hover:w-10
-                    transition-all duration-300 ease-in-out
-                    ${isSidebarOpen ? "left-[360px]" : "left-0"}
-                  `}
-                  title={isSidebarOpen ? "ซ่อน Filter" : "แสดง Filter"}
-                >
-                  <div className={`${!isSidebarOpen ? "rotate-180" : ""} transition-transform duration-300`}>
-                    <ChevronLeftIcon />
-                  </div>
+                <button onClick={toggleSidebar} className={`hidden md:flex fixed z-[160] top-1/2 -translate-y-1/2 items-center justify-center w-8 h-24 rounded-r-2xl border-y border-r border-l-0 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border-slate-300 dark:border-emerald-700/50 text-emerald-600 dark:text-emerald-400 shadow-[4px_0_10px_-2px_rgba(0,0,0,0.1)] hover:w-10 transition-all duration-300 ease-in-out ${isSidebarOpen ? "left-[360px]" : "left-0"}`} title={isSidebarOpen ? "ซ่อน Filter" : "แสดง Filter"}>
+                  <div className={`${!isSidebarOpen ? "rotate-180" : ""} transition-transform duration-300`}><ChevronLeftIcon /></div>
                 </button>
-                {/* ======================================================== */}
-
-                <div
-                  className={`${
-                    activeView === "cards" ? "flex" : "hidden"
-                  } md:flex flex-1 flex-col h-full min-h-0 relative`} /* ✅ เพิ่ม min-h-0 เพื่อแก้บั๊ก Flexbox ไม่ยอม Scroll */
-                >
-                  <section
-                    ref={scrollRef}
-                    onScroll={handleScroll}
-                    className={`
-                      flex-1 h-full w-full
-                      overflow-y-auto           /* ✅ อนุญาตให้เลื่อนแนวตั้ง */
-                      overflow-x-hidden         /* ❌ ห้ามเลื่อนแนวนอน */
-                      -webkit-overflow-scrolling-touch /* ✅ เพิ่มความลื่นไหลบน iOS */
-                      transition-all duration-300 ease-in-out 
-                      p-2 lg:py-8 md:pr-12 lg:pr-16 
-                      pb-40                     /* ✅ เพิ่มพื้นที่ด้านล่างเยอะๆ ให้เลื่อนหนีปุ่มได้ */
-                      ${isSidebarOpen
-                        ? "md:pl-12 lg:pl-16"
-                        : "md:pl-16 lg:pl-24 xl:pl-32"
-                      } 
-                    `}
-                  >
-                    
+                <div className={`${activeView === "cards" ? "flex" : "hidden"} md:flex flex-1 flex-col h-full min-h-0 relative`}>
+                  <section ref={scrollRef} onScroll={handleScroll} className={`flex-1 h-full w-full overflow-y-auto overflow-x-hidden -webkit-overflow-scrolling-touch transition-all duration-300 ease-in-out p-2 lg:py-8 md:pr-12 lg:pr-16 pb-40 ${isSidebarOpen ? "md:pl-12 lg:pl-16" : "md:pl-16 lg:pl-24 xl:pl-32"}`}>
                     <div className="relative bg-white dark:bg-slate-900 text-center py-8 px-4 border-b border-slate-300 dark:border-emerald-700/30 overflow-hidden rounded-lg mb-10">
-                       <div className="absolute inset-0 bg-gradient-to-b from-black/30 to-slate-900 opacity-50"></div>
-                       <div className="absolute inset-0 bg-cover bg-center opacity-10" style={{ backgroundImage: "url('https://www.tcgthailand.com/assets/img/banner.1b838965.webp')" }}></div>
-                       <div className="relative z-10 flex flex-col items-center justify-center">
-                          <img src="/cards/LOGOBOT.png" alt="Battle Of Talingchan Logo" className="w-24 h-24 md:w-28 md:h-28 mb-2 object-contain drop-shadow-lg" onError={(e) => { e.currentTarget.style.display = "none"; }} />
-                          <h1 className="text-3xl md:text-5xl font-extrabold tracking-tight text-slate-900 dark:text-white drop-shadow-md">Battle Of Talingchan</h1>
-                       </div>
+                      <div className="absolute inset-0 bg-gradient-to-b from-black/30 to-slate-900 opacity-50"></div>
+                      <div className="absolute inset-0 bg-cover bg-center opacity-10" style={{ backgroundImage: "url('https://www.tcgthailand.com/assets/img/banner.1b838965.webp')" }}></div>
+                      <div className="relative z-10 flex flex-col items-center justify-center">
+                        <img src="/cards/LOGOBOT.png" alt="Battle Of Talingchan Logo" className="w-24 h-24 md:w-28 md:h-28 mb-2 object-contain drop-shadow-lg" onError={(e) => { e.currentTarget.style.display = "none"; }} />
+                        <h1 className="text-3xl md:text-5xl font-extrabold tracking-tight text-slate-900 dark:text-white drop-shadow-md">Battle Of Talingchan</h1>
+                      </div>
                     </div>
-
                     {cardDb.length === 0 ? (
                       <CardShell>
                         <div className="text-center py-20">
-                          <h3 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">
-                            กำลังโหลดฐานข้อมูลการ์ด...
-                          </h3>
-                          <p className="text-slate-700 dark:text-gray-300">
-                            หากไม่สำเร็จ ลองกด "Reload from TXT" ที่แถบซ้าย
-                          </p>
+                          <h3 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">กำลังโหลดฐานข้อมูลการ์ด...</h3>
+                          <p className="text-slate-700 dark:text-gray-300">หากไม่สำเร็จ ลองกด "Reload from TXT" ที่แถบซ้าย</p>
                         </div>
                       </CardShell>
                     ) : (
                       <>
-                        <CardGrid
-                          cards={paginatedCards}
-                          onDoubleClick={handleCardDoubleClick}
-                          onViewDetails={setZoomedCard}
-                          onAddCard={addToMain}
-                          // 🟢 [เพิ่ม] ส่งฟังก์ชันเปิดประมูลเข้าไป
-                          onAuction={(card) => {
-                              setAuctionTargetCard(card);
-                              setIsAuctionModalOpen(true);
-                          }}
-                        />
-                        
+                        <CardGrid cards={paginatedCards} onDoubleClick={handleCardDoubleClick} onViewDetails={setZoomedCard} onAddCard={addToMain} onAuction={(card) => { setAuctionTargetCard(card); setIsAuctionModalOpen(true); }} />
                         {totalPages > 1 && (
                           <div className="relative z-[70] flex items-center justify-center gap-4 mt-12 py-4 pb-10">
-                            <Button onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} disabled={currentPage === 1}>
-                              ย้อนกลับ
-                            </Button>
-                            <span className="text-slate-900 dark:text-white font-semibold tabular-nums">
-                              หน้า {currentPage} / {totalPages}
-                            </span>
-                            <Button onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}>
-                              ถัดไป
-                            </Button>
+                            <Button onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} disabled={currentPage === 1}>ย้อนกลับ</Button>
+                            <span className="text-slate-900 dark:text-white font-semibold tabular-nums">หน้า {currentPage} / {totalPages}</span>
+                            <Button onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}>ถัดไป</Button>
                           </div>
                         )}
-
                         <footer className="relative z-[70] mt-4 py-10 text-center border-t border-slate-300 dark:border-emerald-700/30">
-                          <h3 className="text-lg font-semibold text-amber-600 dark:text-amber-300 mb-4">
-                            สามารถสนับสนุนค่ากาแฟและค่าเซิร์ฟเวอร์ได้ที่นี่นะคะ ❤️❤️❤️
-                          </h3>
+                          <h3 className="text-lg font-semibold text-amber-600 dark:text-amber-300 mb-4">สามารถสนับสนุนค่ากาแฟและค่าเซิร์ฟเวอร์ได้ที่นี่นะคะ ❤️❤️❤️</h3>
                           <img src="/assets/QRCODE.png" alt="Donate QR Code" className="w-48 h-48 mx-auto rounded-lg border-4 border-emerald-500/30" onError={(e) => (e.currentTarget.style.display = "none")} />
                         </footer>
-
-                        {/* ===================================================== */}
-                        {/* 🟢 ปุ่ม Scroll to Top (แก้ไขเงื่อนไขการแสดงผล) */}
-                        {/* ===================================================== */}
-                        <button
-                          onClick={scrollToTop}
-                          className={`
-                            fixed bottom-6 right-6 z-[90]
-                            p-3 rounded-full shadow-xl
-                            bg-amber-500 text-white
-                            border border-amber-400
-                            hover:bg-amber-400 hover:-translate-y-1
-                            transition-all duration-300 ease-in-out
-                            
-                            /* 👇 แก้ตรงนี้: เพิ่ม && !isSidebarOpen */
-                            /* ความหมาย: ต้องเลื่อนลงมา (showScrollTop) AND ฟิลเตอร์ต้องปิดอยู่ (!isSidebarOpen) ถึงจะโชว์ */
-                            ${showScrollTop && !isSidebarOpen ? "opacity-100 scale-100" : "opacity-0 scale-0 pointer-events-none"}
-                          `}
-                          title="เลื่อนขึ้นบนสุด"
-                        >
-                          <ChevronUpIcon />
-                        </button>
+                        <button onClick={scrollToTop} className={`fixed bottom-6 right-6 z-[90] p-3 rounded-full shadow-xl bg-amber-500 text-white border border-amber-400 hover:bg-amber-400 hover:-translate-y-1 transition-all duration-300 ease-in-out ${showScrollTop && !isSidebarOpen ? "opacity-100 scale-100" : "opacity-0 scale-0 pointer-events-none"}`} title="เลื่อนขึ้นบนสุด"><ChevronUpIcon /></button>
                       </>
                     )}
                   </section>
                 </div>
               </main>
-
-              {/* Modals */}
-              <Modal
-                isOpen={modal.isOpen}
-                title={modal.title}
-                onClose={closeModal}
-                onConfirm={modal.onConfirm}
-                confirmText={
-                  modal.onConfirm ? modal.confirmText || "Confirm" : undefined
-                }
-                confirmIcon={
-                  modal.onConfirm ? modal.confirmIcon || <TrashIcon /> : undefined
-                }
-              >
-                {" "}
-                {modal.message}{" "}
-              </Modal>
-              <ImportDeckModal
-                isOpen={isImportModalOpen}
-                onClose={closeImportModal}
-                onImport={confirmImport}
-              />
-              
-              {/* ================================================================= */}
-              {/* === 📍 [5] แก้ไขการส่ง Props ไปยัง DeckAnalysisModal === */}
-              {/* ================================================================= */}
-              <DeckAnalysisModal
-                isOpen={analysisDeck.deck !== null}
-                onClose={() => setAnalysisDeck({ deck: null, showChart: true })}
-                mainDeck={analysisDeck.deck ? analysisDeck.deck.main : []}
-                lifeDeck={analysisDeck.deck ? analysisDeck.deck.life : []}
-                showChart={analysisDeck.showChart}
-                showAlert={showAlert}
-                theme={theme}
-              />
-
-              <DeckViewModal
-                isOpen={viewingDeck !== null}
-                onClose={() => setViewingDeck(null)}
-                deck={viewingDeck === "main" ? mainDeck : lifeDeck}
-                rules={viewingDeck === "main" ? RULES.main : RULES.life}
-                onAddCard={viewingDeck === "main" ? addToMain : addToLife}
-                onRemoveCard={
-                  viewingDeck === "main" ? removeFromMain : removeFromLife
-                }
-                title={viewingDeck === "main" ? "Main Deck" : "Life Deck"}
-              />
-              <CardDetailModal
-    card={zoomedCard}
-    onClose={() => setZoomedCard(null)}
-    // 👇 ต้องเพิ่มบรรทัดนี้ ปุ่มถึงจะทำงานได้
-    onSell={(card) => {
-        setAuctionTargetCard(card);
-        setIsAuctionModalOpen(true);
-        setZoomedCard(null);
-    }}
-/>
-
-{/* 👇 เพิ่ม Modal นี้ต่อท้ายด้วย (ถ้ายังไม่มี) */}
-<CreateAuctionModal
-    isOpen={isAuctionModalOpen}
-    onClose={() => setIsAuctionModalOpen(false)}
-    card={auctionTargetCard}
-    userProfile={displayUser}
-/>
-                
-              {/* ================================================================= */}
-              {/* === 📍 [6] แก้ไข `onShowCards` ให้ตั้ง `showChart: false` === */}
-              {/* ================================================================= */}
-              <DeckListModal
-                isOpen={isDeckListModalOpen}
-                onClose={() => setIsDeckListModalOpen(false)}
-                userProfile={displayUser}
-                userDecks={userDecks}
-                setUserDecks={setUserDecks}
-                mainDeck={mainDeck}
-                lifeDeck={lifeDeck}
-                setMainDeck={setMainDeck}
-                setLifeDeck={setLifeDeck}
-                showAlert={showAlert}
-                setModal={setModal}
-                closeModal={closeModal}
-                encodeDeckCode={encodeDeckCode}
-                decodeDeckCode={decodeDeckCode}
-                allCards={cardDb}
-                onShowCards={(deck) => setAnalysisDeck({ deck: deck, showChart: false })}
-                key={userProfile?.email || "guest"}
-              />
-
-              {/* [ใหม่] Modalsสำหรับ Profile */}
-              <ProfileSetupModal
-                isOpen={isProfileModalOpen}
-                onClose={() => setIsProfileModalOpen(false)}
-                userProfile={userProfile}
-                onSave={handleSaveProfile}
-              />
-              <SettingsDrawer
-                isOpen={isSettingsOpen}
-                onClose={() => setIsSettingsOpen(false)}
-                userProfile={displayUser}
-                onEditProfile={() => setIsProfileModalOpen(true)}
-                onLogout={handleLogout}
-                theme={theme}
-                setTheme={setTheme}
-                onOpenFeedback={() => setIsFeedbackOpen(true)} // <--- เพิ่มบรรทัดนี้
-                onOpenMyDecks={() => setIsDeckListModalOpen(true)}
-              />
-              <FeedbackModal 
-                isOpen={isFeedbackOpen}
-                onClose={() => setIsFeedbackOpen(false)}
-                userProfile={displayUser}
-                showAlert={showAlert}
-              />
+              <Modal isOpen={modal.isOpen} title={modal.title} onClose={closeModal} onConfirm={modal.onConfirm} confirmText={modal.onConfirm ? modal.confirmText || "Confirm" : undefined} confirmIcon={modal.onConfirm ? modal.confirmIcon || <TrashIcon /> : undefined}>{modal.message}</Modal>
+              <ImportDeckModal isOpen={isImportModalOpen} onClose={closeImportModal} onImport={confirmImport} />
+              <DeckAnalysisModal isOpen={analysisDeck.deck !== null} onClose={() => setAnalysisDeck({ deck: null, showChart: true })} mainDeck={analysisDeck.deck ? analysisDeck.deck.main : []} lifeDeck={analysisDeck.deck ? analysisDeck.deck.life : []} showChart={analysisDeck.showChart} showAlert={showAlert} theme={theme} />
+              <DeckViewModal isOpen={viewingDeck !== null} onClose={() => setViewingDeck(null)} deck={viewingDeck === "main" ? mainDeck : lifeDeck} rules={viewingDeck === "main" ? RULES.main : RULES.life} onAddCard={viewingDeck === "main" ? addToMain : addToLife} onRemoveCard={viewingDeck === "main" ? removeFromMain : removeFromLife} title={viewingDeck === "main" ? "Main Deck" : "Life Deck"} />
+              <CardDetailModal card={zoomedCard} onClose={() => setZoomedCard(null)} onSell={(card) => { setAuctionTargetCard(card); setIsAuctionModalOpen(true); setZoomedCard(null); }} />
+              <CreateAuctionModal isOpen={isAuctionModalOpen} onClose={() => setIsAuctionModalOpen(false)} card={auctionTargetCard} userProfile={displayUser} />
+              <DeckListModal isOpen={isDeckListModalOpen} onClose={() => setIsDeckListModalOpen(false)} userProfile={displayUser} userDecks={userDecks} setUserDecks={setUserDecks} mainDeck={mainDeck} lifeDeck={lifeDeck} setMainDeck={setMainDeck} setLifeDeck={setLifeDeck} showAlert={showAlert} setModal={setModal} closeModal={closeModal} encodeDeckCode={encodeDeckCode} decodeDeckCode={decodeDeckCode} allCards={cardDb} onShowCards={(deck) => setAnalysisDeck({ deck: deck, showChart: false })} key={userProfile?.email || "guest"} />
+              <ProfileSetupModal isOpen={isProfileModalOpen} onClose={() => setIsProfileModalOpen(false)} userProfile={userProfile} onSave={handleSaveProfile} />
+              <SettingsDrawer isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} userProfile={displayUser} onEditProfile={() => setIsProfileModalOpen(true)} onLogout={handleLogout} theme={theme} setTheme={setTheme} onOpenFeedback={() => setIsFeedbackOpen(true)} onOpenMyDecks={() => setIsDeckListModalOpen(true)} userStats={userReputation?.[userProfile?.email]} />
+              <FeedbackModal isOpen={isFeedbackOpen} onClose={() => setIsFeedbackOpen(false)} userProfile={displayUser} showAlert={showAlert} />
             </>
           )}
         </div>
-        {/* 🟢 แสดงลูกไฟวิ่ง */}
-        {flyingLights.map(light => (
-          <FlyingLight 
-            key={light.id} 
-            startRect={light.startRect} 
-            endRect={light.endRect} 
-            onComplete={() => removeLight(light.id)} 
-          />
-        ))}
-
+        {flyingLights.map(light => <FlyingLight key={light.id} startRect={light.startRect} endRect={light.endRect} onComplete={() => removeLight(light.id)} />)}
       </DndStateProvider>
     </DndProvider>
   );

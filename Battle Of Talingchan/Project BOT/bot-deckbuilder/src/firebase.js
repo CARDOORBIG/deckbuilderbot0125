@@ -1,8 +1,7 @@
 import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
+import { getAuth } from "firebase/auth"; // 🟢 1. เพิ่มบรรทัดนี้
 
-// 🛑 [สำคัญมาก]
-// วางโค้ด config ที่คัดลอกมาจาก Firebase Console ของคุณ
 const firebaseConfig = {
   apiKey: "AIzaSyBdP9emGgja_VWZDXUhW11RP9fMZnePLuU",
   authDomain: "battle-of-talingchan-builder.firebaseapp.com",
@@ -13,8 +12,7 @@ const firebaseConfig = {
   measurementId: "G-RW09XRTQFN"
 };
 
-// Initialize Firebase
 const app = initializeApp(firebaseConfig);
 
-// Initialize Cloud Firestore and export it
 export const db = getFirestore(app);
+export const auth = getAuth(app); // 🟢 2. เพิ่มบรรทัดนี้ (Export auth ออกไปใช้)
