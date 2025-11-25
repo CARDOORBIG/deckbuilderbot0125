@@ -1008,16 +1008,16 @@ export default function AuctionMarket() {
                             onChange={(e) => setSortOption(e.target.value)}
                             className="px-2 py-1.5 md:py-2 bg-slate-100 dark:bg-slate-800 rounded-lg text-xs font-bold text-slate-700 dark:text-slate-300 border-none outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer"
                         >
-                            <option value="ending_soon">⏳ เวลา</option>
-                            <option value="price_asc">💰 ถูก➜แพง</option>
-                            <option value="price_desc">💎 แพง➜ถูก</option>
+                            <option value="ending_soon">เวลา</option>
+                            <option value="price_asc">ถูก➜แพง</option>
+                            <option value="price_desc">แพง➜ถูก</option>
                         </select>
 
                         {/* Filter Buttons */}
                         <div className="flex bg-slate-100 dark:bg-slate-800 rounded-lg p-1 gap-1">
                             <button onClick={() => setFilterStatus('all')} className={`px-2 py-1 rounded text-[10px] md:text-xs font-bold transition-all ${filterStatus === 'all' ? 'bg-white dark:bg-slate-600 shadow text-emerald-600 dark:text-emerald-400' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}>รวม</button>
                             <button onClick={() => setFilterStatus('active_bid')} className={`px-2 py-1 rounded text-[10px] md:text-xs font-bold transition-all ${filterStatus === 'active_bid' ? 'bg-white dark:bg-slate-600 shadow text-red-500' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}>เดือด</button>
-                            <button onClick={() => setFilterStatus('no_bid')} className={`px-2 py-1 rounded text-[10px] md:text-xs font-bold transition-all ${filterStatus === 'no_bid' ? 'bg-white dark:bg-slate-600 shadow text-blue-500' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}>❄️ ซิง</button>
+                            <button onClick={() => setFilterStatus('no_bid')} className={`px-2 py-1 rounded text-[10px] md:text-xs font-bold transition-all ${filterStatus === 'no_bid' ? 'bg-white dark:bg-slate-600 shadow text-blue-500' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}>ซิง</button>
                         </div>
 
                         {/* Separator */}
