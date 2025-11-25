@@ -13,7 +13,7 @@ import NotificationCenter from './NotificationCenter';
 import SettingsDrawer from './components/SettingsDrawer';
 import ProfileSetupModal from './components/ProfileSetupModal';
 import RatingBadge from './components/RatingBadge';
-import DeckListModal from './components/DeckListModal'; // 🟢 Import เข้ามาแล้ว
+import DeckListModal from './components/DeckListModal';
 import { 
     MenuIcon, GavelIcon, ShoppingBagIcon, UserCogIcon, 
     CloseIcon, SunIcon, MoonIcon, HistoryIcon, 
@@ -21,7 +21,8 @@ import {
     ShieldCheckIcon, ChatBubbleIcon, SendIcon, 
     TrashIcon, UsersIcon, DeckIcon, StoreIcon, 
     HomeIcon, MessageIcon, NeonLightningIcon, 
-    ImageIcon, ArchiveIcon 
+    ImageIcon, ArchiveIcon,
+    ChevronLeftIcon // 🟢 เพิ่มการ Import ตรงนี้ครับ
 } from './components/Icons';
 
 // === Helper Functions ===
@@ -32,7 +33,7 @@ const getCardImageUrl = (cardImagePath, cardId) => {
     return `/cards/${encodePath(cardImagePath)}/${encodeURIComponent(fileId)}.png`;
 };
 
-// Custom Hook สำหรับ LocalStorage (ย้ายออกมาข้างนอกให้ถูกต้อง)
+// Custom Hook สำหรับ LocalStorage
 function useLocalStorage(key, initial) { 
     const [v, s] = useState(() => { 
         try { 
@@ -150,7 +151,7 @@ const ManageBiddersModal = ({ isOpen, onClose, auction, userProfile }) => {
     );
 };
 
-// === Auction Room Modal (Fixed: Hide buttons if ended) ===
+// === Auction Room Modal ===
 const AuctionRoomModal = ({ isOpen, onClose, auction, userProfile, onBid, onBuyNow }) => {
     const [messages, setMessages] = useState([]);
     const [newMessage, setNewMessage] = useState("");
@@ -174,7 +175,7 @@ const AuctionRoomModal = ({ isOpen, onClose, auction, userProfile, onBid, onBuyN
 
     if (!isOpen || !auction) return null;
 
-    // 🟢 เช็คว่าจบหรือยัง (เพื่อซ่อนปุ่ม)
+    // เช็คสถานะจบ
     const isEnded = auction.status !== 'active' || new Date(auction.end_time) < new Date();
 
     return createPortal(
@@ -183,6 +184,7 @@ const AuctionRoomModal = ({ isOpen, onClose, auction, userProfile, onBid, onBuyN
                 
                 {/* 🖼️ ส่วนซ้าย: รูปภาพ */}
                 <div className="w-full md:w-2/3 h-[50vh] md:h-full flex flex-col bg-slate-100 dark:bg-slate-950 relative">
+                    {/* 🟢 ใช้ ChevronLeftIcon ที่ import มาแล้ว */}
                     <button onClick={onClose} className="absolute top-4 left-4 z-20 bg-black/50 text-white p-2 rounded-full md:hidden hover:bg-red-500 transition-colors"><ChevronLeftIcon /></button>
                     
                     <div className="flex-grow flex items-center justify-center p-4 relative overflow-hidden">
@@ -244,7 +246,6 @@ const AuctionRoomModal = ({ isOpen, onClose, auction, userProfile, onBid, onBuyN
                         </div>
                         
                         {/* Buttons Group */}
-                        {/* 🟢 [แก้ไข] เพิ่มเงื่อนไข !isEnded เพื่อซ่อนปุ่มถ้าจบแล้ว */}
                         {userProfile?.email !== auction.seller_email && !isEnded && (
                             <div className="flex gap-2">
                                 {auction.buy_now_price > 0 && (
@@ -268,8 +269,7 @@ const AuctionRoomModal = ({ isOpen, onClose, auction, userProfile, onBid, onBuyN
                                 </button>
                             </div>
                         )}
-                        
-                        {/* 🟢 [เพิ่ม] แสดงข้อความถ้าจบแล้ว */}
+
                         {isEnded && (
                             <div className="px-4 py-2 bg-slate-200 dark:bg-slate-800 text-slate-500 rounded-lg text-sm font-bold">
                                 ปิดประมูลแล้ว
@@ -1008,16 +1008,16 @@ export default function AuctionMarket() {
                             onChange={(e) => setSortOption(e.target.value)}
                             className="px-2 py-1.5 md:py-2 bg-slate-100 dark:bg-slate-800 rounded-lg text-xs font-bold text-slate-700 dark:text-slate-300 border-none outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer"
                         >
-                            <option value="ending_soon">เวลา</option>
-                            <option value="price_asc">ถูก➜แพง</option>
-                            <option value="price_desc">แพง➜ถูก</option>
+                            <option value="ending_soon">⏳ เวลา</option>
+                            <option value="price_asc">💰 ถูก➜แพง</option>
+                            <option value="price_desc">💎 แพง➜ถูก</option>
                         </select>
 
                         {/* Filter Buttons */}
                         <div className="flex bg-slate-100 dark:bg-slate-800 rounded-lg p-1 gap-1">
                             <button onClick={() => setFilterStatus('all')} className={`px-2 py-1 rounded text-[10px] md:text-xs font-bold transition-all ${filterStatus === 'all' ? 'bg-white dark:bg-slate-600 shadow text-emerald-600 dark:text-emerald-400' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}>รวม</button>
                             <button onClick={() => setFilterStatus('active_bid')} className={`px-2 py-1 rounded text-[10px] md:text-xs font-bold transition-all ${filterStatus === 'active_bid' ? 'bg-white dark:bg-slate-600 shadow text-red-500' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}>เดือด</button>
-                            <button onClick={() => setFilterStatus('no_bid')} className={`px-2 py-1 rounded text-[10px] md:text-xs font-bold transition-all ${filterStatus === 'no_bid' ? 'bg-white dark:bg-slate-600 shadow text-blue-500' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}>บิดคนแรก</button>
+                            <button onClick={() => setFilterStatus('no_bid')} className={`px-2 py-1 rounded text-[10px] md:text-xs font-bold transition-all ${filterStatus === 'no_bid' ? 'bg-white dark:bg-slate-600 shadow text-blue-500' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}>❄️ ซิง</button>
                         </div>
 
                         {/* Separator */}
