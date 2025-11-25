@@ -22,17 +22,32 @@ const RatingBadge = ({ score }) => {
 
     let theme = {};
 
+    // 1. ❌ พวกป่วน (ติดลบ)
     if (s < 0) {
         theme = { icon: Icons.Cross, label: 'เครดิตเสีย', style: 'text-red-600 border-red-600 bg-red-950/40 shadow-[0_0_10px_rgba(220,38,38,0.8)]' };
-    } else if (s < 1000) {
-        theme = { icon: Icons.New, label: 'หน้าใหม่', style: 'text-slate-300 border-slate-500 bg-slate-800/40 shadow-[0_0_5px_rgba(148,163,184,0.3)]' };
-    } else if (s < 10000) {
+    } 
+    // 2. ⚪ หน้าใหม่ (0 - 999) --> 🟢 ปรับ Scale ให้เล็กลง (scale-90)
+    else if (s < 1000) {
+        theme = { 
+            icon: Icons.New, 
+            label: 'หน้าใหม่', 
+            style: 'text-slate-300 border-slate-500 bg-slate-800/40 shadow-[0_0_5px_rgba(148,163,184,0.3)] scale-90 opacity-80' 
+        };
+    } 
+    // 3. 🟢 นักประมูลฝึกหัด (1,000 - 9,999)
+    else if (s < 10000) {
         theme = { icon: Icons.Leaf, label: 'ฝึกหัด', style: 'text-emerald-400 border-emerald-500 bg-emerald-900/20 shadow-[0_0_8px_rgba(52,211,153,0.6)]' };
-    } else if (s < 30000) {
+    } 
+    // 4. 🔵 นักประมูลขาประจำ (10,000 - 29,999)
+    else if (s < 30000) {
         theme = { icon: Icons.Shield, label: 'ขาประจำ', style: 'text-cyan-400 border-cyan-500 bg-cyan-900/20 shadow-[0_0_10px_rgba(34,211,238,0.7)]' };
-    } else if (s < 50000) {
+    } 
+    // 5. 🟣 นักประมูลทุนหนา (30,000 - 49,999)
+    else if (s < 50000) {
         theme = { icon: Icons.Diamond, label: 'ทุนหนา', style: 'text-fuchsia-300 border-fuchsia-400 bg-fuchsia-900/40 shadow-[0_0_15px_2px_rgba(217,70,239,0.7)] drop-shadow-[0_0_5px_rgba(217,70,239,1)] font-bold' };
-    } else {
+    } 
+    // 6. 🔴 สุลต่าน (50,000+)
+    else {
         theme = { icon: Icons.Sultan, label: 'สุลต่าน', style: 'text-rose-100 border-rose-500 bg-rose-900/60 shadow-[0_0_20px_4px_rgba(244,63,94,0.9)] drop-shadow-[0_0_10px_rgba(244,63,94,1)] font-black animate-pulse border-2' };
     }
     

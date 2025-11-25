@@ -684,6 +684,7 @@ export default function App() {
     if (userProfile?.email) fetchUserProfile(userProfile.email);
   }, []);
 
+  // 🟢 [UPDATED] โหลดคะแนน + Realtime (แก้ตรงนี้)
   useEffect(() => {
     if (userProfile?.email) {
       const fetchStats = async () => {
@@ -692,11 +693,31 @@ export default function App() {
           .select('user_email, total_score')
           .eq('user_email', userProfile.email)
           .single();
+        
         if (data) {
           setUserReputation({ [data.user_email]: data });
         }
       };
+
+      // 1. โหลดครั้งแรก
       fetchStats();
+
+      // 2. ดักฟังการเปลี่ยนแปลง (เพื่อให้ยศเปลี่ยนทันทีโดยไม่ต้องรีเฟรช)
+      const channel = supabase
+        .channel('realtime_reputation_app')
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'user_reputations' },
+          () => {
+            console.log("🔔 คะแนนเปลี่ยน! อัปเดตยศ...");
+            fetchStats();
+          }
+        )
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
     }
   }, [userProfile]);
 
@@ -874,8 +895,19 @@ export default function App() {
               <CreateAuctionModal isOpen={isAuctionModalOpen} onClose={() => setIsAuctionModalOpen(false)} card={auctionTargetCard} userProfile={displayUser} />
               <DeckListModal isOpen={isDeckListModalOpen} onClose={() => setIsDeckListModalOpen(false)} userProfile={displayUser} userDecks={userDecks} setUserDecks={setUserDecks} mainDeck={mainDeck} lifeDeck={lifeDeck} setMainDeck={setMainDeck} setLifeDeck={setLifeDeck} showAlert={showAlert} setModal={setModal} closeModal={closeModal} encodeDeckCode={encodeDeckCode} decodeDeckCode={decodeDeckCode} allCards={cardDb} onShowCards={(deck) => setAnalysisDeck({ deck: deck, showChart: false })} key={userProfile?.email || "guest"} />
               <ProfileSetupModal isOpen={isProfileModalOpen} onClose={() => setIsProfileModalOpen(false)} userProfile={userProfile} onSave={handleSaveProfile} />
-              <SettingsDrawer isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} userProfile={displayUser} onEditProfile={() => setIsProfileModalOpen(true)} onLogout={handleLogout} theme={theme} setTheme={setTheme} onOpenFeedback={() => setIsFeedbackOpen(true)} onOpenMyDecks={() => setIsDeckListModalOpen(true)} userStats={userReputation?.[userProfile?.email]} />
-              <FeedbackModal isOpen={isFeedbackOpen} onClose={() => setIsFeedbackOpen(false)} userProfile={displayUser} showAlert={showAlert} />
+              <SettingsDrawer
+    isOpen={isSettingsOpen}
+    onClose={() => setIsSettingsOpen(false)}
+    userProfile={displayUser}
+    onEditProfile={() => setIsProfileModalOpen(true)}
+    onLogout={handleLogout}
+    theme={theme}
+    setTheme={setTheme}
+    onOpenFeedback={() => setIsFeedbackOpen(true)}
+    onOpenMyDecks={() => setIsDeckListModalOpen(true)}
+    // 🟢 [เติมบรรทัดนี้] ส่งคะแนนเข้าไปแสดงผล
+    userStats={userReputation[userProfile?.email]} 
+/><FeedbackModal isOpen={isFeedbackOpen} onClose={() => setIsFeedbackOpen(false)} userProfile={displayUser} showAlert={showAlert} />
             </>
           )}
         </div>

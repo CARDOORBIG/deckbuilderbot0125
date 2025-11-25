@@ -13,6 +13,7 @@ import NotificationCenter from './NotificationCenter';
 import SettingsDrawer from './components/SettingsDrawer';
 import ProfileSetupModal from './components/ProfileSetupModal';
 import RatingBadge from './components/RatingBadge';
+import DeckListModal from './components/DeckListModal'; // 🟢 Import เข้ามาแล้ว
 import { 
     MenuIcon, GavelIcon, ShoppingBagIcon, UserCogIcon, 
     CloseIcon, SunIcon, MoonIcon, HistoryIcon, 
@@ -20,8 +21,7 @@ import {
     ShieldCheckIcon, ChatBubbleIcon, SendIcon, 
     TrashIcon, UsersIcon, DeckIcon, StoreIcon, 
     HomeIcon, MessageIcon, NeonLightningIcon, 
-    ImageIcon, ArchiveIcon,
-    ChevronLeftIcon 
+    ImageIcon, ArchiveIcon 
 } from './components/Icons';
 
 // === Helper Functions ===
@@ -31,6 +31,20 @@ const getCardImageUrl = (cardImagePath, cardId) => {
     const fileId = cardId.replace(' - Only#1', '');
     return `/cards/${encodePath(cardImagePath)}/${encodeURIComponent(fileId)}.png`;
 };
+
+// Custom Hook สำหรับ LocalStorage (ย้ายออกมาข้างนอกให้ถูกต้อง)
+function useLocalStorage(key, initial) { 
+    const [v, s] = useState(() => { 
+        try { 
+            const raw = localStorage.getItem(key); 
+            return raw ? JSON.parse(raw) : initial; 
+        } catch { return initial; } 
+    }); 
+    useEffect(() => { 
+        try { localStorage.setItem(key, JSON.stringify(v)); } catch {} 
+    }, [key, v]); 
+    return [v, s]; 
+}
 
 // === UI Components ===
 const Button = ({ className = "", children, ...props }) => (
@@ -136,11 +150,11 @@ const ManageBiddersModal = ({ isOpen, onClose, auction, userProfile }) => {
     );
 };
 
-// === Auction Room Modal ===
+// === Auction Room Modal (Fixed: Hide buttons if ended) ===
 const AuctionRoomModal = ({ isOpen, onClose, auction, userProfile, onBid, onBuyNow }) => {
     const [messages, setMessages] = useState([]);
     const [newMessage, setNewMessage] = useState("");
-    const [showDesc, setShowDesc] = useState(false); // State เปิด/ปิดรายละเอียด
+    const [showDesc, setShowDesc] = useState(false);
     const chatEndRef = useRef(null);
 
     useEffect(() => {
@@ -160,6 +174,9 @@ const AuctionRoomModal = ({ isOpen, onClose, auction, userProfile, onBid, onBuyN
 
     if (!isOpen || !auction) return null;
 
+    // 🟢 เช็คว่าจบหรือยัง (เพื่อซ่อนปุ่ม)
+    const isEnded = auction.status !== 'active' || new Date(auction.end_time) < new Date();
+
     return createPortal(
         <div className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center z-[700] p-0 md:p-4" onClick={onClose}>
             <div className="bg-white dark:bg-slate-900 border-0 md:border border-slate-200 dark:border-emerald-500/30 rounded-none md:rounded-xl shadow-2xl w-full h-full md:h-[90vh] max-w-6xl flex flex-col md:flex-row overflow-hidden" onClick={e => e.stopPropagation()}>
@@ -178,7 +195,6 @@ const AuctionRoomModal = ({ isOpen, onClose, auction, userProfile, onBid, onBuyN
                             <TimeLeft endTime={auction.end_time} />
                         </div>
 
-                        {/* ปุ่มดูรายละเอียด */}
                         {auction.description && (
                             <button 
                                 onClick={() => setShowDesc(true)}
@@ -188,7 +204,6 @@ const AuctionRoomModal = ({ isOpen, onClose, auction, userProfile, onBid, onBuyN
                             </button>
                         )}
 
-                        {/* Overlay แสดงรายละเอียด */}
                         {showDesc && (
                             <div className="absolute inset-0 z-30 bg-black/80 backdrop-blur-sm flex items-center justify-center p-8 animate-fade-in" onClick={() => setShowDesc(false)}>
                                 <div className="bg-white dark:bg-slate-900 p-6 rounded-xl max-w-md w-full max-h-[80vh] overflow-y-auto border border-slate-700 shadow-2xl relative" onClick={e => e.stopPropagation()}>
@@ -216,10 +231,11 @@ const AuctionRoomModal = ({ isOpen, onClose, auction, userProfile, onBid, onBuyN
                             )}
                         </div>
 
-                        {/* Current Price */}
                         <div className="flex-grow min-w-0 flex flex-col items-center justify-center">
                             <div className="flex flex-col items-center justify-center">
-                                <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">CURRENT BID</span>
+                                <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">
+                                    {isEnded ? 'SOLD PRICE' : 'CURRENT BID'}
+                                </span>
                                 <div className="flex items-baseline leading-none">
                                     <span className="text-xl font-bold text-emerald-600 dark:text-emerald-400 mr-1">฿</span>
                                     <span className="text-3xl md:text-4xl font-black font-mono text-slate-900 dark:text-white">{auction.current_price.toLocaleString()}</span>
@@ -228,9 +244,9 @@ const AuctionRoomModal = ({ isOpen, onClose, auction, userProfile, onBid, onBuyN
                         </div>
                         
                         {/* Buttons Group */}
-                        {userProfile?.email !== auction.seller_email && (
+                        {/* 🟢 [แก้ไข] เพิ่มเงื่อนไข !isEnded เพื่อซ่อนปุ่มถ้าจบแล้ว */}
+                        {userProfile?.email !== auction.seller_email && !isEnded && (
                             <div className="flex gap-2">
-                                {/* ปุ่ม Buy Now */}
                                 {auction.buy_now_price > 0 && (
                                     <div className="flex flex-col items-center">
                                         <button 
@@ -250,6 +266,13 @@ const AuctionRoomModal = ({ isOpen, onClose, auction, userProfile, onBid, onBuyN
                                 >
                                     <GavelIcon /> <span className="hidden md:inline">Bid</span>
                                 </button>
+                            </div>
+                        )}
+                        
+                        {/* 🟢 [เพิ่ม] แสดงข้อความถ้าจบแล้ว */}
+                        {isEnded && (
+                            <div className="px-4 py-2 bg-slate-200 dark:bg-slate-800 text-slate-500 rounded-lg text-sm font-bold">
+                                ปิดประมูลแล้ว
                             </div>
                         )}
                     </div>
@@ -520,40 +543,20 @@ export default function AuctionMarket() {
   const [isAdminOpen, setIsAdminOpen] = useState(false);
   const [reportTarget, setReportTarget] = useState(null); 
   const [manageAuction, setManageAuction] = useState(null);
-  // 🟢 [ใหม่ 1.1] ประกาศตัวแปรสำหรับเก็บค่าการค้นหา
+
+  // 🟢 [NEW] State สำหรับระบบกรองและค้นหา
   const [searchTerm, setSearchTerm] = useState("");
   const [sortOption, setSortOption] = useState("ending_soon"); // ending_soon, price_asc, price_desc
   const [filterStatus, setFilterStatus] = useState("all");     // all, active_bid, no_bid
 
-  // 🟢 [ใหม่ 1.2] สูตรคำนวณการกรอง (Logic)
-  // ระบบจะสร้างรายการใหม่ชื่อ "filteredAuctions" ตามเงื่อนไขที่เราเลือก
-  const filteredAuctions = useMemo(() => {
-    return auctions
-      .filter(item => {
-        // 1. กรองตามชื่อ
-        const matchName = item.card_name.toLowerCase().includes(searchTerm.toLowerCase());
-        
-        // 2. กรองตามสถานะ (เดือด/ซิง)
-        let matchStatus = true;
-        if (filterStatus === 'active_bid') {
-           // ราคาปัจจุบัน > ราคาเริ่ม = มีคนบิดแล้ว (เดือด)
-           matchStatus = item.current_price > item.start_price;
-        } else if (filterStatus === 'no_bid') {
-           // ราคาเท่าเดิม = ยังไม่มีใครเปิด (ซิง)
-           matchStatus = item.current_price === item.start_price;
-        }
+  // 🟢 [ใหม่] State สำหรับจัดการ Deck
+  const [isDeckListModalOpen, setIsDeckListModalOpen] = useState(false);
 
-        return matchName && matchStatus;
-      })
-      .sort((a, b) => {
-        // 3. เรียงลำดับ
-        if (sortOption === 'price_asc') return a.current_price - b.current_price; // ราคา ต่ำ->สูง
-        if (sortOption === 'price_desc') return b.current_price - a.current_price; // ราคา สูง->ต่ำ
-        // Default: เวลาเหลือน้อยขึ้นก่อน (ending_soon)
-        return new Date(a.end_time) - new Date(b.end_time);
-      });
-  }, [auctions, searchTerm, sortOption, filterStatus]);
-  
+  const [userDecks, setUserDecks] = useLocalStorage("bot-userDecks-v1", {});
+  const [mainDeck, setMainDeck] = useLocalStorage("bot-mainDeck-v32-final", []);
+  const [lifeDeck, setLifeDeck] = useLocalStorage("bot-lifeDeck-v32-final", []);
+  const [cardDb] = useLocalStorage("bot-cardDb-v32-final", []); // โหลดการ์ดทั้งหมดมาเพื่อใช้ Decode Deck
+
   const [userReputation, setUserReputation] = useState({});
   const [confirmTransaction, setConfirmTransaction] = useState(null);
 
@@ -585,6 +588,34 @@ export default function AuctionMarket() {
     return { ...userProfile, name: customProfile.displayName || userProfile.name, picture: customProfile.avatarUrl || userProfile.picture };
   }, [userProfile, customProfile]);
 
+  // 🟢 [NEW] Logic การกรองและเรียงลำดับ (ใช้ useMemo เพื่อประสิทธิภาพ)
+  const filteredAuctions = useMemo(() => {
+    return auctions
+      .filter(item => {
+        // 1. กรองตามชื่อ
+        const matchName = item.card_name.toLowerCase().includes(searchTerm.toLowerCase());
+        
+        // 2. กรองตามสถานะ (เดือด/ซิง)
+        let matchStatus = true;
+        if (filterStatus === 'active_bid') {
+           // ราคาปัจจุบัน > ราคาเริ่ม = มีคนบิดแล้ว (เดือด)
+           matchStatus = item.current_price > item.start_price;
+        } else if (filterStatus === 'no_bid') {
+           // ราคาเท่าเดิม = ยังไม่มีใครเปิด (ซิง)
+           matchStatus = item.current_price === item.start_price;
+        }
+
+        return matchName && matchStatus;
+      })
+      .sort((a, b) => {
+        // 3. เรียงลำดับ
+        if (sortOption === 'price_asc') return a.current_price - b.current_price; // ราคา ต่ำ->สูง
+        if (sortOption === 'price_desc') return b.current_price - a.current_price; // ราคา สูง->ต่ำ
+        // Default: เวลาเหลือน้อยขึ้นก่อน (ending_soon)
+        return new Date(a.end_time) - new Date(b.end_time);
+      });
+  }, [auctions, searchTerm, sortOption, filterStatus]);
+
   useEffect(() => {
     const root = document.documentElement;
     if (theme === 'dark') root.classList.add('dark');
@@ -603,7 +634,6 @@ export default function AuctionMarket() {
     fetchProfile();
   }, [userProfile]);
 
-  // 🟢 Load reputations when component mounts or profile changes
   useEffect(() => {
     fetchReputations();
   }, []);
@@ -648,7 +678,13 @@ export default function AuctionMarket() {
 
   async function fetchMyAuctions() {
     if (!userProfile?.email) return;
-    const { data } = await supabase.from('auctions').select('*').eq('seller_email', userProfile.email);
+    
+    // 🟢 [แก้ไข] ดึงทั้ง "รายการที่ขาย" และ "รายการที่ชนะ"
+    const { data } = await supabase
+        .from('auctions')
+        .select('*')
+        .or(`seller_email.eq.${userProfile.email},winner_email.eq.${userProfile.email}`);
+        
     if (data) {
         const sorted = data.sort((a, b) => {
             const aActive = new Date(a.end_time) > new Date();
@@ -841,7 +877,7 @@ export default function AuctionMarket() {
       </div>
 
       {/* Content */}
-      <main className="flex-grow p-0 md:p-8 w-full">
+      <main className="flex-grow p-0 md:p-8 w-full pb-40 min-h-[120vh]">
         {activeTab === 'my-auctions' && (
             <div className="animate-fade-in w-full">
                 <div className="flex justify-between items-center mb-6 px-4"><h2 className="text-2xl font-bold flex items-center gap-2"><span className="text-blue-500">📦</span> สินค้าของฉัน</h2><span className="text-sm text-slate-500">{myAuctions.length} รายการ</span></div>
@@ -866,7 +902,29 @@ export default function AuctionMarket() {
                                 >
                                     <div className="aspect-[5/7] bg-slate-200 dark:bg-slate-800 relative">
                                         <img src={getCardImageUrl(item.card_image_path, item.card_id)} className="w-full h-full object-contain p-2" onError={(e) => { if (!e.currentTarget.src.endsWith('.jpg')) e.currentTarget.src = e.currentTarget.src.replace('.png', '.jpg'); }} />
-                                        <div className={`absolute top-2 right-2 text-white text-[10px] px-2 py-1 rounded-full backdrop-blur-sm border font-bold ${isCancelled ? 'bg-red-600/80 border-red-400' : !isEnded ? 'bg-blue-600/80 border-blue-400' : 'bg-slate-600/80 border-slate-500'}`}>{isCancelled ? 'ยกเลิกแล้ว' : !isEnded ? 'กำลังประมูล' : 'จบแล้ว'}</div>
+                                        
+                                        {/* 🟢 [แก้ไข] ป้ายสถานะ (Badge) */}
+                                        <div className={`
+                                            absolute top-2 right-2 text-white text-[10px] px-2 py-1 rounded-full backdrop-blur-sm border font-bold shadow-sm
+                                            ${isCancelled 
+                                                ? 'bg-red-600/90 border-red-400' 
+                                                : !isEnded 
+                                                    ? 'bg-blue-600/90 border-blue-400' 
+                                                    : (item.winner_email === userProfile.email && item.seller_email !== userProfile.email) // ถ้าจบแล้ว + เราชนะ + ไม่ใช่ของตัวเอง
+                                                        ? 'bg-emerald-500/90 border-emerald-400 shadow-[0_0_10px_rgba(16,185,129,0.6)] text-white' // สีเขียวอ่อนมีแสง
+                                                        : 'bg-slate-600/90 border-slate-500' // จบปกติ/ขายออก
+                                            }
+                                        `}>
+                                            {isCancelled 
+                                                ? 'ยกเลิกแล้ว' 
+                                                : !isEnded 
+                                                    ? 'กำลังประมูล' 
+                                                    : (item.winner_email === userProfile.email && item.seller_email !== userProfile.email)
+                                                        ? '🎉 ประมูลชนะ' 
+                                                        : 'จบแล้ว'
+                                            }
+                                        </div>
+
                                         <button onClick={(e) => { e.stopPropagation(); setHistoryAuction(item); }} className="absolute top-2 left-2 bg-white/20 hover:bg-white/40 backdrop-blur-sm text-white p-1.5 rounded-full transition-colors"><div className="scale-75"><HistoryIcon /></div></button>
                                     </div>
                                     <div className="p-3 flex-1 flex flex-col">
@@ -923,79 +981,68 @@ export default function AuctionMarket() {
 
         {activeTab === 'auction' && (
             <div className="animate-fade-in w-full md:px-8">
-                <div className="flex justify-between items-center mt-4 mb-6 px-4 md:px-0"> 
-                    <h2 className="text-xl font-black flex items-center gap-3 text-slate-800 dark:text-white">
-                        <span className="text-xl"></span>
-                    </h2>
-                    <button 
-                        onClick={() => setIsCompletedModalOpen(true)} 
-                        className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-800 hover:bg-slate-0 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 rounded-full text-xs font-bold text-slate-600 dark:text-slate-400 transition-all shadow-sm"
-                    >
-                        <HistoryIcon /> <span>ประวัติการประมูล</span>
-                    </button>
-                </div>
                 
-                {/* 🟢 [ใหม่ 2] แถบเครื่องมือค้นหาและกรอง (วางแทรกตรงนี้เลย) */}
-        <div className="mb-6 flex flex-col md:flex-row gap-3 md:items-center bg-white dark:bg-slate-900/50 p-3 rounded-xl border border-slate-200 dark:border-emerald-500/20 shadow-sm">
-            
-            {/* 2.1 ช่องค้นหา */}
-            <div className="relative flex-grow">
-                <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
-                    <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                {/* 🟢 [NEW] Integrated Toolbar (Search + Filter + History) */}
+                <div className="mt-4 mb-6 flex flex-col md:flex-row gap-2 md:items-center bg-white dark:bg-slate-900/50 p-2 md:p-3 rounded-xl border border-slate-200 dark:border-emerald-500/20 shadow-sm mx-4 md:mx-0">
+                    
+                    {/* 1. Search Bar (Left Side - Grow) */}
+                    <div className="relative flex-grow w-full md:w-auto">
+                        <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
+                            <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                        </div>
+                        <input 
+                            type="text" 
+                            placeholder="ค้นหาชื่อการ์ด..." 
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="w-full pl-9 pr-4 py-1.5 md:py-2 bg-slate-100 dark:bg-slate-800 border-none rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none text-slate-900 dark:text-white placeholder-slate-400 transition-all"
+                        />
+                    </div>
+
+                    {/* 2. Action Group (Right Side - Sort, Filter, History) */}
+                    <div className="flex gap-2 items-center overflow-x-auto pb-1 md:pb-0 no-scrollbar shrink-0">
+                        
+                        {/* Sort Dropdown */}
+                        <select 
+                            value={sortOption} 
+                            onChange={(e) => setSortOption(e.target.value)}
+                            className="px-2 py-1.5 md:py-2 bg-slate-100 dark:bg-slate-800 rounded-lg text-xs font-bold text-slate-700 dark:text-slate-300 border-none outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer"
+                        >
+                            <option value="ending_soon">เวลา</option>
+                            <option value="price_asc">ถูก➜แพง</option>
+                            <option value="price_desc">แพง➜ถูก</option>
+                        </select>
+
+                        {/* Filter Buttons */}
+                        <div className="flex bg-slate-100 dark:bg-slate-800 rounded-lg p-1 gap-1">
+                            <button onClick={() => setFilterStatus('all')} className={`px-2 py-1 rounded text-[10px] md:text-xs font-bold transition-all ${filterStatus === 'all' ? 'bg-white dark:bg-slate-600 shadow text-emerald-600 dark:text-emerald-400' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}>รวม</button>
+                            <button onClick={() => setFilterStatus('active_bid')} className={`px-2 py-1 rounded text-[10px] md:text-xs font-bold transition-all ${filterStatus === 'active_bid' ? 'bg-white dark:bg-slate-600 shadow text-red-500' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}>เดือด</button>
+                            <button onClick={() => setFilterStatus('no_bid')} className={`px-2 py-1 rounded text-[10px] md:text-xs font-bold transition-all ${filterStatus === 'no_bid' ? 'bg-white dark:bg-slate-600 shadow text-blue-500' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}>บิดคนแรก</button>
+                        </div>
+
+                        {/* Separator */}
+                        <div className="w-px h-6 bg-slate-300 dark:bg-slate-700 mx-1"></div>
+
+                        {/* History Button (Compact) */}
+                        <button 
+                            onClick={() => setIsCompletedModalOpen(true)} 
+                            className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 border border-transparent hover:border-slate-300 dark:hover:border-slate-600 rounded-lg text-xs font-bold text-slate-600 dark:text-slate-400 transition-all whitespace-nowrap"
+                            title="ดูประวัติการประมูลที่จบแล้ว"
+                        >
+                            <HistoryIcon /> 
+                            <span className="hidden sm:inline">ประวัติ</span>
+                        </button>
+                    </div>
                 </div>
-                <input 
-                    type="text" 
-                    placeholder="ค้นหาชื่อการ์ด..." 
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2 bg-slate-100 dark:bg-slate-800 border-none rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none text-slate-900 dark:text-white placeholder-slate-400"
-                />
-            </div>
 
-            <div className="flex gap-2 overflow-x-auto pb-1 md:pb-0 no-scrollbar">
-                {/* 2.2 ตัวเรียงลำดับ (Sort Dropdown) */}
-                <select 
-                    value={sortOption} 
-                    onChange={(e) => setSortOption(e.target.value)}
-                    className="px-3 py-2 bg-slate-100 dark:bg-slate-800 rounded-lg text-xs font-bold text-slate-700 dark:text-slate-300 border-none outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer min-w-[120px]"
-                >
-                    <option value="ending_soon">เวลาจะหมด</option>
-                    <option value="price_asc">ราคา: ต่ำ ➜ สูง</option>
-                    <option value="price_desc">ราคา: สูง ➜ ต่ำ</option>
-                </select>
-
-                {/* 2.3 ปุ่มกรองสถานะ (Filter Buttons) */}
-                <div className="flex bg-slate-100 dark:bg-slate-800 rounded-lg p-1 gap-1 shrink-0">
-                    <button 
-                        onClick={() => setFilterStatus('all')}
-                        className={`px-3 py-1 rounded-md text-xs font-bold transition-all ${filterStatus === 'all' ? 'bg-white dark:bg-slate-600 shadow text-emerald-600 dark:text-emerald-400' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}
-                    >
-                        ทั้งหมด
-                    </button>
-                    <button 
-                        onClick={() => setFilterStatus('active_bid')}
-                        className={`px-3 py-1 rounded-md text-xs font-bold transition-all ${filterStatus === 'active_bid' ? 'bg-white dark:bg-slate-600 shadow text-red-500' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}
-                    >
-                        เดือด
-                    </button>
-                    <button 
-                        onClick={() => setFilterStatus('no_bid')}
-                        className={`px-3 py-1 rounded-md text-xs font-bold transition-all ${filterStatus === 'no_bid' ? 'bg-white dark:bg-slate-600 shadow text-blue-500' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}
-                    >
-                        ยังไม่มีคนเปิด
-                    </button>
-                </div>
-            </div>
-        </div>
-
-                {/* 🟢 Grid Layout Updated with Buy Now */}
+                {/* 🟢 Grid Layout (Updated with filteredAuctions) */}
                 <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 md:gap-6">
-                    {auctions.length === 0 ? (
+                    {filteredAuctions.length === 0 ? (
                         <div className="col-span-full flex flex-col items-center justify-center py-32 text-slate-400 opacity-50">
                             <GavelIcon className="w-16 h-16 mb-4" />
-                            <p className="text-xl font-bold">ยังไม่มีการประมูลขณะนี้...</p>
+                            <p className="text-xl font-bold">ไม่พบสินค้าตามเงื่อนไข...</p>
                         </div>
-                    ) : auctions.map(item => {
+                    ) : filteredAuctions.map(item => {
                         const sellerScore = userReputation[item.seller_email]?.total_score || 0;
                         
                         return (
@@ -1049,16 +1096,14 @@ export default function AuctionMarket() {
                                 {/* === Info Section === */}
                                 <div className="p-3 flex-1 flex flex-col gap-1">
                                     <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-800 pb-1 mb-1">
-    <div className="flex items-center gap-1 min-w-0">
-        <p className="text-[10px] text-slate-500">Seller:</p>
-        <p className="text-[10px] font-bold text-slate-700 dark:text-slate-300 truncate max-w-[80px]">{item.seller_name}</p>
-    </div>
-    
-    {/* 🟢 2. ใส่ div ครอบเพื่อกันคลิกทะลุ */}
-    <div onClick={e => e.stopPropagation()}> 
-        <RatingBadge score={sellerScore} />
-    </div>
-</div>
+                                        <div className="flex items-center gap-1 min-w-0">
+                                            <p className="text-[10px] text-slate-500">Seller:</p>
+                                            <p className="text-[10px] font-bold text-slate-700 dark:text-slate-300 truncate max-w-[80px]">{item.seller_name}</p>
+                                        </div>
+                                        <div onClick={e => e.stopPropagation()}>
+                                            <RatingBadge score={sellerScore} />
+                                        </div>
+                                    </div>
 
                                     <div className="flex justify-center mb-1">
                                         <div className="scale-90 origin-center"><TimeLeft endTime={item.end_time} /></div>
@@ -1130,6 +1175,7 @@ export default function AuctionMarket() {
         setTheme={setTheme}
         onOpenAdmin={() => setIsAdminOpen(true)} 
         userStats={userReputation[userProfile?.email]}
+        onOpenMyDecks={() => setIsDeckListModalOpen(true)}
       />
       <ProfileSetupModal isOpen={isProfileModalOpen} onClose={() => setIsProfileModalOpen(false)} userProfile={userProfile} onSave={handleSaveProfile} />
       <BidHistoryModal isOpen={!!historyAuction} onClose={() => setHistoryAuction(null)} auction={historyAuction} />
@@ -1162,7 +1208,20 @@ export default function AuctionMarket() {
         userProfile={userProfile}
         fetchReputations={fetchReputations}
         onBuyNow={handleBuyNow}
-      /> 
-    </div>
+      />
+      {/* 🟢 [ใหม่] Modal จัดการเด็ค */}
+      <DeckListModal
+        isOpen={isDeckListModalOpen}
+        onClose={() => setIsDeckListModalOpen(false)}
+        userProfile={displayUser}
+        userDecks={userDecks}
+        setUserDecks={setUserDecks}
+        mainDeck={mainDeck}
+        lifeDeck={lifeDeck}
+        setMainDeck={setMainDeck}
+        setLifeDeck={setLifeDeck}
+        cardDb={cardDb}
+      />
+    </div> // <-- ปิด div หลัก
   );
 }
