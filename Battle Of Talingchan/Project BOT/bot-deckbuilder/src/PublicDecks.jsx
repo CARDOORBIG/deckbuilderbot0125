@@ -87,7 +87,7 @@ const FeedbackModal = ({ isOpen, onClose, userProfile, showAlert }) => {
     if (!isOpen) return null;
   
     const handleSubmit = async () => {
-      if (!text.trim()) return showAlert("ข้อความว่างเปล่า", "กรุณากรอกข้อความก่อนส่งครับ");
+      if (!text.trim()) return showAlert("ข้อความว่างเปล่า", "กรุณากรอกข้อความก่อนส่งค่ะ");
       
       setIsSubmitting(true);
       try {
@@ -104,7 +104,7 @@ const FeedbackModal = ({ isOpen, onClose, userProfile, showAlert }) => {
           version: "1.0"
         });
         
-        showAlert("ขอบคุณครับ! 🙏", "เราได้รับข้อมูลของท่านแล้ว ทีมงานจะนำไปปรับปรุงให้ดียิ่งขึ้น");
+        showAlert("ขอบคุณค่ะ! ", "เราได้รับข้อมูลของท่านแล้ว ทีมงานจะนำไปปรับปรุงให้ดียิ่งขึ้น");
         setText("");
         onClose();
       } catch (e) {
@@ -142,7 +142,7 @@ const FeedbackModal = ({ isOpen, onClose, userProfile, showAlert }) => {
                 rows="4"
                 value={text}
                 onChange={(e) => setText(e.target.value)}
-                placeholder="เล่าให้เราฟังหน่อยครับ..."
+                placeholder="เล่าให้เราฟังหน่อยค่ะ..."
                 className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-emerald-500 outline-none resize-none"
               />
             </div>
@@ -232,7 +232,7 @@ function CommentSection({ deckId, userProfile, showAlert, deckOwnerEmail }) {
   }, [deckId]);
   useEffect(() => { if(comments.length > 0) endRef.current?.scrollIntoView({ behavior: "smooth" }); }, [comments.length]);
   const handleAdd = async (text, parentId = null) => {
-    if (!userProfile) return showAlert("กรุณาเข้าสู่ระบบ", "Login ก่อนนะครับ");
+    if (!userProfile) return showAlert("กรุณาเข้าสู่ระบบ", "Login ก่อนนะค่ะ");
     try { await addDoc(collection(db, "publicDecks", deckId, "comments"), { text: text.trim(), userId: userProfile.email, userName: userProfile.name, userPicture: userProfile.picture, createdAt: serverTimestamp(), parentId }); if (!parentId) setNewComment(''); } catch (e) { console.error(e); showAlert("Error", "ส่งคอมเม้นท์ไม่สำเร็จ"); }
   };
   const handleEdit = async (id, txt) => { try { await updateDoc(doc(db, "publicDecks", deckId, "comments", id), { text: txt }); } catch (e) { console.error(e); } };
@@ -616,13 +616,13 @@ export default function PublicDecks() {
   useEffect(() => { if (currentPage > 0 || (currentPage === 0 && pageSnapshots.length > 1)) { fetchDecks({ isNextPage: true }); } }, [currentPage]);
 
   const handleDelete = (deck) => { setModal({ isOpen: true, title: "Delete", message: `ลบเด็ค "${deck.deckName}"?`, onConfirm: async () => { closeModal(); try { await deleteDoc(doc(db, "publicDecks", deck.id)); await deleteDoc(doc(db, "publicDeckDetails", deck.id)); setSharedDecks(p => p.filter(d => d.id !== deck.id)); } catch { showAlert("Error", "ลบไม่สำเร็จ"); } }, confirmText: "Delete", confirmIcon: <ClearIcon /> }); };
-  const handleLike = async (deck) => { if (!userProfile) return showAlert("Login", "เข้าสู่ระบบก่อนนะครับ"); if (isLiking) return; setIsLiking(true); const isLiked = (deck.likedBy || []).includes(userProfile.email); try { await updateDoc(doc(db, "publicDecks", deck.id), { likeCount: increment(isLiked ? -1 : 1), likedBy: isLiked ? arrayRemove(userProfile.email) : arrayUnion(userProfile.email) }); setSharedDecks(prev => prev.map(d => d.id === deck.id ? { ...d, likeCount: (d.likeCount||0) + (isLiked ? -1 : 1), likedBy: isLiked ? d.likedBy.filter(e=>e!==userProfile.email) : [...(d.likedBy||[]), userProfile.email] } : d)); } catch { showAlert("Error", "Like failed"); } finally { setIsLiking(false); } };
+  const handleLike = async (deck) => { if (!userProfile) return showAlert("Login", "เข้าสู่ระบบก่อนนะค่ะ"); if (isLiking) return; setIsLiking(true); const isLiked = (deck.likedBy || []).includes(userProfile.email); try { await updateDoc(doc(db, "publicDecks", deck.id), { likeCount: increment(isLiked ? -1 : 1), likedBy: isLiked ? arrayRemove(userProfile.email) : arrayUnion(userProfile.email) }); setSharedDecks(prev => prev.map(d => d.id === deck.id ? { ...d, likeCount: (d.likeCount||0) + (isLiked ? -1 : 1), likedBy: isLiked ? d.likedBy.filter(e=>e!==userProfile.email) : [...(d.likedBy||[]), userProfile.email] } : d)); } catch { showAlert("Error", "Like failed"); } finally { setIsLiking(false); } };
   const handleView = async (deck) => { if (isDetailLoading || !cardDb.length) return cardDb.length===0 && showAlert("Error", "No Card DB"); setIsDetailLoading(true); setViewingDeck({ ...deck, main: [], life: [] }); try { const snap = await getDoc(doc(db, "publicDeckDetails", deck.id)); if (snap.exists()) { const data = snap.data(); const find = (id) => cardDb.find(c => c.id === id); setViewingDeck({ ...deck, main: (data.mainDeck||[]).map(find).filter(Boolean), life: (data.lifeDeck||[]).map(find).filter(Boolean) }); setSharedDecks(prev => prev.map(d => d.id === deck.id ? { ...d, viewCount: (d.viewCount || 0) + 1 } : d)); updateDoc(doc(db, "publicDecks", deck.id), { viewCount: increment(1) }).catch(()=>{}); } else throw new Error("Not found"); } catch { showAlert("Error", "Failed to load details"); setViewingDeck(null); } finally { setIsDetailLoading(false); } };
   const handlePhoto = (d, a) => { if(!isCapturing) { setIsCapturing(true); setImageDeck({ ...d, analysis: a }); } };
   useEffect(() => { if (imageDeck && imageTemplateRef.current) { html2canvas(imageTemplateRef.current, { useCORS: true, scale: 1.5, backgroundColor: '#1e293b' }).then(c => { const l = document.createElement('a'); l.download = `${imageDeck.deckName}.png`; l.href = c.toDataURL('image/png'); l.click(); }).finally(() => { setIsCapturing(false); setImageDeck(null); }); } }, [imageDeck]);
   
   const handleCloneDeck = (targetDeck) => {
-    if (!userProfile) return showAlert("Login", "กรุณาเข้าสู่ระบบก่อน Clone เด็คครับ");
+    if (!userProfile) return showAlert("Login", "กรุณาเข้าสู่ระบบก่อน Clone เด็คค่ะ");
     const email = userProfile.email;
     const userData = userDecks[email] || { slots: [{ name: "Slot 1", main: [], life: [] }, { name: "Slot 2", main: [], life: [] }] };
     const slots = userData.slots;

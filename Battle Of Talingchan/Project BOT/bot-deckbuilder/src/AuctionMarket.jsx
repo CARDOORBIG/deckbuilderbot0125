@@ -698,14 +698,14 @@ export default function AuctionMarket() {
   }
 
   async function handleBid(auction) {
-    if (!userProfile) return alert("กรุณา Login ที่หน้าแรกก่อนครับ");
-    if (userProfile.email === auction.seller_email) return alert("ห้ามบิดของตัวเองครับ!");
+    if (!userProfile) return alert("กรุณา Login ที่หน้าแรกก่อนค่ะ");
+    if (userProfile.email === auction.seller_email) return alert("ห้ามบิดของตัวเองค่ะ!");
 
     const minBid = auction.current_price + auction.min_bid_increment;
     const amountStr = prompt(`🔥 บิดสินค้า: ${auction.card_name}\n💰 ราคาปัจจุบัน: ${auction.current_price.toLocaleString()} บาท\n📈 ขั้นต่ำที่ต้องบิด: ${minBid.toLocaleString()} บาท\nกรอกราคาที่คุณต้องการสู้:`, minBid);
     if (!amountStr) return;
     const amount = parseInt(amountStr);
-    if (amount < minBid) return alert(`ต้องบิดอย่างน้อย ${minBid} บาทครับ`);
+    if (amount < minBid) return alert(`ต้องบิดอย่างน้อย ${minBid} บาทค่ะ`);
 
     const { data, error } = await supabase.rpc('place_bid', {
       p_auction_id: auction.id,
@@ -720,8 +720,8 @@ export default function AuctionMarket() {
   }
 
   async function handleBuyNow(auction) {
-    if (!userProfile) return alert("กรุณา Login ก่อนครับ");
-    if (userProfile.email === auction.seller_email) return alert("ซื้อของตัวเองไม่ได้ครับ");
+    if (!userProfile) return alert("กรุณา Login ก่อนค่ะ");
+    if (userProfile.email === auction.seller_email) return alert("ซื้อของตัวเองไม่ได้ค่ะ");
 
     if (!confirm(`⚡ ยืนยันการซื้อทันที (Buy Now)?\n\n💰 ราคา: ${auction.buy_now_price.toLocaleString()} บาท\n\n(การประมูลจะจบลงทันทีและคุณจะเป็นผู้ชนะ)`)) return;
 
@@ -870,7 +870,7 @@ export default function AuctionMarket() {
                 onClick={() => setActiveTab('my-auctions')}
                 className={`flex-1 md:flex-none flex items-center justify-center gap-1 md:gap-2 px-2 md:px-6 py-2 rounded-full font-bold text-xs md:text-sm transition-all whitespace-nowrap ${activeTab === 'my-auctions' ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-md' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
             >
-                <PackageIcon /> <span className="hidden sm:inline">สินค้าที่ลงประมูล</span><span className="inline sm:hidden">รายการประมูลของฉัน</span>
+                <PackageIcon /> <span className="hidden sm:inline">สินค้าที่ลงประมูล</span><span className="inline sm:hidden">รายการประมูล</span>
             </button>      
 
         </div>
@@ -1016,7 +1016,7 @@ export default function AuctionMarket() {
                         {/* Filter Buttons */}
                         <div className="flex bg-slate-100 dark:bg-slate-800 rounded-lg p-1 gap-1">
                             <button onClick={() => setFilterStatus('all')} className={`px-2 py-1 rounded text-[10px] md:text-xs font-bold transition-all ${filterStatus === 'all' ? 'bg-white dark:bg-slate-600 shadow text-emerald-600 dark:text-emerald-400' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}>รวม</button>
-                            <button onClick={() => setFilterStatus('active_bid')} className={`px-2 py-1 rounded text-[10px] md:text-xs font-bold transition-all ${filterStatus === 'active_bid' ? 'bg-white dark:bg-slate-600 shadow text-red-500' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}>สู้ราคาอยู่</button>
+                            <button onClick={() => setFilterStatus('active_bid')} className={`px-2 py-1 rounded text-[10px] md:text-xs font-bold transition-all ${filterStatus === 'active_bid' ? 'bg-white dark:bg-slate-600 shadow text-red-500' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}>สู้ราคา</button>
                             <button onClick={() => setFilterStatus('no_bid')} className={`px-2 py-1 rounded text-[10px] md:text-xs font-bold transition-all ${filterStatus === 'no_bid' ? 'bg-white dark:bg-slate-600 shadow text-blue-500' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}>ใหม่</button>
                         </div>
 
@@ -1167,7 +1167,7 @@ export default function AuctionMarket() {
             <div className="animate-fade-in text-center py-20 w-full">
                 <div className="inline-block p-6 bg-slate-200 dark:bg-slate-800 rounded-full mb-4"><ShoppingBagIcon width="48" height="48" className="text-emerald-500" /></div>
                 <h2 className="text-2xl font-bold text-slate-700 dark:text-slate-300 mb-2">ตลาดซื้อขาย (Coming Soon)</h2>
-                <p className="text-slate-500">ระบบวางขายการ์ดแบบกำหนดราคาตายตัว กำลังพัฒนาครับ...</p>
+                <p className="text-slate-500">ระบบวางขายการ์ดแบบกำหนดราคาตายตัว กำลังพัฒนาค่ะ...</p>
             </div>
         )}
       </main>

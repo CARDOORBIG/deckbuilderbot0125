@@ -129,7 +129,7 @@ const FeedbackModal = ({ isOpen, onClose, userProfile, showAlert }) => {
   if (!isOpen) return null;
 
   const handleSubmit = async () => {
-    if (!text.trim()) return showAlert("ข้อความว่างเปล่า", "กรุณากรอกข้อความก่อนส่งครับ");
+    if (!text.trim()) return showAlert("ข้อความว่างเปล่า", "กรุณากรอกข้อความก่อนส่งค่ะ");
     setIsSubmitting(true);
     try {
       await addDoc(collection(db, "feedbacks"), {
@@ -137,7 +137,7 @@ const FeedbackModal = ({ isOpen, onClose, userProfile, showAlert }) => {
         user: userProfile ? { name: userProfile.name, email: userProfile.email, uid: userProfile.email } : "Anonymous",
         createdAt: serverTimestamp(), status: "new", version: "1.0"
       });
-      showAlert("ขอบคุณครับ! 🙏", "เราได้รับข้อมูลของท่านแล้ว ทีมงานจะนำไปปรับปรุงให้ดียิ่งขึ้น");
+      showAlert("ขอบคุณค่ะ! ", "เราได้รับข้อมูลของท่านแล้ว ทีมงานจะนำไปปรับปรุงให้ดียิ่งขึ้น");
       setText(""); onClose();
     } catch (e) { console.error("Feedback error: ", e); showAlert("เกิดข้อผิดพลาด", "ไม่สามารถส่งข้อมูลได้ โปรดลองใหม่ภายหลัง"); } finally { setIsSubmitting(false); }
   };
@@ -157,7 +157,7 @@ const FeedbackModal = ({ isOpen, onClose, userProfile, showAlert }) => {
           </div>
           <div>
             <label className="text-sm text-slate-600 dark:text-gray-400 mb-1 block">รายละเอียด</label>
-            <textarea rows="4" value={text} onChange={(e) => setText(e.target.value)} placeholder="เล่าให้เราฟังหน่อยครับ..." className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-emerald-500 outline-none resize-none" />
+            <textarea rows="4" value={text} onChange={(e) => setText(e.target.value)} placeholder="เล่าให้เราฟังหน่อยค่ะ..." className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-emerald-500 outline-none resize-none" />
           </div>
         </div>
         <div className="flex justify-end gap-3 mt-6">
