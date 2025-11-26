@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { supabase } from './supabaseClient';
-import { Link, useNavigate, useLocation } from 'react-router-dom'; // 🟢 เพิ่ม useLocation
+import { Link, useNavigate, useLocation } from 'react-router-dom'; // 🟢 Import ครบ
 import { createPortal } from "react-dom";
 import { googleLogout } from '@react-oauth/google';
 import { db } from './firebase';
@@ -22,7 +22,7 @@ import {
     TrashIcon, UsersIcon, DeckIcon, StoreIcon, 
     HomeIcon, MessageIcon, NeonLightningIcon, 
     ImageIcon, ArchiveIcon,
-    ChevronLeftIcon // 🟢 มีครบแล้ว
+    ChevronLeftIcon // 🟢 เพิ่มไอคอนนี้เพื่อแก้หน้าขาว
 } from './components/Icons';
 
 // === Helper Functions ===
@@ -184,6 +184,7 @@ const AuctionRoomModal = ({ isOpen, onClose, auction, userProfile, onBid, onBuyN
                 
                 {/* 🖼️ ส่วนซ้าย: รูปภาพ */}
                 <div className="w-full md:w-2/3 h-[50vh] md:h-full flex flex-col bg-slate-100 dark:bg-slate-950 relative">
+                    {/* 🟢 ใช้ ChevronLeftIcon ที่ import มาแล้ว */}
                     <button onClick={onClose} className="absolute top-4 left-4 z-20 bg-black/50 text-white p-2 rounded-full md:hidden hover:bg-red-500 transition-colors"><ChevronLeftIcon /></button>
                     
                     <div className="flex-grow flex items-center justify-center p-4 relative overflow-hidden">
@@ -528,20 +529,20 @@ const CompletedAuctionsModal = ({ isOpen, onClose, userProfile }) => {
 // === Main Component ===
 export default function AuctionMarket() {
   const navigate = useNavigate();
-  const location = useLocation(); // 🟢 1. เพิ่มตัวแปร location
+  const [activeTab, setActiveTab] = useState('auction');
+  const [auctions, setAuctions] = useState([]);
+  const [myAuctions, setMyAuctions] = useState([]);
+  const location = useLocation(); // 🟢 1. เพิ่มตัวแปร location เพื่อดึง URL
 
   // 🟢 2. Logic ตรวจ In-App Browser (LINE/FB)
   useEffect(() => {
     const ua = navigator.userAgent || navigator.vendor || window.opera;
     const isInApp = /(Line|FBAN|FBAV|Instagram|Messenger)/i.test(ua);
     if (isInApp) {
-      navigate('/open-browser', { replace: true });
+      // ส่งไป open-browser พร้อมบอกว่าให้ redirect กลับมาที่หน้านี้
+      navigate(`/open-browser?redirect=${encodeURIComponent(location.pathname + location.search)}`, { replace: true });
     }
   }, [location, navigate]);
-
-  const [activeTab, setActiveTab] = useState('auction');
-  const [auctions, setAuctions] = useState([]);
-  const [myAuctions, setMyAuctions] = useState([]);
   
   // States for Modals
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
