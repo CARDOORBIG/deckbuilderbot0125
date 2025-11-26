@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { supabase } from './supabaseClient';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom'; // 🟢 เพิ่ม useLocation
 import { createPortal } from "react-dom";
 import { googleLogout } from '@react-oauth/google';
 import { db } from './firebase';
@@ -22,7 +22,7 @@ import {
     TrashIcon, UsersIcon, DeckIcon, StoreIcon, 
     HomeIcon, MessageIcon, NeonLightningIcon, 
     ImageIcon, ArchiveIcon,
-    ChevronLeftIcon
+    ChevronLeftIcon // 🟢 มีครบแล้ว
 } from './components/Icons';
 
 // === Helper Functions ===
@@ -528,10 +528,7 @@ const CompletedAuctionsModal = ({ isOpen, onClose, userProfile }) => {
 // === Main Component ===
 export default function AuctionMarket() {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState('auction');
-  const [auctions, setAuctions] = useState([]);
-  const [myAuctions, setMyAuctions] = useState([]);
-  const location = useLocation(); // 🟢 1. เพิ่มตัวแปร location เพื่อดึง URL
+  const location = useLocation(); // 🟢 1. เพิ่มตัวแปร location
 
   // 🟢 2. Logic ตรวจ In-App Browser (LINE/FB)
   useEffect(() => {
@@ -541,6 +538,10 @@ export default function AuctionMarket() {
       navigate('/open-browser', { replace: true });
     }
   }, [location, navigate]);
+
+  const [activeTab, setActiveTab] = useState('auction');
+  const [auctions, setAuctions] = useState([]);
+  const [myAuctions, setMyAuctions] = useState([]);
   
   // States for Modals
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);

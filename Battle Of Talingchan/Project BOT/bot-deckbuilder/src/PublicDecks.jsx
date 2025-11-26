@@ -30,7 +30,7 @@ ChartJS.register(RadialLinearScale, PointElement, LineElement, Filler, Tooltip, 
 
 // === Local UI Components ===
 const Button = ({ className = "", children, ...props }) => ( 
-  <button className={`flex items-center justify-center gap-2 px-4 py-2 rounded-lg shadow-lg border border-amber-400/20 bg-amber-200/20 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 hover:bg-amber-200/50 dark:hover:bg-amber-700/50 dark:hover:text-white hover:border-amber-400/60 active:scale-[.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed ${className}`} {...props}> 
+  <button className={`flex items-center justify-center gap-2 px-4 py-2 rounded-lg shadow-lg border border-amber-300/20 dark:border-amber-400/20 bg-amber-200/20 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 hover:bg-amber-200/50 dark:hover:bg-amber-700/50 dark:hover:text-white hover:border-amber-400/60 active:scale-[.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed ${className}`} {...props}> 
     {children} 
   </button> 
 );
@@ -444,6 +444,8 @@ const DeckImageTemplate = React.forwardRef(({ deck, analysis }, ref) => {
 function DeckCard({ deck, onViewDeck, userProfile, onDeleteDeck, isDetailLoading, onLikeDeck, isLiking }) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const menuRef = useRef(null);
+  
+  // 🟢 [1] เพิ่ม Ref สำหรับจับเวลา Double Tap เอง
   const lastTapRef = useRef(0);
 
   const mainCardImg = useMemo(() => {
@@ -464,13 +466,14 @@ function DeckCard({ deck, onViewDeck, userProfile, onDeleteDeck, isDetailLoading
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  // 🟢 [2] ฟังก์ชันจัดการ Double Tap แบบ Manual (ใช้ได้ทั้งมือถือและคอม)
   const handleCardClick = (e) => {
     const now = Date.now();
-    const DOUBLE_TAP_DELAY = 300; 
+    const DOUBLE_TAP_DELAY = 300; // ระยะเวลา (ms) ที่ถือว่าเป็น double tap (0.3 วินาที)
     
     if (now - lastTapRef.current < DOUBLE_TAP_DELAY) {
       e.preventDefault();
-      onViewDeck(deck); 
+      onViewDeck(deck); // เรียกฟังก์ชันเปิดเด็ค
     }
     
     lastTapRef.current = now;
@@ -478,10 +481,12 @@ function DeckCard({ deck, onViewDeck, userProfile, onDeleteDeck, isDetailLoading
 
   return (
     <div 
-      className="relative group select-none cursor-pointer" 
-      onClick={handleCardClick} 
+      className="relative group select-none cursor-pointer" // select-none กันการไฮไลท์ข้อความเวลากดรัวๆ
+      onClick={handleCardClick} // 🟢 [3] ใช้ onClick แทน onDoubleClick
     >
       <CardShell className="flex flex-col p-2 md:p-3 h-full relative hover:border-amber-400/50 transition-all">
+        
+        {/* Header: User & 3-Dot Menu */}
         <div className="flex justify-between items-start mb-2 relative z-20">
           <div className="flex items-center gap-2 overflow-hidden pr-6">
             
@@ -528,6 +533,7 @@ function DeckCard({ deck, onViewDeck, userProfile, onDeleteDeck, isDetailLoading
             className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" 
             loading="lazy"
           />
+          {/* Overlay บอกว่า Double Tap ได้ */}
           <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/20 pointer-events-none">
             <span className="text-white text-[10px] bg-black/50 px-2 py-1 rounded-full backdrop-blur-sm">Double Tap</span>
           </div>
@@ -566,15 +572,31 @@ function DeckCardSkeleton() { return (<CardShell className="flex flex-col animat
 
 // === Main PublicDecks Component ===
 export default function PublicDecks() {
+  const navigate = useNavigate();
+  const location = useLocation(); // 🟢 1. เพิ่มตัวแปร location
+
+  // 🟢 2. Logic ตรวจ In-App Browser (LINE/FB)
+  useEffect(() => {
+    const ua = navigator.userAgent || navigator.vendor || window.opera;
+    const isInApp = /(Line|FBAN|FBAV|Instagram|Messenger)/i.test(ua);
+    
+    if (isInApp) {
+      navigate('/open-browser', { replace: true });
+    }
+  }, [location, navigate]);
+
   const [sharedDecks, setSharedDecks] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [lastVisible, setLastVisible] = useState(null);
-  const [firstVisible, setFirstVisible] = useState(null); 
+  const [firstVisible, setFirstVisible] = useState(null); // Track for prev page
   const [hasMore, setHasMore] = useState(true);
-  const [pageSnapshots, setPageSnapshots] = useState([null]); 
+  
+  // --- Pagination State ---
+  const [pageSnapshots, setPageSnapshots] = useState([null]); // Stores startAt snapshots
   const [currentPage, setCurrentPage] = useState(0); 
   const [totalLoadedCount, setTotalLoadedCount] = useState(0); 
+
   const [userProfile, setUserProfile] = useLocalStorage("bot-userProfile-v1", null);
   const [modal, setModal] = useState({ isOpen: false, title: '', message: '', onConfirm: null });
   const [cardDb] = useLocalStorage("bot-cardDb-v32-final", []);
@@ -587,6 +609,8 @@ export default function PublicDecks() {
   const [imageDeck, setImageDeck] = useState(null);
   const imageTemplateRef = useRef(null);
   const loaderRef = useRef(null);
+  
+  // --- Constants ---
   const CHUNK_SIZE = 20; 
   const PAGE_SIZE_LIMIT = 100; 
 
@@ -605,17 +629,6 @@ export default function PublicDecks() {
   // 🟢 [ใหม่] State สำหรับดึง User Stats (เพื่อให้ยศขึ้นใน Setting Drawer)
   const [userReputation, setUserReputation] = useState({});
 
-  // 🟢 [ใหม่] Logic ตรวจ In-App Browser (LINE/FB) - Copy มาจาก App.jsx
-  const navigate = useNavigate();
-  const location = useLocation();
-  useEffect(() => {
-    const ua = navigator.userAgent || navigator.vendor || window.opera;
-    const isInApp = /(Line|FBAN|FBAV|Instagram|Messenger)/i.test(ua);
-    if (isInApp) {
-      navigate('/open-browser', { replace: true });
-    }
-  }, [location, navigate]);
-
   useEffect(() => {
       const root = document.documentElement;
       if (theme === 'dark') root.classList.add('dark');
@@ -633,15 +646,6 @@ export default function PublicDecks() {
     if (userProfile?.email) {
         // 1. ดึง Profile
         getDoc(doc(db, "users", userProfile.email)).then(s => s.exists() && setCustomProfile(s.data()));
-
-        // 2. ดึง Stats (จาก Supabase) - ทำเหมือน App.jsx
-        const fetchStats = async () => {
-             // ต้องมี supabase import เข้ามาก่อนนะ (เดี๋ยวผมเพิ่มให้ด้านบน)
-             // เนื่องจากไฟล์นี้ใช้ firebase เป็นหลัก การดึง stats จาก supabase อาจจะต้องทำแยก
-             // หรือถ้าคุณไม่ได้ใช้ supabase ในไฟล์นี้ ก็อาจจะละไว้ก่อน
-             // แต่ถ้าอยากให้ยศขึ้น ก็ต้อง import supabase มาดึงข้อมูลครับ
-        };
-        // fetchStats(); // ถ้าต้องการ
     }
   }, [userProfile]);
 
@@ -651,76 +655,265 @@ export default function PublicDecks() {
 
   // === Fetch Logic (Revised) ===
   const fetchDecks = async (options = {}) => {
-    const { isInitialLoad = false, loadNextChunk = false, isNextPage = false, isPrevPage = false } = options;
+    const { 
+      isInitialLoad = false, 
+      loadNextChunk = false, 
+      isNextPage = false, 
+      isPrevPage = false 
+    } = options;
+
     if (isInitialLoad || isNextPage || isPrevPage) setIsLoading(true);
     else setIsLoadingMore(true);
+
     try {
-      let baseQuery = query(collection(db, "publicDecks"), orderBy(sortOrder.field, sortOrder.direction), limit(CHUNK_SIZE));
+      let baseQuery = query(
+        collection(db, "publicDecks"), 
+        orderBy(sortOrder.field, sortOrder.direction), 
+        limit(CHUNK_SIZE)
+      );
+
       let finalQuery = baseQuery;
-      if (isInitialLoad) { } 
-      else if (isNextPage) { const startSnap = pageSnapshots[currentPage]; if (startSnap) finalQuery = query(baseQuery, startAfter(startSnap)); } 
-      else if (isPrevPage) { const startSnap = pageSnapshots[currentPage]; if (startSnap) finalQuery = query(baseQuery, startAfter(startSnap)); else finalQuery = baseQuery; } 
-      else if (loadNextChunk) { if (lastVisible) finalQuery = query(baseQuery, startAfter(lastVisible)); }
+
+      if (isInitialLoad) {
+         // Reset cursors handled in useEffect [sortOrder]
+      } else if (isNextPage) {
+         // Start from the snapshot saved for this page index
+         const startSnap = pageSnapshots[currentPage];
+         if (startSnap) finalQuery = query(baseQuery, startAfter(startSnap));
+      } else if (isPrevPage) {
+         // Start from the snapshot saved for the previous page index
+         const startSnap = pageSnapshots[currentPage];
+         if (startSnap) finalQuery = query(baseQuery, startAfter(startSnap));
+         else finalQuery = baseQuery; // Page 0 has null snapshot
+      } else if (loadNextChunk) {
+         if (lastVisible) finalQuery = query(baseQuery, startAfter(lastVisible));
+      }
+
       const snap = await getDocs(finalQuery);
       const newDecks = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      if (snap.docs.length > 0) { setLastVisible(snap.docs[snap.docs.length - 1]); setFirstVisible(snap.docs[0]); }
-      if (isInitialLoad || isNextPage || isPrevPage) { setSharedDecks(newDecks); setTotalLoadedCount(newDecks.length); if(isNextPage || isPrevPage) window.scrollTo({ top: 0, behavior: 'smooth' }); } 
-      else { setSharedDecks(prev => [...prev, ...newDecks]); setTotalLoadedCount(prev => prev + newDecks.length); }
+      
+      if (snap.docs.length > 0) {
+        setLastVisible(snap.docs[snap.docs.length - 1]);
+        setFirstVisible(snap.docs[0]);
+      }
+
+      if (isInitialLoad || isNextPage || isPrevPage) {
+        setSharedDecks(newDecks);
+        setTotalLoadedCount(newDecks.length);
+        // Scroll top on page change
+        if(isNextPage || isPrevPage) window.scrollTo({ top: 0, behavior: 'smooth' });
+      } else {
+        setSharedDecks(prev => [...prev, ...newDecks]);
+        setTotalLoadedCount(prev => prev + newDecks.length);
+      }
+
       setHasMore(newDecks.length === CHUNK_SIZE);
-    } catch (err) { console.error(err); } finally { setIsLoading(false); setIsLoadingMore(false); }
+
+    } catch (err) { 
+      console.error(err); 
+    } finally { 
+      setIsLoading(false); 
+      setIsLoadingMore(false); 
+    }
   };
 
-  useEffect(() => { setPageSnapshots([null]); setCurrentPage(0); setLastVisible(null); setTotalLoadedCount(0); setHasMore(true); fetchDecks({ isInitialLoad: true }); }, [sortOrder]);
+  // === Reset on Sort Change ===
+  useEffect(() => { 
+      setPageSnapshots([null]); 
+      setCurrentPage(0);
+      setLastVisible(null);
+      setTotalLoadedCount(0);
+      setHasMore(true);
+      fetchDecks({ isInitialLoad: true }); 
+  }, [sortOrder]);
+
+  // === Infinite Scroll Observer ===
   useEffect(() => {
-    const observer = new IntersectionObserver((entries) => { const first = entries[0]; if (first.isIntersecting && hasMore && !isLoading && !isLoadingMore && totalLoadedCount < PAGE_SIZE_LIMIT) { fetchDecks({ loadNextChunk: true }); } }, { threshold: 0.5 });
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const first = entries[0];
+        if (first.isIntersecting && hasMore && !isLoading && !isLoadingMore && totalLoadedCount < PAGE_SIZE_LIMIT) {
+          fetchDecks({ loadNextChunk: true });
+        }
+      },
+      { threshold: 0.5 }
+    );
     if (loaderRef.current) observer.observe(loaderRef.current);
     return () => { if (loaderRef.current) observer.unobserve(loaderRef.current); };
   }, [hasMore, isLoading, isLoadingMore, lastVisible, totalLoadedCount]);
 
-  const handleNextPage = () => { const nextIndex = currentPage + 1; const newSnapshots = [...pageSnapshots]; if (!newSnapshots[nextIndex]) { newSnapshots[nextIndex] = lastVisible; } setPageSnapshots(newSnapshots); setCurrentPage(nextIndex); };
-  const handlePrevPage = () => { if (currentPage > 0) { setCurrentPage(prev => prev - 1); } };
-  useEffect(() => { if (currentPage > 0 || (currentPage === 0 && pageSnapshots.length > 1)) { fetchDecks({ isNextPage: true }); } }, [currentPage]);
+  // === Pagination Handlers ===
+  const handleNextPage = () => {
+      const nextIndex = currentPage + 1;
+      const newSnapshots = [...pageSnapshots];
+      if (!newSnapshots[nextIndex]) {
+          newSnapshots[nextIndex] = lastVisible;
+      }
+      setPageSnapshots(newSnapshots);
+      setCurrentPage(nextIndex);
+  };
 
-  const handleDelete = (deck) => { setModal({ isOpen: true, title: "Delete", message: `ลบเด็ค "${deck.deckName}"?`, onConfirm: async () => { closeModal(); try { await deleteDoc(doc(db, "publicDecks", deck.id)); await deleteDoc(doc(db, "publicDeckDetails", deck.id)); setSharedDecks(p => p.filter(d => d.id !== deck.id)); } catch { showAlert("Error", "ลบไม่สำเร็จ"); } }, confirmText: "Delete", confirmIcon: <ClearIcon /> }); };
-  const handleLike = async (deck) => { if (!userProfile) return showAlert("Login", "เข้าสู่ระบบก่อนนะครับ"); if (isLiking) return; setIsLiking(true); const isLiked = (deck.likedBy || []).includes(userProfile.email); try { await updateDoc(doc(db, "publicDecks", deck.id), { likeCount: increment(isLiked ? -1 : 1), likedBy: isLiked ? arrayRemove(userProfile.email) : arrayUnion(userProfile.email) }); setSharedDecks(prev => prev.map(d => d.id === deck.id ? { ...d, likeCount: (d.likeCount||0) + (isLiked ? -1 : 1), likedBy: isLiked ? d.likedBy.filter(e=>e!==userProfile.email) : [...(d.likedBy||[]), userProfile.email] } : d)); } catch { showAlert("Error", "Like failed"); } finally { setIsLiking(false); } };
-  const handleView = async (deck) => { if (isDetailLoading || !cardDb.length) return cardDb.length===0 && showAlert("Error", "No Card DB"); setIsDetailLoading(true); setViewingDeck({ ...deck, main: [], life: [] }); try { const snap = await getDoc(doc(db, "publicDeckDetails", deck.id)); if (snap.exists()) { const data = snap.data(); const find = (id) => cardDb.find(c => c.id === id); setViewingDeck({ ...deck, main: (data.mainDeck||[]).map(find).filter(Boolean), life: (data.lifeDeck||[]).map(find).filter(Boolean) }); setSharedDecks(prev => prev.map(d => d.id === deck.id ? { ...d, viewCount: (d.viewCount || 0) + 1 } : d)); updateDoc(doc(db, "publicDecks", deck.id), { viewCount: increment(1) }).catch(()=>{}); } else throw new Error("Not found"); } catch { showAlert("Error", "Failed to load details"); setViewingDeck(null); } finally { setIsDetailLoading(false); } };
+  const handlePrevPage = () => {
+      if (currentPage > 0) {
+          setCurrentPage(prev => prev - 1);
+      }
+  };
+
+  // Effect to trigger fetch when currentPage changes
+  useEffect(() => {
+      if (currentPage > 0 || (currentPage === 0 && pageSnapshots.length > 1)) {
+           fetchDecks({ isNextPage: true }); 
+      }
+  }, [currentPage]);
+
+
+  const handleDelete = (deck) => {
+    setModal({ isOpen: true, title: "Delete", message: `ลบเด็ค "${deck.deckName}"?`, onConfirm: async () => {
+      closeModal();
+      try { await deleteDoc(doc(db, "publicDecks", deck.id)); await deleteDoc(doc(db, "publicDeckDetails", deck.id)); setSharedDecks(p => p.filter(d => d.id !== deck.id)); }
+      catch { showAlert("Error", "ลบไม่สำเร็จ"); }
+    }, confirmText: "Delete", confirmIcon: <ClearIcon /> });
+  };
+
+  const handleLike = async (deck) => {
+    if (!userProfile) return showAlert("Login", "เข้าสู่ระบบก่อนนะครับ");
+    if (isLiking) return; setIsLiking(true);
+    const isLiked = (deck.likedBy || []).includes(userProfile.email);
+    try {
+      await updateDoc(doc(db, "publicDecks", deck.id), { likeCount: increment(isLiked ? -1 : 1), likedBy: isLiked ? arrayRemove(userProfile.email) : arrayUnion(userProfile.email) });
+      setSharedDecks(prev => prev.map(d => d.id === deck.id ? { ...d, likeCount: (d.likeCount||0) + (isLiked ? -1 : 1), likedBy: isLiked ? d.likedBy.filter(e=>e!==userProfile.email) : [...(d.likedBy||[]), userProfile.email] } : d));
+    } catch { showAlert("Error", "Like failed"); } finally { setIsLiking(false); }
+  };
+
+  const handleView = async (deck) => {
+    if (isDetailLoading || !cardDb.length) return cardDb.length===0 && showAlert("Error", "No Card DB");
+    setIsDetailLoading(true); setViewingDeck({ ...deck, main: [], life: [] });
+    try {
+      const snap = await getDoc(doc(db, "publicDeckDetails", deck.id));
+      if (snap.exists()) {
+        const data = snap.data();
+        const find = (id) => cardDb.find(c => c.id === id);
+        setViewingDeck({ ...deck, main: (data.mainDeck||[]).map(find).filter(Boolean), life: (data.lifeDeck||[]).map(find).filter(Boolean) });
+        setSharedDecks(prev => prev.map(d => d.id === deck.id ? { ...d, viewCount: (d.viewCount || 0) + 1 } : d));
+        updateDoc(doc(db, "publicDecks", deck.id), { viewCount: increment(1) }).catch(()=>{});
+      } else throw new Error("Not found");
+    } catch { showAlert("Error", "Failed to load details"); setViewingDeck(null); } finally { setIsDetailLoading(false); }
+  };
+
   const handlePhoto = (d, a) => { if(!isCapturing) { setIsCapturing(true); setImageDeck({ ...d, analysis: a }); } };
-  useEffect(() => { if (imageDeck && imageTemplateRef.current) { html2canvas(imageTemplateRef.current, { useCORS: true, scale: 1.5, backgroundColor: '#1e293b' }).then(c => { const l = document.createElement('a'); l.download = `${imageDeck.deckName}.png`; l.href = c.toDataURL('image/png'); l.click(); }).finally(() => { setIsCapturing(false); setImageDeck(null); }); } }, [imageDeck]);
+  useEffect(() => {
+    if (imageDeck && imageTemplateRef.current) {
+      html2canvas(imageTemplateRef.current, { useCORS: true, scale: 1.5, backgroundColor: '#1e293b' }).then(c => {
+        const l = document.createElement('a'); l.download = `${imageDeck.deckName}.png`; l.href = c.toDataURL('image/png'); l.click();
+      }).finally(() => { setIsCapturing(false); setImageDeck(null); });
+    }
+  }, [imageDeck]);
   
   const handleCloneDeck = (targetDeck) => {
     if (!userProfile) return showAlert("Login", "กรุณาเข้าสู่ระบบก่อน Clone เด็คครับ");
     const email = userProfile.email;
     const userData = userDecks[email] || { slots: [{ name: "Slot 1", main: [], life: [] }, { name: "Slot 2", main: [], life: [] }] };
     const slots = userData.slots;
-    setModal({ isOpen: true, title: "Clone Deck", message: (<div className="flex flex-col gap-4"><p>เลือก Slot ที่ต้องการบันทึกเด็ค "{targetDeck.deckName}" ลงไป:</p>{slots.map((slot, index) => (<button key={index} onClick={() => { if (!viewingDeck || viewingDeck.id !== targetDeck.id) return showAlert("Error", "กรุณากด View Details ก่อน Clone"); const newSlots = [...slots]; newSlots[index] = { name: targetDeck.deckName, main: viewingDeck.main, life: viewingDeck.life }; setUserDecks(prev => ({ ...prev, [email]: { ...prev[email], slots: newSlots } })); closeModal(); showAlert("Success", `บันทึกเด็คลงใน ${slot.name} เรียบร้อย!`); }} className="p-3 bg-slate-200 dark:bg-slate-800 border border-emerald-500/30 rounded-lg hover:bg-emerald-100 dark:hover:bg-emerald-900/30 text-left flex justify-between items-center group"><span className="font-bold text-emerald-700 dark:text-emerald-400">{slot.name}</span><span className="text-xs text-gray-500 group-hover:text-emerald-500">{slot.main.length > 0 ? "(จะถูกเขียนทับ)" : "(ว่าง)"}</span></button>))}</div>), confirmText: null });
+    setModal({
+      isOpen: true, title: "Clone Deck", message: (
+        <div className="flex flex-col gap-4">
+          <p>เลือก Slot ที่ต้องการบันทึกเด็ค "{targetDeck.deckName}" ลงไป:</p>
+          {slots.map((slot, index) => (
+            <button key={index} onClick={() => {
+              if (!viewingDeck || viewingDeck.id !== targetDeck.id) return showAlert("Error", "กรุณากด View Details ก่อน Clone");
+              const newSlots = [...slots];
+              newSlots[index] = { name: targetDeck.deckName, main: viewingDeck.main, life: viewingDeck.life };
+              setUserDecks(prev => ({ ...prev, [email]: { ...prev[email], slots: newSlots } }));
+              closeModal();
+              showAlert("Success", `บันทึกเด็คลงใน ${slot.name} เรียบร้อย!`);
+            }} className="p-3 bg-slate-200 dark:bg-slate-800 border border-emerald-500/30 rounded-lg hover:bg-emerald-100 dark:hover:bg-emerald-900/30 text-left flex justify-between items-center group">
+              <span className="font-bold text-emerald-700 dark:text-emerald-400">{slot.name}</span>
+              <span className="text-xs text-gray-500 group-hover:text-emerald-500">{slot.main.length > 0 ? "(จะถูกเขียนทับ)" : "(ว่าง)"}</span>
+            </button>
+          ))}
+        </div>), confirmText: null
+    });
   };
 
-  const handleLogout = () => { googleLogout(); setUserProfile(null); setCustomProfile(null); setIsSettingsOpen(false); };
-  const handleSaveProfile = async (data) => { if (!userProfile) return; try { const batch = writeBatch(db); batch.set(doc(db, "users", userProfile.email), { displayName: data.displayName, avatarUrl: data.avatarUrl, isSetup: true, updatedAt: serverTimestamp() }, { merge: true }); const decksSnap = await getDocs(query(collection(db, "publicDecks"), where("user.email", "==", userProfile.email))); decksSnap.forEach(doc => batch.update(doc.ref, { "user.name": data.displayName, "user.picture": data.avatarUrl })); await batch.commit(); setCustomProfile(p => ({ ...p, ...data, isSetup: true })); setIsProfileModalOpen(false); showAlert("Success", "บันทึกข้อมูลเรียบร้อย!"); } catch (e) { console.error(e); showAlert("Error", "บันทึกไม่สำเร็จ"); } };
+  const handleLogout = () => {
+      googleLogout();
+      setUserProfile(null);
+      setCustomProfile(null);
+      setIsSettingsOpen(false);
+  };
+
+  const handleSaveProfile = async (data) => {
+    if (!userProfile) return;
+    try {
+      const batch = writeBatch(db);
+      batch.set(doc(db, "users", userProfile.email), { displayName: data.displayName, avatarUrl: data.avatarUrl, isSetup: true, updatedAt: serverTimestamp() }, { merge: true });
+      const decksSnap = await getDocs(query(collection(db, "publicDecks"), where("user.email", "==", userProfile.email)));
+      decksSnap.forEach(doc => batch.update(doc.ref, { "user.name": data.displayName, "user.picture": data.avatarUrl }));
+      await batch.commit();
+      setCustomProfile(p => ({ ...p, ...data, isSetup: true })); setIsProfileModalOpen(false); showAlert("Success", "บันทึกข้อมูลเรียบร้อย!");
+    } catch (e) { console.error(e); showAlert("Error", "บันทึกไม่สำเร็จ"); }
+  };
+
 
   return (
     <div className="h-screen flex flex-col text-slate-900 dark:text-gray-200 bg-slate-100 dark:bg-black">
       <style>{`::-webkit-scrollbar{width:8px}::-webkit-scrollbar-track{background:#0f172a}::-webkit-scrollbar-thumb{background:#1e293b;border-radius:4px}::-webkit-scrollbar-thumb:hover{background:#334155}.image-render-target{position:fixed;top:-9999px;left:0;width:1280px;height:auto;background:#1e293b;padding:24px;box-shadow:0 0 30px rgba(0,0,0,0.5);display:flex;gap:24px;flex-shrink:0;flex-grow:0;}`}</style>
+      
+      {/* Header: Redesigned (Consistent with App.jsx) */}
       <header className="px-3 md:px-6 py-2 border-b border-slate-200 dark:border-emerald-700/30 bg-white/80 dark:bg-black/60 backdrop-blur-sm shrink-0 z-40 h-14 flex flex-col justify-center">
          <div className="flex items-center justify-between gap-2">
+          
+          {/* 🟢 ฝั่งซ้าย: Menu + Title */}
           <div className="flex items-center gap-1.5 overflow-hidden">
-             {userProfile && (<button onClick={() => setIsSettingsOpen(true)} className="p-1.5 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-full text-slate-800 dark:text-white transition-colors shrink-0"><div className="scale-90"><MenuIcon /></div></button>)}
-             <h1 className="text-lg md:text-3xl font-extrabold tracking-tight bg-gradient-to-r from-amber-500 to-emerald-600 dark:from-amber-300 dark:to-emerald-400 bg-clip-text text-transparent truncate pt-0.5">Public Decks</h1>
+             {userProfile && (
+                 <button onClick={() => setIsSettingsOpen(true)} className="p-1.5 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-full text-slate-800 dark:text-white transition-colors shrink-0">
+                    <div className="scale-90"><MenuIcon /></div>
+                 </button>
+             )}
+             <h1 className="text-lg md:text-3xl font-extrabold tracking-tight bg-gradient-to-r from-amber-500 to-emerald-600 dark:from-amber-300 dark:to-emerald-400 bg-clip-text text-transparent truncate pt-0.5">
+                Public Decks
+             </h1>
           </div>
+          
+          {/* 🟢 ฝั่งขวา: ปุ่มต่างๆ เรียงตามลำดับ (Market -> Public -> My Decks -> Bell -> Profile) */}
           <div className="flex items-center gap-1.5 md:gap-3 shrink-0">
-            <Link to="/auction"><Button className="!px-2 md:!px-4 bg-gradient-to-r from-rose-500 to-orange-600 text-white border-none shadow-md hover:shadow-lg hover:from-rose-400 hover:to-orange-500"><StoreIcon /> <span className="hidden md:inline ml-1">Market</span></Button></Link>
-            <Link to="/"><Button as="span" className="!px-2 md:!px-4 bg-gradient-to-r from-blue-500 to-purple-600 text-white border-none shadow-lg hover:from-blue-400 hover:to-purple-500 ring-2 ring-offset-2 ring-blue-500/50 dark:ring-offset-slate-900"><HomeIcon /> <span className="hidden md:inline">Home</span></Button></Link>
+            
+            {/* 1. Market */}
+            <Link to="/auction">
+                <Button className="!px-2 md:!px-4 bg-gradient-to-r from-rose-500 to-orange-600 text-white border-none shadow-md hover:shadow-lg hover:from-rose-400 hover:to-orange-500">
+                    <StoreIcon /> 
+                    <span className="hidden md:inline ml-1">Market</span>
+                </Button>
+            </Link>
+
+            {/* 2. Public (หน้าหลัก) */}
+            <Link to="/">
+                <Button
+                    as="span"
+                    className="!px-2 md:!px-4 bg-gradient-to-r from-blue-500 to-purple-600 text-white border-none shadow-lg hover:from-blue-400 hover:to-purple-500 ring-2 ring-offset-2 ring-blue-500/50 dark:ring-offset-slate-900"
+                >
+                    <HomeIcon />{" "}
+                    <span className="hidden md:inline">Home</span>
+                </Button>
+            </Link>
+
+            {/* 4. Bell (Notification) */}
             <NotificationCenter userEmail={userProfile?.email} />
-            
-            {/* 🟢 [FIXED] Conditional Rendering for Profile Picture */}
-            {displayUser ? (
-                <img src={displayUser.picture} alt={displayUser.name} className="w-8 h-8 md:w-9 md:h-9 rounded-full border-2 border-emerald-500 object-cover ml-1 cursor-pointer hover:scale-105 transition-transform" title={`Logged in as ${displayUser.name}`} onClick={() => setIsSettingsOpen(true)} />
-            ) : (
-                <div className="w-8 h-8 md:w-9 md:h-9 rounded-full bg-slate-300 dark:bg-slate-600 ml-1 flex items-center justify-center text-xs font-bold text-slate-500 dark:text-slate-300">?</div>
-            )}
-            
-            <span className="text-slate-900 dark:text-white hidden lg:block text-sm font-semibold max-w-[100px] truncate">{displayUser?.name || 'Guest'}</span>
+
+            {/* 5. Profile Picture */}
+            <img
+                src={displayUser.picture}
+                alt={displayUser.name}
+                className="w-8 h-8 md:w-9 md:h-9 rounded-full border-2 border-emerald-500 object-cover ml-1 cursor-pointer hover:scale-105 transition-transform"
+                title={`Logged in as ${displayUser.name}`}
+                onClick={() => setIsSettingsOpen(true)} 
+            />
+            {/* ซ่อนชื่อบนมือถือ */}
+            <span className="text-slate-900 dark:text-white hidden lg:block text-sm font-semibold max-w-[100px] truncate">
+                {displayUser.name}
+            </span>
           </div>
+
         </div>
       </header>
 
@@ -728,35 +921,113 @@ export default function PublicDecks() {
         <h2 className="text-3xl font-bold text-slate-900 dark:text-white mb-6">Public Shared Decks</h2>
         <div className="mb-8 p-4 bg-white dark:bg-slate-900/70 rounded-xl border border-slate-200 dark:border-emerald-500/20">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4"><input type="search" placeholder="Search decks..." className="w-full px-4 py-2 border border-slate-300 dark:border-emerald-500/30 rounded-lg bg-white dark:bg-slate-700/50 text-slate-900 dark:text-white" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} /></div>
+          {/* 🔽 Sort Dropdown (New Design) */}
           <div className="flex items-center gap-3 mt-4">
-            <label className="text-sm text-slate-600 dark:text-gray-400 font-medium">Sort by:</label>
+            <label className="text-sm text-slate-600 dark:text-gray-400 font-medium">
+              Sort by:
+            </label>
             <div className="relative group">
-              <select value={`${sortOrder.field}-${sortOrder.direction}`} onChange={(e) => { const [field, direction] = e.target.value.split('-'); setSortOrder({ field, direction }); }} className="appearance-none cursor-pointer pl-4 pr-10 py-2 rounded-lg bg-white dark:bg-slate-800 border border-slate-300 dark:border-emerald-500/30 text-slate-900 dark:text-white text-sm font-medium shadow-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all duration-200 hover:border-emerald-400 dark:hover:border-emerald-400">
-                <option value="sharedAt-desc">ล่าสุด (Latest)</option><option value="likeCount-desc">ยอดนิยม (Popular)</option><option value="viewCount-desc">คนดูเยอะสุด (Most Views)</option><option value="sharedAt-asc">เก่าสุด (Oldest)</option>
+              <select
+                value={`${sortOrder.field}-${sortOrder.direction}`}
+                onChange={(e) => {
+                  const [field, direction] = e.target.value.split('-');
+                  setSortOrder({ field, direction });
+                }}
+                className="
+                  appearance-none cursor-pointer
+                  pl-4 pr-10 py-2 
+                  rounded-lg 
+                  bg-white dark:bg-slate-800 
+                  border border-slate-300 dark:border-emerald-500/30 
+                  text-slate-900 dark:text-white text-sm font-medium 
+                  shadow-sm 
+                  focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none 
+                  transition-all duration-200
+                  hover:border-emerald-400 dark:hover:border-emerald-400
+                "
+              >
+                <option value="sharedAt-desc">ล่าสุด (Latest)</option>
+                <option value="likeCount-desc">ยอดนิยม (Popular)</option>
+                <option value="viewCount-desc">คนดูเยอะสุด (Most Views)</option>
+                <option value="sharedAt-asc">เก่าสุด (Oldest)</option>
               </select>
-              <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none text-slate-500 dark:text-emerald-500 group-hover:text-emerald-600 transition-colors"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg></div>
+              
+              {/* Custom Chevron Icon */}
+              <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none text-slate-500 dark:text-emerald-500 group-hover:text-emerald-600 transition-colors">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path>
+                </svg>
+              </div>
             </div>
           </div>
         </div>
         
-        {isLoading && (<div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 md:gap-6">{Array.from({ length: CHUNK_SIZE }).map((_, i) => <DeckCardSkeleton key={i} />)}</div>)}
+        {/* --- [1] Grid Layout (Mobile=2 Cols / Desktop=5 Cols) --- */}
+        {isLoading && (
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 md:gap-6"> {/* 🟢 แก้ตรงนี้ */}
+            {Array.from({ length: CHUNK_SIZE }).map((_, i) => <DeckCardSkeleton key={i} />)}
+          </div>
+        )}
         {!isLoading && sharedDecks.length > 0 && (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 md:gap-6">
-            {sharedDecks.filter(d => d.deckName.toLowerCase().includes(searchTerm.toLowerCase())).map(d => (<DeckCard key={d.id} deck={d} onViewDeck={handleView} userProfile={displayUser} onDeleteDeck={handleDelete} isDetailLoading={isDetailLoading && viewingDeck?.id === d.id} onLikeDeck={handleLike} isLiking={isLiking} />))}
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 md:gap-6"> {/* 🟢 แก้ตรงนี้ */}
+            {sharedDecks.filter(d => d.deckName.toLowerCase().includes(searchTerm.toLowerCase())).map(d => (
+              <DeckCard 
+                key={d.id} 
+                deck={d} 
+                onViewDeck={handleView} 
+                userProfile={displayUser} 
+                onDeleteDeck={handleDelete} 
+                isDetailLoading={isDetailLoading && viewingDeck?.id === d.id} 
+                onLikeDeck={handleLike} 
+                isLiking={isLiking} 
+              />
+            ))}
           </div>
         )}
 
+        {/* --- [2] Load More / Pagination Trigger --- */}
         <div ref={loaderRef} className="mt-8 py-4 text-center min-h-[50px]">
-          {(isLoadingMore || (hasMore && !isLoading && totalLoadedCount < PAGE_SIZE_LIMIT)) && (<div className="inline-flex items-center gap-2 text-slate-500 dark:text-slate-400 animate-pulse"><svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg><span>Loading more decks...</span></div>)}
-          {!isLoading && (<div className="flex justify-center gap-4 mt-4">{currentPage > 0 && (<Button onClick={handlePrevPage} className="bg-slate-600 text-white hover:bg-slate-500">&larr; Previous Page</Button>)}{(totalLoadedCount >= PAGE_SIZE_LIMIT && hasMore) && (<Button onClick={handleNextPage} className="bg-emerald-600 text-white hover:bg-emerald-500">Next Page (Page {currentPage + 2}) &rarr;</Button>)}</div>)}
-          {!hasMore && sharedDecks.length > 0 && totalLoadedCount < PAGE_SIZE_LIMIT && (<p className="text-slate-400 dark:text-slate-600 text-sm mt-4">-- End of list --</p>)}
+          {/* 2.1 Loader (Infinite Scroll) */}
+          {(isLoadingMore || (hasMore && !isLoading && totalLoadedCount < PAGE_SIZE_LIMIT)) && (
+            <div className="inline-flex items-center gap-2 text-slate-500 dark:text-slate-400 animate-pulse">
+              <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+              <span>Loading more decks...</span>
+            </div>
+          )}
+          
+          {/* 2.2 Pagination Buttons (Visible when limit reached or page > 0) */}
+          {!isLoading && (
+             <div className="flex justify-center gap-4 mt-4">
+                {/* Prev Button */}
+                {currentPage > 0 && (
+                  <Button onClick={handlePrevPage} className="bg-slate-600 text-white hover:bg-slate-500">
+                     &larr; Previous Page
+                  </Button>
+                )}
+                
+                {/* Next Button (Only if limit reached AND has more in DB) */}
+                {(totalLoadedCount >= PAGE_SIZE_LIMIT && hasMore) && (
+                   <Button onClick={handleNextPage} className="bg-emerald-600 text-white hover:bg-emerald-500">
+                     Next Page (Page {currentPage + 2}) &rarr;
+                   </Button>
+                )}
+             </div>
+          )}
+
+          {/* 2.3 End of List Message */}
+          {!hasMore && sharedDecks.length > 0 && totalLoadedCount < PAGE_SIZE_LIMIT && (
+            <p className="text-slate-400 dark:text-slate-600 text-sm mt-4">-- End of list --</p>
+          )}
         </div>
       </main>
       
       <Modal isOpen={modal.isOpen} title={modal.title} onClose={closeModal} onConfirm={modal.onConfirm} confirmText={modal.onConfirm ? modal.confirmText || "Confirm" : undefined} confirmIcon={modal.onConfirm ? modal.confirmIcon || <ClearIcon /> : undefined}>{modal.message}</Modal>
+      
       <DeckViewModal isOpen={viewingDeck !== null} onClose={() => setViewingDeck(null)} deck={viewingDeck} showAlert={showAlert} isLoading={isDetailLoading} isCapturing={isCapturing} onTakePhoto={handlePhoto} userProfile={displayUser} onClone={handleCloneDeck} />
+      
       {imageDeck && <DeckImageTemplate ref={imageTemplateRef} deck={imageDeck} analysis={imageDeck.analysis} />}
 
+      {/* === Modals for Profile & Settings & Feedback === */}
       <SettingsDrawer
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
@@ -766,12 +1037,23 @@ export default function PublicDecks() {
         theme={theme}
         setTheme={setTheme}
         onOpenFeedback={() => setIsFeedbackOpen(true)}
-        onOpenMyDecks={() => setIsDeckListModalOpen(true)} // 🟢 เพิ่ม: เปิด Modal My Decks
+        onOpenMyDecks={() => setIsDeckListModalOpen(true)} // 🟢 เปิด Modal My Decks
+        userStats={null} // ถ้ายังไม่ได้ต่อ Supabase ให้ใส่ null ไปก่อน
       />
-      <ProfileSetupModal isOpen={isProfileModalOpen} onClose={() => setIsProfileModalOpen(false)} userProfile={userProfile} onSave={handleSaveProfile} />
-      <FeedbackModal isOpen={isFeedbackOpen} onClose={() => setIsFeedbackOpen(false)} userProfile={displayUser} showAlert={showAlert} />
-      
-      {/* 🟢 [ใหม่] เพิ่ม DeckListModal ตรงนี้ */}
+      <ProfileSetupModal
+        isOpen={isProfileModalOpen}
+        onClose={() => setIsProfileModalOpen(false)}
+        userProfile={userProfile}
+        onSave={handleSaveProfile}
+      />
+      <FeedbackModal 
+        isOpen={isFeedbackOpen}
+        onClose={() => setIsFeedbackOpen(false)}
+        userProfile={displayUser}
+        showAlert={showAlert}
+      />
+
+      {/* 🟢 [ใหม่] Modal จัดการเด็ค (เพิ่มเข้ามาแล้ว) */}
       <DeckListModal
         isOpen={isDeckListModalOpen}
         onClose={() => setIsDeckListModalOpen(false)}
