@@ -13,11 +13,11 @@ import html2canvas from 'html2canvas';
 import { googleLogout } from '@react-oauth/google'; 
 import NotificationCenter from './NotificationCenter'; 
 
-// --- Imported Components (Refactored) ---
+// --- Imported Components ---
 import SettingsDrawer from './components/SettingsDrawer';
 import ProfileSetupModal from './components/ProfileSetupModal';
 import RatingBadge from './components/RatingBadge';
-import DeckListModal from './components/DeckListModal'; // 🟢 Import DeckListModal
+import DeckListModal from './components/DeckListModal';
 import { 
     MenuIcon, ShoppingBagIcon, CloseIcon, 
     SunIcon, MoonIcon, MessageIcon, StoreIcon, HomeIcon, 
@@ -28,9 +28,9 @@ import {
 
 ChartJS.register(RadialLinearScale, PointElement, LineElement, Filler, Tooltip, Legend);
 
-// === Local UI Components (Specific to this page) ===
+// === Local UI Components ===
 const Button = ({ className = "", children, ...props }) => ( 
-  <button className={`flex items-center justify-center gap-2 px-4 py-2 rounded-lg shadow-lg border border-amber-400/20 bg-amber-200/20 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 hover:bg-amber-200/50 dark:hover:bg-amber-700/50 dark:hover:text-white hover:border-amber-400/60 active:scale-[.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed ${className}`} {...props}> 
+  <button className={`flex items-center justify-center gap-2 px-4 py-2 rounded-lg shadow-lg border border-amber-300/20 dark:border-amber-400/20 bg-amber-200/20 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 hover:bg-amber-200/50 dark:hover:bg-amber-700/50 dark:hover:text-white hover:border-amber-400/60 active:scale-[.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed ${className}`} {...props}> 
     {children} 
   </button> 
 );
@@ -622,6 +622,17 @@ export default function PublicDecks() {
   // 🟢 [ใหม่] State สำหรับดึง User Stats (เพื่อให้ยศขึ้นใน Setting Drawer)
   const [userReputation, setUserReputation] = useState({});
 
+  // 🟢 [ใหม่] Logic ตรวจ In-App Browser (LINE/FB) - Copy มาจาก App.jsx
+  const navigate = useNavigate();
+  const location = useLocation();
+  useEffect(() => {
+    const ua = navigator.userAgent || navigator.vendor || window.opera;
+    const isInApp = /(Line|FBAN|FBAV|Instagram|Messenger)/i.test(ua);
+    if (isInApp) {
+      navigate('/open-browser', { replace: true });
+    }
+  }, [location, navigate]);
+
   useEffect(() => {
       const root = document.documentElement;
       if (theme === 'dark') root.classList.add('dark');
@@ -651,16 +662,6 @@ export default function PublicDecks() {
     }
   }, [userProfile]);
 
-  // 🟢 [ใหม่] Logic ตรวจ In-App Browser (LINE/FB) - Copy มาจาก App.jsx
-  const navigate = useNavigate();
-  const location = useLocation();
-  useEffect(() => {
-    const ua = navigator.userAgent || navigator.vendor || window.opera;
-    const isInApp = /(Line|FBAN|FBAV|Instagram|Messenger)/i.test(ua);
-    if (isInApp) {
-      navigate('/open-browser', { replace: true });
-    }
-  }, [location, navigate]);
 
   const closeModal = () => setModal({ isOpen: false });
   const showAlert = (title, message) => setModal({ isOpen: true, title, message });
@@ -870,7 +871,6 @@ export default function PublicDecks() {
   return (
     <div className="h-screen flex flex-col text-slate-900 dark:text-gray-200 bg-slate-100 dark:bg-black">
       <style>{`::-webkit-scrollbar{width:8px}::-webkit-scrollbar-track{background:#0f172a}::-webkit-scrollbar-thumb{background:#1e293b;border-radius:4px}::-webkit-scrollbar-thumb:hover{background:#334155}.image-render-target{position:fixed;top:-9999px;left:0;width:1280px;height:auto;background:#1e293b;padding:24px;box-shadow:0 0 30px rgba(0,0,0,0.5);display:flex;gap:24px;flex-shrink:0;flex-grow:0;}`}</style>
-      
       {/* Header: Redesigned (Consistent with App.jsx) */}
       <header className="px-3 md:px-6 py-2 border-b border-slate-200 dark:border-emerald-700/30 bg-white/80 dark:bg-black/60 backdrop-blur-sm shrink-0 z-40 h-14 flex flex-col justify-center">
          <div className="flex items-center justify-between gap-2">
@@ -887,7 +887,7 @@ export default function PublicDecks() {
              </h1>
           </div>
           
-          {/* 🟢 ฝั่งขวา: ปุ่มต่างๆ */}
+          {/* 🟢 ฝั่งขวา: ปุ่มต่างๆ เรียงตามลำดับ (Market -> Public -> My Decks -> Bell -> Profile) */}
           <div className="flex items-center gap-1.5 md:gap-3 shrink-0">
             
             {/* 1. Market */}
@@ -1078,6 +1078,6 @@ export default function PublicDecks() {
         setLifeDeck={setLifeDeck}
         cardDb={cardDb}
       />
-    </div>
+    </div> // <-- ปิด div หลัก
   );
 }
