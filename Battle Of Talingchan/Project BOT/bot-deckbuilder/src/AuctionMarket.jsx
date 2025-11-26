@@ -870,7 +870,7 @@ export default function AuctionMarket() {
                 onClick={() => setActiveTab('my-auctions')}
                 className={`flex-1 md:flex-none flex items-center justify-center gap-1 md:gap-2 px-2 md:px-6 py-2 rounded-full font-bold text-xs md:text-sm transition-all whitespace-nowrap ${activeTab === 'my-auctions' ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-md' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
             >
-                <PackageIcon /> <span className="hidden sm:inline">สินค้าที่ลงประมูล</span><span className="inline sm:hidden">รายการที่เคยประมูล</span>
+                <PackageIcon /> <span className="hidden sm:inline">สินค้าที่ลงประมูล</span><span className="inline sm:hidden">รายการประมูลของฉัน</span>
             </button>      
 
         </div>
@@ -880,7 +880,7 @@ export default function AuctionMarket() {
       <main className="flex-grow p-0 md:p-8 w-full pb-40 min-h-[120vh]">
         {activeTab === 'my-auctions' && (
             <div className="animate-fade-in w-full">
-                <div className="flex justify-between items-center mb-6 px-4"><h2 className="text-2xl font-bold flex items-center gap-2"><span className="text-blue-500">📦</span> สินค้าของฉัน</h2><span className="text-sm text-slate-500">{myAuctions.length} รายการ</span></div>
+                <div className="flex justify-between items-center mb-6 px-4"><h2 className="text-2xl font-bold flex items-center gap-2"><span className="text-blue-500"></span> สินค้าของฉัน</h2><span className="text-sm text-slate-500">{myAuctions.length} รายการ</span></div>
                 {(!userProfile) ? (<div className="text-center py-20 text-slate-500 w-full">กรุณาเข้าสู่ระบบเพื่อดูรายการสินค้าของคุณ</div>) : myAuctions.length === 0 ? (<div className="text-center py-20 text-slate-500 w-full">คุณยังไม่ได้ลงประมูลสินค้าใดๆ</div>) : (
                     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-3 gap-4 w-full px-4">
                         {myAuctions.map(item => {
@@ -982,7 +982,7 @@ export default function AuctionMarket() {
         {activeTab === 'auction' && (
             <div className="animate-fade-in w-full md:px-8">
                 
-                {/* 🟢 [NEW] Integrated Toolbar (Search + Filter + History) */}
+                {/* 🟢 [NEW] Integrated Toolbar (Search + Filter + History + Start Auction) */}
                 <div className="mt-4 mb-6 flex flex-col md:flex-row gap-2 md:items-center bg-white dark:bg-slate-900/50 p-2 md:p-3 rounded-xl border border-slate-200 dark:border-emerald-500/20 shadow-sm mx-4 md:mx-0">
                     
                     {/* 1. Search Bar (Left Side - Grow) */}
@@ -1008,7 +1008,7 @@ export default function AuctionMarket() {
                             onChange={(e) => setSortOption(e.target.value)}
                             className="px-2 py-1.5 md:py-2 bg-slate-100 dark:bg-slate-800 rounded-lg text-xs font-bold text-slate-700 dark:text-slate-300 border-none outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer"
                         >
-                            <option value="ending_soon">เวลา</option>
+                            <option value="ending_soon">เวลาล่าสุด</option>
                             <option value="price_asc">ถูก➜แพง</option>
                             <option value="price_desc">แพง➜ถูก</option>
                         </select>
@@ -1016,12 +1016,20 @@ export default function AuctionMarket() {
                         {/* Filter Buttons */}
                         <div className="flex bg-slate-100 dark:bg-slate-800 rounded-lg p-1 gap-1">
                             <button onClick={() => setFilterStatus('all')} className={`px-2 py-1 rounded text-[10px] md:text-xs font-bold transition-all ${filterStatus === 'all' ? 'bg-white dark:bg-slate-600 shadow text-emerald-600 dark:text-emerald-400' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}>รวม</button>
-                            <button onClick={() => setFilterStatus('active_bid')} className={`px-2 py-1 rounded text-[10px] md:text-xs font-bold transition-all ${filterStatus === 'active_bid' ? 'bg-white dark:bg-slate-600 shadow text-red-500' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}>เดือด</button>
-                            <button onClick={() => setFilterStatus('no_bid')} className={`px-2 py-1 rounded text-[10px] md:text-xs font-bold transition-all ${filterStatus === 'no_bid' ? 'bg-white dark:bg-slate-600 shadow text-blue-500' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}>ซิง</button>
+                            <button onClick={() => setFilterStatus('active_bid')} className={`px-2 py-1 rounded text-[10px] md:text-xs font-bold transition-all ${filterStatus === 'active_bid' ? 'bg-white dark:bg-slate-600 shadow text-red-500' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}>สู้ราคาอยู่</button>
+                            <button onClick={() => setFilterStatus('no_bid')} className={`px-2 py-1 rounded text-[10px] md:text-xs font-bold transition-all ${filterStatus === 'no_bid' ? 'bg-white dark:bg-slate-600 shadow text-blue-500' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}>ใหม่</button>
                         </div>
 
                         {/* Separator */}
                         <div className="w-px h-6 bg-slate-300 dark:bg-slate-700 mx-1"></div>
+
+                        {/* 🟢 ปุ่มเริ่มประมูล (เพิ่มใหม่ ตรงนี้ครับ) */}
+                        <button 
+                            onClick={() => navigate('/', { state: { showAuctionTutorial: true } })} 
+                            className="flex items-center gap-1 px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-xs font-bold shadow-md hover:shadow-emerald-500/30 transition-all active:scale-95 whitespace-nowrap"
+                        >
+                            <span className="text-lg leading-none mb-0.5">+</span> เริ่ม
+                        </button>
 
                         {/* History Button (Compact) */}
                         <button 

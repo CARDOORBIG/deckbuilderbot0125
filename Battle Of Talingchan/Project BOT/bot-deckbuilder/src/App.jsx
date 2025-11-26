@@ -538,7 +538,36 @@ export default function App() {
   const [customProfile, setCustomProfile] = useState(null);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  // 🟢 [UPDATED] State สำหรับ Tutorial
+  const [showAuctionTutorial, setShowAuctionTutorial] = useState(false);
+  const [dontShowAgain, setDontShowAgain] = useState(false); // 🆕 เก็บสถานะ Checkbox
 
+  // 🟢 [UPDATED] เช็คว่าต้องแสดง Tutorial หรือไม่ (เช็ค localStorage ด้วย)
+  useEffect(() => {
+    const isHidden = localStorage.getItem("bot-hide-auction-tutorial"); // ดูว่าเคยปิดถาวรไหม
+
+    if (location.state?.showAuctionTutorial && !isHidden) {
+        setShowAuctionTutorial(true);
+        // เคลียร์ state ของ location ทิ้ง เพื่อไม่ให้แสดงซ้ำตอน refresh
+        window.history.replaceState({}, document.title);
+    }
+  }, [location]);
+
+  // 🟢 [NEW] ฟังก์ชันปิด Tutorial (พร้อมบันทึกค่าถ้าติ๊กถูก)
+  const handleCloseTutorial = () => {
+      if (dontShowAgain) {
+          localStorage.setItem("bot-hide-auction-tutorial", "true");
+      }
+      setShowAuctionTutorial(false);
+  };
+  useEffect(() => {
+    if (location.state?.showAuctionTutorial) {
+        setShowAuctionTutorial(true);
+        // เคลียร์ state ทิ้ง เพื่อไม่ให้แสดงซ้ำตอน refresh
+        window.history.replaceState({}, document.title);
+    }
+  }, [location]);
+  
   const displayUser = useMemo(() => {
     if (!userProfile) return null;
     if (!customProfile) return userProfile;
@@ -794,15 +823,6 @@ export default function App() {
                 <div className="mt-4 scale-110 shrink-0">
                   <GoogleLogin onSuccess={handleLoginSuccess} onError={handleLoginError} theme={theme === 'dark' ? "filled_black" : "outline"} size="large" shape="pill" text="signin_with" logo_alignment="left" />
                 </div>
-                <button
-                  onClick={handleFacebookLogin}
-                  className="mt-3 flex items-center gap-2 px-6 py-2.5 bg-[#1877F2] text-white font-bold rounded-full shadow-lg hover:bg-[#166fe5] transition-transform active:scale-95 w-[240px] justify-center"
-                >
-                  <div className="bg-white text-[#1877F2] rounded-full p-0.5">
-                    <FacebookIcon />
-                  </div>
-                  <span>Sign in with Facebook</span>
-                </button>
                 <div className="mt-12 pt-8 border-t border-slate-300 dark:border-emerald-700/30 w-full max-w-sm flex flex-col items-center">
                   <h3 className="text-lg font-semibold text-amber-600 dark:text-amber-300 mb-4 text-center">สนับสนุนค่ากาแฟและค่าเซิร์ฟเวอร์ ❤️</h3>
                   <img src="/assets/QRCODE.png" alt="QR Code" className="w-48 h-48 mx-auto rounded-lg border-4 border-emerald-500/30" onError={(e) => (e.currentTarget.style.display = "none")} />
@@ -908,6 +928,75 @@ export default function App() {
     // 🟢 [เติมบรรทัดนี้] ส่งคะแนนเข้าไปแสดงผล
     userStats={userReputation[userProfile?.email]} 
 /><FeedbackModal isOpen={isFeedbackOpen} onClose={() => setIsFeedbackOpen(false)} userProfile={displayUser} showAlert={showAlert} />
+
+       {/* 🟢 [UPDATED] Tutorial Overlay: แบบมีปุ่ม "ไม่ต้องแสดงอีก" */}
+      {showAuctionTutorial && (
+        <div className="fixed inset-0 z-[9999] bg-black/90 backdrop-blur-md flex items-center justify-center p-4 animate-fade-in" onClick={handleCloseTutorial}>
+            <div className="bg-white dark:bg-slate-900 p-6 md:p-8 rounded-3xl max-w-md w-full shadow-2xl border-2 border-emerald-500 relative overflow-hidden" onClick={e => e.stopPropagation()}>
+                
+                {/* Decor Background */}
+                <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 rounded-bl-full -mr-10 -mt-10"></div>
+                <div className="absolute bottom-0 left-0 w-24 h-24 bg-amber-500/10 rounded-tr-full -ml-10 -mb-10"></div>
+
+                <h2 className="text-2xl md:text-3xl font-black text-center text-slate-900 dark:text-white mb-8">
+                    วิธีเริ่มลงขายการ์ด 🔨
+                </h2>
+                
+                <div className="space-y-6 relative">
+                    {/* เส้นเชื่อมจุด */}
+                    <div className="absolute left-[27px] top-10 bottom-10 w-0.5 bg-slate-200 dark:bg-slate-700 -z-10"></div>
+
+                    {/* Step 1: Filter */}
+                    <div className="flex gap-4 items-start">
+                        <div className="w-14 h-14 rounded-full bg-slate-100 dark:bg-slate-800 border-2 border-slate-300 dark:border-slate-600 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shadow-sm shrink-0">
+                            <FilterIcon />
+                        </div>
+                        <div>
+                            <h3 className="font-bold text-lg text-emerald-600 dark:text-emerald-400">1. ค้นหาการ์ด</h3>
+                            <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
+                                ใช้ปุ่ม <span className="font-bold bg-slate-200 dark:bg-slate-700 px-1.5 rounded">Filter</span> (มุมซ้ายล่าง) หรือช่องค้นหา เพื่อหาการ์ดใบที่คุณต้องการจะขาย
+                            </p>
+                        </div>
+                    </div>
+
+                    {/* Step 2: Auction Button */}
+                    <div className="flex gap-4 items-start">
+                        <div className="w-14 h-14 rounded-full bg-amber-100 dark:bg-amber-900/30 border-2 border-amber-300 dark:border-amber-600 flex items-center justify-center text-amber-600 dark:text-amber-400 shadow-sm shrink-0">
+                            <GavelIcon />
+                        </div>
+                        <div>
+                            <h3 className="font-bold text-lg text-amber-600 dark:text-amber-400">2. กดปุ่มเริ่มประมูล</h3>
+                            <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
+                                เมื่อเจอการ์ดแล้ว ให้กดที่ปุ่ม <span className="font-bold">รูปค้อน</span> ที่มุมขวาบนของการ์ด เพื่อตั้งราคาและเวลา
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                {/* 🟢 [ใหม่] Checkbox: ไม่ต้องแสดงหน้านี้อีก */}
+                <div className="mt-8 flex items-center justify-center gap-2" onClick={e => e.stopPropagation()}>
+                    <input 
+                        type="checkbox" 
+                        id="dontShow" 
+                        checked={dontShowAgain} 
+                        onChange={e => setDontShowAgain(e.target.checked)}
+                        className="w-5 h-5 accent-emerald-500 rounded cursor-pointer border-slate-300 focus:ring-emerald-500"
+                    />
+                    <label htmlFor="dontShow" className="text-sm text-slate-500 dark:text-slate-400 cursor-pointer select-none hover:text-emerald-500 transition-colors">
+                        ไม่ต้องแสดงหน้านี้อีก
+                    </label>
+                </div>
+
+                <button
+                    onClick={handleCloseTutorial}
+                    className="mt-4 w-full py-3.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-bold rounded-xl shadow-lg shadow-emerald-500/30 transition-transform hover:scale-[1.02] active:scale-[0.98]"
+                >
+                    เข้าใจแล้ว! ลุยเลย 
+                </button>
+            </div>
+        </div>
+      )}             
+
             </>
           )}
         </div>
