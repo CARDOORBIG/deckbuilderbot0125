@@ -937,8 +937,11 @@ export default function App() {
         onClose={() => setIsAdminOpen(false)} 
         adminEmail={userProfile?.email} 
       />
-      <ChatWidget userProfile={displayUser} />
-       {/* 🟢 [UPDATED] Tutorial Overlay: แบบมีปุ่ม "ไม่ต้องแสดงอีก" */}
+      <ChatWidget 
+          userProfile={displayUser} 
+          isMobileMenuOpen={isSidebarOpen} 
+      />
+      {/* 🟢 [UPDATED] Tutorial Overlay: แบบมีปุ่ม "ไม่ต้องแสดงอีก" */}
       {showAuctionTutorial && (
         <div className="fixed inset-0 z-[9999] bg-black/90 backdrop-blur-md flex items-center justify-center p-4 animate-fade-in" onClick={handleCloseTutorial}>
             <div className="bg-white dark:bg-slate-900 p-6 md:p-8 rounded-3xl max-w-md w-full shadow-2xl border-2 border-emerald-500 relative overflow-hidden" onClick={e => e.stopPropagation()}>

@@ -8,6 +8,7 @@ import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import AdminDashboardModal from './AdminDashboardModal';
 import ReportModal from './ReportModal';
 import NotificationCenter from './NotificationCenter';
+import ChatWidget from './ChatWidget';
 
 // --- Imported Components ---
 import SettingsDrawer from './components/SettingsDrawer';
@@ -444,7 +445,7 @@ const ConfirmTransactionModal = ({ isOpen, onClose, auction, userProfile, fetchR
     );
 };
 
-// === Completed Auctions Modal ===
+// === Completed Auctions Modal (Grid Layout Updated) ===
 const CompletedAuctionsModal = ({ isOpen, onClose, userProfile }) => {
     const [items, setItems] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -486,36 +487,81 @@ const CompletedAuctionsModal = ({ isOpen, onClose, userProfile }) => {
 
     return createPortal(
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[600] p-4" onClick={onClose}>
-            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-emerald-500/30 rounded-xl shadow-2xl w-full max-w-3xl overflow-hidden flex flex-col max-h-[85vh]" onClick={e => e.stopPropagation()}>
+            {/* 🟢 ปรับขนาด Modal ให้กว้างขึ้นเพื่อรองรับ 5 คอลัมน์ */}
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-emerald-500/30 rounded-xl shadow-2xl w-full max-w-6xl overflow-hidden flex flex-col max-h-[85vh]" onClick={e => e.stopPropagation()}>
+                
+                {/* Header */}
                 <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center bg-slate-50 dark:bg-slate-800/50">
-                    <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2"><HistoryIcon /> ประวัติการประมูลที่จบแล้ว</h3>
+                    <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                        <HistoryIcon /> ประวัติการประมูลที่จบแล้ว
+                    </h3>
                     <button onClick={onClose} className="text-slate-500 hover:text-red-500 transition-colors"><CloseIcon /></button>
                 </div>
-                <div className="p-4 flex-grow overflow-y-auto">
-                    {loading ? (<div className="text-center py-20 text-slate-500">กำลังโหลด...</div>) : items.length === 0 ? (<div className="text-center py-20 text-slate-500">ยังไม่มีรายการที่จบแล้ว</div>) : (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+
+                {/* Content */}
+                <div className="p-4 flex-grow overflow-y-auto bg-slate-100 dark:bg-black/20">
+                    {loading ? (
+                        <div className="text-center py-20 text-slate-500">กำลังโหลด...</div>
+                    ) : items.length === 0 ? (
+                        <div className="text-center py-20 text-slate-500">ยังไม่มีรายการที่จบแล้ว</div>
+                    ) : (
+                        // 🟢 Grid Layout: มือถือ 2, Tablet 3-4, PC 5 ช่อง
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
                             {items.map(item => (
-                                <div key={item.id} className="flex gap-3 p-3 bg-slate-50 dark:bg-slate-800/30 border border-slate-200 dark:border-slate-700 rounded-lg relative group">
-                                    <div className="w-16 h-20 bg-slate-200 dark:bg-slate-700 rounded shrink-0 overflow-hidden">
-                                        <img src={getCardImageUrl(item.card_image_path, item.card_id)} className="w-full h-full object-contain" onError={(e) => { if (!e.currentTarget.src.endsWith('.jpg')) e.currentTarget.src = e.currentTarget.src.replace('.png', '.jpg'); }} />
-                                    </div>
-                                    <div className="flex-grow min-w-0 flex flex-col justify-between">
-                                        <div><h4 className="font-bold text-slate-900 dark:text-white truncate">{item.card_name}</h4><p className="text-xs text-slate-500 dark:text-slate-400">จบเมื่อ: {new Date(item.end_time).toLocaleDateString('th-TH')}</p></div>
-                                        <div className="flex justify-between items-end mt-2">
-                                            <div><p className="text-[10px] text-slate-400">จบที่ราคา</p><p className="text-lg font-bold text-emerald-600 dark:text-emerald-400">฿{item.current_price.toLocaleString()}</p></div>
-                                            {item.winner_name ? (<div className="text-right"><p className="text-[10px] text-slate-400">ผู้ชนะ</p><p className="text-xs font-bold text-amber-600 dark:text-amber-400 truncate max-w-[100px]">👑 {item.winner_name}</p></div>) : (<p className="text-xs text-slate-400 italic">ไม่มีผู้บิด</p>)}
-                                        </div>
+                                <div 
+                                    key={item.id} 
+                                    className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden flex flex-col relative group hover:shadow-lg hover:-translate-y-1 transition-all duration-300"
+                                >
+                                    {/* Image Section */}
+                                    <div className="aspect-[5/7] bg-slate-200 dark:bg-slate-700/50 p-3 relative flex items-center justify-center">
+                                        <img 
+                                            src={getCardImageUrl(item.card_image_path, item.card_id)} 
+                                            className="w-full h-full object-contain drop-shadow-md" 
+                                            onError={(e) => { if (!e.currentTarget.src.endsWith('.jpg')) e.currentTarget.src = e.currentTarget.src.replace('.png', '.jpg'); }} 
+                                        />
+                                        
+                                        {/* Admin Delete Button */}
+                                        {userProfile?.email === 'koritros619@gmail.com' && (
+                                            <button 
+                                                onClick={(e) => { e.stopPropagation(); handleDeleteHistory(item.id); }}
+                                                className="absolute top-2 right-2 p-1.5 bg-red-600 text-white rounded-full shadow-md opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-700 z-10 scale-90"
+                                                title="Admin Delete"
+                                            >
+                                                <TrashIcon />
+                                            </button>
+                                        )}
                                     </div>
 
-                                    {userProfile?.email === 'koritros619@gmail.com' && (
-                                        <button 
-                                            onClick={(e) => { e.stopPropagation(); handleDeleteHistory(item.id); }}
-                                            className="absolute top-2 right-2 p-1.5 bg-red-600 text-white rounded-full shadow-md opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-700 z-10"
-                                            title="Admin Delete History"
-                                        >
-                                            <TrashIcon />
-                                        </button>
-                                    )}
+                                    {/* Info Section */}
+                                    <div className="p-2.5 flex flex-col flex-grow">
+                                        <h4 className="font-bold text-xs md:text-sm text-slate-900 dark:text-white line-clamp-1 mb-0.5" title={item.card_name}>
+                                            {item.card_name}
+                                        </h4>
+                                        <p className="text-[10px] text-slate-500 dark:text-slate-400 mb-2">
+                                            จบเมื่อ: {new Date(item.end_time).toLocaleDateString('th-TH')}
+                                        </p>
+                                        
+                                        <div className="mt-auto pt-2 border-t border-slate-100 dark:border-slate-700">
+                                            <div className="flex justify-between items-end">
+                                                <div>
+                                                    <p className="text-[9px] text-slate-400 uppercase tracking-wide">Sold Price</p>
+                                                    <p className="text-sm md:text-base font-black text-emerald-600 dark:text-emerald-400">
+                                                        ฿{item.current_price.toLocaleString()}
+                                                    </p>
+                                                </div>
+                                                {item.winner_name ? (
+                                                    <div className="text-right max-w-[50%]">
+                                                        <p className="text-[9px] text-slate-400">Winner</p>
+                                                        <p className="text-[10px] font-bold text-amber-600 dark:text-amber-400 truncate flex items-center justify-end gap-0.5">
+                                                            👑 {item.winner_name}
+                                                        </p>
+                                                    </div>
+                                                ) : (
+                                                    <p className="text-[10px] text-slate-400 italic self-center">ไม่มีผู้บิด</p>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             ))}
                         </div>
@@ -1245,6 +1291,10 @@ export default function AuctionMarket() {
         setLifeDeck={setLifeDeck}
         cardDb={cardDb}
       />
-    </div> // <-- ปิด div หลัก
+      <ChatWidget 
+        userProfile={displayUser} 
+        isMobileMenuOpen={isSettingsOpen} // ซ่อนปุ่มแชทถ้าเปิดเมนูตั้งค่า
+      />
+    </div>
   );
 }

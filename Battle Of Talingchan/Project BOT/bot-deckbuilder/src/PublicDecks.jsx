@@ -13,6 +13,7 @@ import { Radar } from 'react-chartjs-2';
 import html2canvas from 'html2canvas';
 import { googleLogout } from '@react-oauth/google'; 
 import NotificationCenter from './NotificationCenter'; 
+import ChatWidget from './ChatWidget';
 
 // --- Imported Components ---
 import SettingsDrawer from './components/SettingsDrawer';
@@ -928,17 +929,29 @@ export default function PublicDecks() {
             <NotificationCenter userEmail={userProfile?.email} />
 
             {/* 5. Profile Picture */}
-            <img
-                src={displayUser.picture}
-                alt={displayUser.name}
-                className="w-8 h-8 md:w-9 md:h-9 rounded-full border-2 border-emerald-500 object-cover ml-1 cursor-pointer hover:scale-105 transition-transform"
-                title={`Logged in as ${displayUser.name}`}
-                onClick={() => setIsSettingsOpen(true)} 
-            />
-            {/* ซ่อนชื่อบนมือถือ */}
-            <span className="text-slate-900 dark:text-white hidden lg:block text-sm font-semibold max-w-[100px] truncate">
-                {displayUser.name}
-            </span>
+            {/* 5. Profile Picture (แก้ไขแล้ว: ตรวจสอบก่อนแสดงผล) */}
+            {displayUser ? (
+              <>
+                <img
+                    src={displayUser.picture}
+                    alt={displayUser.name}
+                    className="w-8 h-8 md:w-9 md:h-9 rounded-full border-2 border-emerald-500 object-cover ml-1 cursor-pointer hover:scale-105 transition-transform"
+                    title={`Logged in as ${displayUser.name}`}
+                    onClick={() => setIsSettingsOpen(true)} 
+                />
+                <span className="text-slate-900 dark:text-white hidden lg:block text-sm font-semibold max-w-[100px] truncate">
+                    {displayUser.name}
+                </span>
+              </>
+            ) : (
+              // กรณีไม่ได้ Login: แสดงปุ่มให้กดไป Login แทน
+              <button 
+                onClick={() => navigate('/')} 
+                className="ml-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-full shadow transition-all"
+              >
+                Login
+              </button>
+            )}
           </div>
 
         </div>
@@ -1092,6 +1105,10 @@ export default function PublicDecks() {
         setMainDeck={setMainDeck}
         setLifeDeck={setLifeDeck}
         cardDb={cardDb}
+      />
+      <ChatWidget 
+        userProfile={displayUser} 
+        isMobileMenuOpen={isSettingsOpen} // ซ่อนปุ่มแชทถ้าเปิดเมนูตั้งค่า (บนมือถือ)
       />
     </div>
   );
