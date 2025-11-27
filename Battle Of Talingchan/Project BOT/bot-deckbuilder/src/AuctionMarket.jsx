@@ -26,7 +26,8 @@ import {
     TrashIcon, UsersIcon, DeckIcon, StoreIcon, 
     HomeIcon, MessageIcon, NeonLightningIcon, 
     ImageIcon, ArchiveIcon,
-    ChevronLeftIcon 
+    ChevronLeftIcon,
+    UserPlusIcon // 🟢 ใช้อันนี้
 } from './components/Icons';
 
 // === Helper Functions ===
@@ -155,12 +156,31 @@ const ManageBiddersModal = ({ isOpen, onClose, auction, userProfile }) => {
     );
 };
 
-// === Auction Room Modal ===
+// === Auction Room Modal (Live Chat & Card) ===
 const AuctionRoomModal = ({ isOpen, onClose, auction, userProfile, onBid, onBuyNow }) => {
     const [messages, setMessages] = useState([]);
     const [newMessage, setNewMessage] = useState("");
     const [showDesc, setShowDesc] = useState(false);
     const chatEndRef = useRef(null);
+    
+    // 🟢 State สำหรับโปรไฟล์ผู้ขายและ Toast
+    const [sellerAvatar, setSellerAvatar] = useState(null);
+    const [toastMessage, setToastMessage] = useState(null);
+
+    // 🟢 ดึงรูปผู้ขายจาก Firestore
+    useEffect(() => {
+        if (isOpen && auction?.seller_email) {
+            const fetchSeller = async () => {
+                try {
+                    const docSnap = await getDoc(doc(db, "users", auction.seller_email));
+                    if (docSnap.exists()) {
+                        setSellerAvatar(docSnap.data().avatarUrl);
+                    }
+                } catch (e) { console.error("Err fetching seller", e); }
+            };
+            fetchSeller();
+        }
+    }, [isOpen, auction]);
 
     useEffect(() => {
         if (isOpen && auction) {
@@ -177,13 +197,40 @@ const AuctionRoomModal = ({ isOpen, onClose, auction, userProfile, onBid, onBuyN
     const scrollToBottom = () => { setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100); };
     const handleSendMessage = async (e) => { e.preventDefault(); if (!newMessage.trim() || !userProfile) return; await supabase.from('auction_comments').insert({ auction_id: auction.id, user_email: userProfile.email, user_name: userProfile.name, user_picture: userProfile.picture, message: newMessage.trim() }); setNewMessage(""); };
 
+    // 🟢 ฟังก์ชันเพิ่มเพื่อน
+    const handleAddFriend = async () => {
+        if (!userProfile) return alert("กรุณา Login ก่อนครับ");
+        if (userProfile.email === auction.seller_email) return;
+
+        // เช็คว่าเคยแอดไปรึยัง
+        const { data: existing } = await supabase.from('friendships').select('*').or(`and(requester_id.eq.${userProfile.email},receiver_id.eq.${auction.seller_email}),and(requester_id.eq.${auction.seller_email},receiver_id.eq.${userProfile.email})`);
+        
+        if (existing && existing.length > 0) {
+            setToastMessage("เป็นเพื่อนกันแล้ว หรือส่งคำขอไปแล้ว");
+        } else {
+            const { error } = await supabase.from('friendships').insert({ requester_id: userProfile.email, receiver_id: auction.seller_email });
+            if (!error) setToastMessage(`ส่งคำขอเป็นเพื่อนหา ${auction.seller_name} แล้ว!`);
+            else alert(error.message);
+        }
+
+        // Auto hide toast
+        setTimeout(() => setToastMessage(null), 3000);
+    };
+
     if (!isOpen || !auction) return null;
 
-    // เช็คสถานะจบ
     const isEnded = auction.status !== 'active' || new Date(auction.end_time) < new Date();
 
     return createPortal(
         <div className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center z-[700] p-0 md:p-4" onClick={onClose}>
+            
+            {/* 🟢 Toast Notification */}
+            {toastMessage && (
+                <div className="absolute top-10 left-1/2 transform -translate-x-1/2 z-[800] bg-black/80 text-white px-6 py-3 rounded-full shadow-2xl border border-emerald-500 animate-fade-in-up flex items-center gap-2">
+                    <span className="text-xl">✅</span> {toastMessage}
+                </div>
+            )}
+
             <div className="bg-white dark:bg-slate-900 border-0 md:border border-slate-200 dark:border-emerald-500/30 rounded-none md:rounded-xl shadow-2xl w-full h-full md:h-[90vh] max-w-6xl flex flex-col md:flex-row overflow-hidden" onClick={e => e.stopPropagation()}>
                 
                 {/* 🖼️ ส่วนซ้าย: รูปภาพ */}
@@ -225,10 +272,30 @@ const AuctionRoomModal = ({ isOpen, onClose, auction, userProfile, onBid, onBuyN
                     {/* Action Bar */}
                     <div className="p-4 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-emerald-500/20 flex items-center gap-4 shrink-0">
                         <div className="flex-grow min-w-0 flex flex-col justify-center">
-                            <div className="flex items-center justify-between">
+                            <div className="flex items-center justify-between mb-1">
                                 <h2 className="text-lg font-bold text-slate-900 dark:text-white line-clamp-1 truncate">{auction.card_name}</h2>
                             </div>
-                            <p className="text-xs text-slate-500">Seller: {auction.seller_name}</p>
+                            
+                            {/* 🟢 แสดงโปรไฟล์ผู้ขาย + ปุ่มเพิ่มเพื่อน */}
+                            <div className="flex items-center gap-2">
+                                <img 
+                                    src={sellerAvatar || `https://ui-avatars.com/api/?name=${auction.seller_name}&background=random`} 
+                                    className="w-6 h-6 rounded-full border border-slate-300 dark:border-slate-600 object-cover"
+                                />
+                                <div className="flex items-center gap-1">
+                                    <p className="text-xs text-slate-500">Seller: <span className="font-bold text-slate-700 dark:text-slate-300">{auction.seller_name}</span></p>
+                                    {userProfile && userProfile.email !== auction.seller_email && (
+                                        <button 
+                                            onClick={(e) => { e.stopPropagation(); handleAddFriend(); }}
+                                            className="ml-1 p-1 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 rounded-full hover:bg-emerald-200 transition-colors"
+                                            title="เพิ่มเพื่อน"
+                                        >
+                                            <div className="scale-75"><UserPlusIcon /></div>
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+
                             {auction.winner_name && (
                                 <p className="text-sm font-bold text-amber-500 mt-1">
                                     👑 Highest: <span className="text-slate-900 dark:text-white">{auction.winner_name}</span>
@@ -489,6 +556,7 @@ const CompletedAuctionsModal = ({ isOpen, onClose, userProfile }) => {
 
     return createPortal(
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[600] p-4" onClick={onClose}>
+            {/* 🟢 ปรับขนาด Modal ให้กว้างขึ้นเพื่อรองรับ 5 คอลัมน์ */}
             <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-emerald-500/30 rounded-xl shadow-2xl w-full max-w-6xl overflow-hidden flex flex-col max-h-[85vh]" onClick={e => e.stopPropagation()}>
                 
                 {/* Header */}
@@ -1033,10 +1101,12 @@ export default function AuctionMarket() {
       />
 
       {/* Chat Widget */}
-      <ChatWidget 
-        userProfile={displayUser} 
-        isMobileMenuOpen={isSettingsOpen} 
-      />
+      {!chatAuction && (
+        <ChatWidget 
+            userProfile={displayUser} 
+            isMobileMenuOpen={isSettingsOpen} 
+        />
+      )}
 
     </div>
   );
