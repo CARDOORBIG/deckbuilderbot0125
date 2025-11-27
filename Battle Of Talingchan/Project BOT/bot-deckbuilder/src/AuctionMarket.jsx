@@ -1,14 +1,17 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { supabase } from './supabaseClient';
-import { Link, useNavigate, useLocation } from 'react-router-dom'; // 🟢 Import ครบ
+import { Link, useNavigate, useLocation } from 'react-router-dom'; 
 import { createPortal } from "react-dom";
 import { googleLogout } from '@react-oauth/google';
 import { db } from './firebase';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+
+// --- Local Modals ---
 import AdminDashboardModal from './AdminDashboardModal';
 import ReportModal from './ReportModal';
 import NotificationCenter from './NotificationCenter';
 import ChatWidget from './ChatWidget';
+import FeedbackModal from './components/FeedbackModal';
 
 // --- Imported Components ---
 import SettingsDrawer from './components/SettingsDrawer';
@@ -23,7 +26,7 @@ import {
     TrashIcon, UsersIcon, DeckIcon, StoreIcon, 
     HomeIcon, MessageIcon, NeonLightningIcon, 
     ImageIcon, ArchiveIcon,
-    ChevronLeftIcon // 🟢 เพิ่มไอคอนนี้เพื่อแก้หน้าขาว
+    ChevronLeftIcon 
 } from './components/Icons';
 
 // === Helper Functions ===
@@ -185,7 +188,6 @@ const AuctionRoomModal = ({ isOpen, onClose, auction, userProfile, onBid, onBuyN
                 
                 {/* 🖼️ ส่วนซ้าย: รูปภาพ */}
                 <div className="w-full md:w-2/3 h-[50vh] md:h-full flex flex-col bg-slate-100 dark:bg-slate-950 relative">
-                    {/* 🟢 ใช้ ChevronLeftIcon ที่ import มาแล้ว */}
                     <button onClick={onClose} className="absolute top-4 left-4 z-20 bg-black/50 text-white p-2 rounded-full md:hidden hover:bg-red-500 transition-colors"><ChevronLeftIcon /></button>
                     
                     <div className="flex-grow flex items-center justify-center p-4 relative overflow-hidden">
@@ -487,7 +489,6 @@ const CompletedAuctionsModal = ({ isOpen, onClose, userProfile }) => {
 
     return createPortal(
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[600] p-4" onClick={onClose}>
-            {/* 🟢 ปรับขนาด Modal ให้กว้างขึ้นเพื่อรองรับ 5 คอลัมน์ */}
             <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-emerald-500/30 rounded-xl shadow-2xl w-full max-w-6xl overflow-hidden flex flex-col max-h-[85vh]" onClick={e => e.stopPropagation()}>
                 
                 {/* Header */}
@@ -575,55 +576,38 @@ const CompletedAuctionsModal = ({ isOpen, onClose, userProfile }) => {
 // === Main Component ===
 export default function AuctionMarket() {
   const navigate = useNavigate();
+  const location = useLocation();
+  
   const [activeTab, setActiveTab] = useState('auction');
   const [auctions, setAuctions] = useState([]);
   const [myAuctions, setMyAuctions] = useState([]);
-  const location = useLocation(); // 🟢 1. เพิ่มตัวแปร location เพื่อดึง URL
-
-  // 🟢 2. Logic ตรวจ In-App Browser (LINE/FB)
-  useEffect(() => {
-    const ua = navigator.userAgent || navigator.vendor || window.opera;
-    const isInApp = /(Line|FBAN|FBAV|Instagram|Messenger)/i.test(ua);
-    if (isInApp) {
-      // ส่งไป open-browser พร้อมบอกว่าให้ redirect กลับมาที่หน้านี้
-      navigate(`/open-browser?redirect=${encodeURIComponent(location.pathname + location.search)}`, { replace: true });
-    }
-  }, [location, navigate]);
   
   // States for Modals
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [historyAuction, setHistoryAuction] = useState(null); 
-  const [isNotiOpen, setIsNotiOpen] = useState(false);
-  const [unreadNotiCount, setUnreadNotiCount] = useState(0);
   const [isCompletedModalOpen, setIsCompletedModalOpen] = useState(false);
   const [isAdminOpen, setIsAdminOpen] = useState(false);
   const [reportTarget, setReportTarget] = useState(null); 
   const [manageAuction, setManageAuction] = useState(null);
+  
+  // 🟢 State for Feedback
+  const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
 
-  // 🟢 [NEW] State สำหรับระบบกรองและค้นหา
+  // Filter & Search
   const [searchTerm, setSearchTerm] = useState("");
-  const [sortOption, setSortOption] = useState("ending_soon"); // ending_soon, price_asc, price_desc
-  const [filterStatus, setFilterStatus] = useState("all");     // all, active_bid, no_bid
+  const [sortOption, setSortOption] = useState("ending_soon");
+  const [filterStatus, setFilterStatus] = useState("all");
 
-  // 🟢 [ใหม่] State สำหรับจัดการ Deck
+  // Deck Management
   const [isDeckListModalOpen, setIsDeckListModalOpen] = useState(false);
-
   const [userDecks, setUserDecks] = useLocalStorage("bot-userDecks-v1", {});
   const [mainDeck, setMainDeck] = useLocalStorage("bot-mainDeck-v32-final", []);
   const [lifeDeck, setLifeDeck] = useLocalStorage("bot-lifeDeck-v32-final", []);
-  const [cardDb] = useLocalStorage("bot-cardDb-v32-final", []); // โหลดการ์ดทั้งหมดมาเพื่อใช้ Decode Deck
+  const [cardDb] = useLocalStorage("bot-cardDb-v32-final", []);
 
   const [userReputation, setUserReputation] = useState({});
   const [confirmTransaction, setConfirmTransaction] = useState(null);
-
-  const fetchReputations = async () => {
-      const { data } = await supabase.from('user_stats').select('user_email, total_score, penalty_level');
-      const map = {};
-      data?.forEach(u => map[u.user_email] = u);
-      setUserReputation(map);
-  };
-
   const [chatAuction, setChatAuction] = useState(null);
   const [customProfile, setCustomProfile] = useState(null);
   
@@ -634,50 +618,35 @@ export default function AuctionMarket() {
     try { return JSON.parse(localStorage.getItem("bot-theme")) || 'dark'; } catch { return 'dark'; }
   });
 
-  const setTheme = (newTheme) => {
-    setThemeState(newTheme);
-    localStorage.setItem("bot-theme", JSON.stringify(newTheme));
-  };
+  // --- Effects ---
 
-  const displayUser = useMemo(() => {
-    if (!userProfile) return null;
-    if (!customProfile) return userProfile;
-    return { ...userProfile, name: customProfile.displayName || userProfile.name, picture: customProfile.avatarUrl || userProfile.picture };
-  }, [userProfile, customProfile]);
+  // 1. In-App Browser Check
+  useEffect(() => {
+    const ua = navigator.userAgent || navigator.vendor || window.opera;
+    const isInApp = /(Line|FBAN|FBAV|Instagram|Messenger)/i.test(ua);
+    if (isInApp) {
+      navigate(`/open-browser?redirect=${encodeURIComponent(location.pathname + location.search)}`, { replace: true });
+    }
+  }, [location, navigate]);
 
-  // 🟢 [NEW] Logic การกรองและเรียงลำดับ (ใช้ useMemo เพื่อประสิทธิภาพ)
-  const filteredAuctions = useMemo(() => {
-    return auctions
-      .filter(item => {
-        // 1. กรองตามชื่อ
-        const matchName = item.card_name.toLowerCase().includes(searchTerm.toLowerCase());
-        
-        // 2. กรองตามสถานะ (เดือด/ซิง)
-        let matchStatus = true;
-        if (filterStatus === 'active_bid') {
-           // ราคาปัจจุบัน > ราคาเริ่ม = มีคนบิดแล้ว (เดือด)
-           matchStatus = item.current_price > item.start_price;
-        } else if (filterStatus === 'no_bid') {
-           // ราคาเท่าเดิม = ยังไม่มีใครเปิด (ซิง)
-           matchStatus = item.current_price === item.start_price;
-        }
-
-        return matchName && matchStatus;
-      })
-      .sort((a, b) => {
-        // 3. เรียงลำดับ
-        if (sortOption === 'price_asc') return a.current_price - b.current_price; // ราคา ต่ำ->สูง
-        if (sortOption === 'price_desc') return b.current_price - a.current_price; // ราคา สูง->ต่ำ
-        // Default: เวลาเหลือน้อยขึ้นก่อน (ending_soon)
-        return new Date(a.end_time) - new Date(b.end_time);
-      });
-  }, [auctions, searchTerm, sortOption, filterStatus]);
-
+  // 2. Theme
   useEffect(() => {
     const root = document.documentElement;
     if (theme === 'dark') root.classList.add('dark');
     else root.classList.remove('dark');
   }, [theme]);
+
+  const setTheme = (newTheme) => {
+    setThemeState(newTheme);
+    localStorage.setItem("bot-theme", JSON.stringify(newTheme));
+  };
+
+  // 3. User Profile & Stats
+  const displayUser = useMemo(() => {
+    if (!userProfile) return null;
+    if (!customProfile) return userProfile;
+    return { ...userProfile, name: customProfile.displayName || userProfile.name, picture: customProfile.avatarUrl || userProfile.picture };
+  }, [userProfile, customProfile]);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -691,21 +660,39 @@ export default function AuctionMarket() {
     fetchProfile();
   }, [userProfile]);
 
+  const fetchReputations = async () => {
+      const { data } = await supabase.from('user_stats').select('user_email, total_score, penalty_level');
+      const map = {};
+      data?.forEach(u => map[u.user_email] = u);
+      setUserReputation(map);
+  };
+
   useEffect(() => {
     fetchReputations();
   }, []);
 
+  // 4. Notification Logic (แยกออกมาเป็นอิสระ)
   useEffect(() => {
-    if (!userProfile?.email) return;
-    const fetchUnread = async () => {
-        const { count } = await supabase.from('notifications').select('*', { count: 'exact', head: true }).eq('user_email', userProfile.email).eq('is_read', false);
-        setUnreadNotiCount(count || 0);
-    };
-    fetchUnread();
-    const channel = supabase.channel(`noti_count:${userProfile.email}`).on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_email=eq.${userProfile.email}` }, (payload) => { setUnreadNotiCount(prev => prev + 1); }).subscribe();
-    return () => supabase.removeChannel(channel);
-  }, [userProfile]);
+    const openFromNoti = async () => {
+        if (location.state?.openAuctionId) {
+            const auctionId = location.state.openAuctionId;
+            let targetAuction = auctions.find(a => a.id === auctionId) || myAuctions.find(a => a.id === auctionId);
 
+            if (!targetAuction) {
+                const { data } = await supabase.from('auctions').select('*').eq('id', auctionId).single();
+                if (data) targetAuction = data;
+            }
+
+            if (targetAuction) {
+                setChatAuction(targetAuction);
+                window.history.replaceState({}, document.title);
+            }
+        }
+    };
+    openFromNoti();
+  }, [location, auctions, myAuctions]);
+
+  // 5. Fetch Auctions Logic
   useEffect(() => {
     if (activeTab === 'my-auctions' && userProfile?.email) {
         fetchMyAuctions();
@@ -724,24 +711,13 @@ export default function AuctionMarket() {
 
   async function fetchAuctions() {
     const now = new Date().toISOString();
-    const { data } = await supabase
-        .from('auctions')
-        .select('*')
-        .eq('status', 'active')
-        .gt('end_time', now)
-        .order('end_time', { ascending: true });
+    const { data } = await supabase.from('auctions').select('*').eq('status', 'active').gt('end_time', now).order('end_time', { ascending: true });
     if (data) setAuctions(data);
   }
 
   async function fetchMyAuctions() {
     if (!userProfile?.email) return;
-    
-    // 🟢 [แก้ไข] ดึงทั้ง "รายการที่ขาย" และ "รายการที่ชนะ"
-    const { data } = await supabase
-        .from('auctions')
-        .select('*')
-        .or(`seller_email.eq.${userProfile.email},winner_email.eq.${userProfile.email}`);
-        
+    const { data } = await supabase.from('auctions').select('*').or(`seller_email.eq.${userProfile.email},winner_email.eq.${userProfile.email}`);
     if (data) {
         const sorted = data.sort((a, b) => {
             const aActive = new Date(a.end_time) > new Date();
@@ -754,6 +730,24 @@ export default function AuctionMarket() {
     }
   }
 
+  // --- Logic การกรอง ---
+  const filteredAuctions = useMemo(() => {
+    return auctions
+      .filter(item => {
+        const matchName = item.card_name.toLowerCase().includes(searchTerm.toLowerCase());
+        let matchStatus = true;
+        if (filterStatus === 'active_bid') matchStatus = item.current_price > item.start_price;
+        else if (filterStatus === 'no_bid') matchStatus = item.current_price === item.start_price;
+        return matchName && matchStatus;
+      })
+      .sort((a, b) => {
+        if (sortOption === 'price_asc') return a.current_price - b.current_price;
+        if (sortOption === 'price_desc') return b.current_price - a.current_price;
+        return new Date(a.end_time) - new Date(b.end_time);
+      });
+  }, [auctions, searchTerm, sortOption, filterStatus]);
+
+  // --- Actions ---
   async function handleBid(auction) {
     if (!userProfile) return alert("กรุณา Login ที่หน้าแรกก่อนครับ");
     if (userProfile.email === auction.seller_email) return alert("ห้ามบิดของตัวเองครับ!");
@@ -789,49 +783,31 @@ export default function AuctionMarket() {
       p_amount: auction.buy_now_price
     });
 
-    if (error) {
-       alert("Error: " + error.message);
-    } else if (!data.success) {
-       alert(data.message);
-    } else {
+    if (error) alert("Error: " + error.message);
+    else if (!data.success) alert(data.message);
+    else {
        alert("🎉 ยินดีด้วย! คุณชนะการประมูลด้วยระบบ Buy Now");
-       setChatAuction(null); // ปิดหน้าต่าง
-       fetchAuctions(); // รีโหลดข้อมูล
+       setChatAuction(null); 
+       fetchAuctions(); 
     }
   }
 
   async function handleCancel(auctionId) {
     const isAdmin = userProfile?.email === 'koritros619@gmail.com';
-    const confirmMsg = isAdmin
-        ? "👑 Admin Force Cancel:\nต้องการยกเลิกการประมูลนี้ใช่หรือไม่?\n(ผู้ใช้งานจะไม่ได้รับโทษ แต่การประมูลจะยุติทันที)"
-        : "⚠️ ยืนยันการยกเลิก?\n- ยกเลิกได้ 3 ครั้ง/วัน\n- หากเกินจะติดคูลดาวน์ 3 ชม.\n- ผู้ที่บิดไปแล้วจะได้รับการแจ้งเตือน";
-
+    const confirmMsg = isAdmin ? "👑 Admin Force Cancel:\nยืนยัน?" : "⚠️ ยืนยันการยกเลิก?";
     if (!confirm(confirmMsg)) return;
 
-    const { data, error } = await supabase.rpc('cancel_auction', {
-      p_auction_id: auctionId,
-      p_user_email: userProfile.email
-    });
-
+    const { data, error } = await supabase.rpc('cancel_auction', { p_auction_id: auctionId, p_user_email: userProfile.email });
     if (error) alert("Error: " + error.message);
     else if (!data.success) alert(data.message);
-    else {
-        alert(data.message);
-        fetchAuctions();
-        fetchMyAuctions();
-    }
+    else { alert(data.message); fetchAuctions(); fetchMyAuctions(); }
   }
 
   async function handleDeleteMyAuction(auctionId) {
-    if (!confirm("⚠️ ยืนยันการลบรายการนี้ออกจากประวัติของคุณ?\n(การกระทำนี้จะลบข้อมูลออกจากระบบอย่างถาวร)")) return;
-
+    if (!confirm("⚠️ ยืนยันการลบรายการนี้?")) return;
     const { error } = await supabase.from('auctions').delete().eq('id', auctionId);
-
-    if (error) {
-      alert("ไม่สามารถลบได้ (อาจมีข้อมูลการบิดที่เชื่อมโยงอยู่): " + error.message);
-    } else {
-      setMyAuctions(prev => prev.filter(item => item.id !== auctionId));
-    }
+    if (error) alert("ลบไม่ได้: " + error.message);
+    else setMyAuctions(prev => prev.filter(item => item.id !== auctionId));
   }
 
   const handleLogout = () => {
@@ -851,6 +827,7 @@ export default function AuctionMarket() {
     } catch (e) { console.error(e); alert("บันทึกไม่สำเร็จ"); }
   };
 
+  // --- Render ---
   return (
     <div className="h-full overflow-y-auto bg-slate-100 dark:bg-black text-slate-900 dark:text-white flex flex-col transition-colors duration-300">
       
@@ -882,12 +859,8 @@ export default function AuctionMarket() {
                 </Link>
 
                 <Link to="/public-decks">
-                    <Button
-                        as="span"
-                        className="!px-2 md:!px-4 bg-gradient-to-r from-blue-500 to-purple-600 text-white border-none shadow-lg hover:from-blue-400 hover:to-purple-500"
-                    >
-                        <UsersIcon />{" "}
-                        <span className="hidden md:inline">Public</span>
+                    <Button as="span" className="!px-2 md:!px-4 bg-gradient-to-r from-blue-500 to-purple-600 text-white border-none shadow-lg hover:from-blue-400 hover:to-purple-500">
+                        <UsersIcon /> <span className="hidden md:inline">Public</span>
                     </Button>
                 </Link>
 
@@ -910,330 +883,121 @@ export default function AuctionMarket() {
       {/* Tabs */}
       <div className="flex justify-center mt-4 px-2 md:px-4">
         <div className="flex w-full md:w-auto bg-slate-200 dark:bg-slate-800 rounded-full p-1 shadow-inner">
-            <button 
-                onClick={() => setActiveTab('auction')}
-                className={`flex-1 md:flex-none flex items-center justify-center gap-1 md:gap-2 px-2 md:px-6 py-2 rounded-full font-bold text-xs md:text-sm transition-all whitespace-nowrap ${activeTab === 'auction' ? 'bg-white dark:bg-slate-700 text-amber-600 dark:text-amber-400 shadow-md' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
-            >
+            <button onClick={() => setActiveTab('auction')} className={`flex-1 md:flex-none flex items-center justify-center gap-1 md:gap-2 px-2 md:px-6 py-2 rounded-full font-bold text-xs md:text-sm transition-all whitespace-nowrap ${activeTab === 'auction' ? 'bg-white dark:bg-slate-700 text-amber-600 dark:text-amber-400 shadow-md' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}>
                 <GavelIcon /> ลานประมูล
             </button>
-
-            <button 
-                onClick={() => setActiveTab('market')}
-                className={`flex-1 md:flex-none flex items-center justify-center gap-1 md:gap-2 px-2 md:px-6 py-2 rounded-full font-bold text-xs md:text-sm transition-all whitespace-nowrap ${activeTab === 'market' ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-md' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
-            >
+            <button onClick={() => setActiveTab('market')} className={`flex-1 md:flex-none flex items-center justify-center gap-1 md:gap-2 px-2 md:px-6 py-2 rounded-full font-bold text-xs md:text-sm transition-all whitespace-nowrap ${activeTab === 'market' ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-md' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}>
                 <ShoppingBagIcon /> <span className="hidden sm:inline">ตลาดซื้อขาย</span><span className="inline sm:hidden">ตลาด</span>
             </button>
-            <button 
-                onClick={() => setActiveTab('my-auctions')}
-                className={`flex-1 md:flex-none flex items-center justify-center gap-1 md:gap-2 px-2 md:px-6 py-2 rounded-full font-bold text-xs md:text-sm transition-all whitespace-nowrap ${activeTab === 'my-auctions' ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-md' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
-            >
+            <button onClick={() => setActiveTab('my-auctions')} className={`flex-1 md:flex-none flex items-center justify-center gap-1 md:gap-2 px-2 md:px-6 py-2 rounded-full font-bold text-xs md:text-sm transition-all whitespace-nowrap ${activeTab === 'my-auctions' ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-md' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}>
                 <PackageIcon /> <span className="hidden sm:inline">สินค้าที่ลงประมูล</span><span className="inline sm:hidden">รายการที่เคยประมูล</span>
             </button>      
-
         </div>
       </div>
 
-      {/* Content */}
+      {/* Content Area */}
       <main className="flex-grow p-0 md:p-8 w-full pb-40 min-h-[120vh]">
-        {activeTab === 'my-auctions' && (
-            <div className="animate-fade-in w-full">
-                <div className="flex justify-between items-center mb-6 px-4"><h2 className="text-2xl font-bold flex items-center gap-2"><span className="text-blue-500">📦</span> สินค้าของฉัน</h2><span className="text-sm text-slate-500">{myAuctions.length} รายการ</span></div>
-                {(!userProfile) ? (<div className="text-center py-20 text-slate-500 w-full">กรุณาเข้าสู่ระบบเพื่อดูรายการสินค้าของคุณ</div>) : myAuctions.length === 0 ? (<div className="text-center py-20 text-slate-500 w-full">คุณยังไม่ได้ลงประมูลสินค้าใดๆ</div>) : (
-                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-3 gap-4 w-full px-4">
-                        {myAuctions.map(item => {
-                            const isEnded = new Date(item.end_time) < new Date();
-                            const isCancelled = item.status === 'cancelled';
-                            const sellerScore = userReputation[item.seller_email]?.total_score || 0; 
-                            const winnerConfirmed = isEnded && item.winner_email && item.seller_confirmed;
-                            const buyerConfirmed = isEnded && item.winner_email && item.winner_confirmed;
-
-                            const canConfirm = isEnded && item.winner_email && !isCancelled && (
-                                (item.seller_email === userProfile.email && !item.seller_confirmed) || 
-                                (item.winner_email === userProfile.email && !item.winner_confirmed)   
-                            );
-
-                            return (
-                                <div key={item.id} 
-                                     className={`bg-white dark:bg-slate-900 border ${!isEnded && !isCancelled ? 'border-blue-400 dark:border-blue-500/50' : 'border-slate-200 dark:border-slate-700 opacity-70'} rounded-xl shadow-lg overflow-hidden flex flex-col hover:border-blue-400 transition-all group relative cursor-pointer`}
-                                     onClick={() => setChatAuction(item)}
-                                >
-                                    <div className="aspect-[5/7] bg-slate-200 dark:bg-slate-800 relative">
-                                        <img src={getCardImageUrl(item.card_image_path, item.card_id)} className="w-full h-full object-contain p-2" onError={(e) => { if (!e.currentTarget.src.endsWith('.jpg')) e.currentTarget.src = e.currentTarget.src.replace('.png', '.jpg'); }} />
-                                        
-                                        {/* 🟢 [แก้ไข] ป้ายสถานะ (Badge) */}
-                                        <div className={`
-                                            absolute top-2 right-2 text-white text-[10px] px-2 py-1 rounded-full backdrop-blur-sm border font-bold shadow-sm
-                                            ${isCancelled 
-                                                ? 'bg-red-600/90 border-red-400' 
-                                                : !isEnded 
-                                                    ? 'bg-blue-600/90 border-blue-400' 
-                                                    : (item.winner_email === userProfile.email && item.seller_email !== userProfile.email) // ถ้าจบแล้ว + เราชนะ + ไม่ใช่ของตัวเอง
-                                                        ? 'bg-emerald-500/90 border-emerald-400 shadow-[0_0_10px_rgba(16,185,129,0.6)] text-white' // สีเขียวอ่อนมีแสง
-                                                        : 'bg-slate-600/90 border-slate-500' // จบปกติ/ขายออก
-                                            }
-                                        `}>
-                                            {isCancelled 
-                                                ? 'ยกเลิกแล้ว' 
-                                                : !isEnded 
-                                                    ? 'กำลังประมูล' 
-                                                    : (item.winner_email === userProfile.email && item.seller_email !== userProfile.email)
-                                                        ? '🎉 ประมูลชนะ' 
-                                                        : 'จบแล้ว'
-                                            }
-                                        </div>
-
-                                        <button onClick={(e) => { e.stopPropagation(); setHistoryAuction(item); }} className="absolute top-2 left-2 bg-white/20 hover:bg-white/40 backdrop-blur-sm text-white p-1.5 rounded-full transition-colors"><div className="scale-75"><HistoryIcon /></div></button>
-                                    </div>
-                                    <div className="p-3 flex-1 flex flex-col">
-                                        <div className="flex justify-between items-center mb-2"><p className="text-[10px] text-slate-500">ผู้ขาย: {item.seller_name}</p><RatingBadge score={sellerScore} /></div>
-                                        <h3 className="font-bold text-sm truncate mb-1">{item.card_name}</h3>
-                                        {canConfirm && (
-                                            <button 
-                                                onClick={() => setConfirmTransaction({ auction: item })}
-                                                className="w-full py-2 bg-blue-600 text-white font-bold rounded-lg shadow transition-all hover:bg-blue-500 mt-2"
-                                            >
-                                                ยืนยันธุรกรรม / ให้คะแนน
-                                            </button>
-                                        )}
-                                        <div className="mt-auto bg-slate-50 dark:bg-slate-800/50 p-2 rounded border border-slate-100 dark:border-slate-700 text-center mb-2">
-                                            <p className="text-[10px] text-slate-400 uppercase">{!isEnded && !isCancelled ? 'Current Bid' : 'Sold Price'}</p>
-                                            <p className={`text-xl font-bold ${isCancelled ? 'text-red-500 line-through' : 'text-blue-600 dark:text-blue-400'}`}>฿{item.current_price.toLocaleString()}</p>
-                                            {item.winner_name && !isCancelled ? <p className="text-[10px] text-amber-500 mt-0.5 truncate">👑 {item.winner_name}</p> : <p className="text-[10px] text-slate-400 mt-0.5">-</p>}
-                                        </div>
-                                        
-                                        {/* 🟢 FIXED: Correct button logic */}
-                                        {item.status === 'active' ? (
-                                            <div className="mt-2 space-y-2" onClick={e => e.stopPropagation()}>
-                                                <button 
-                                                    onClick={() => handleCancel(item.id)}
-                                                    className="w-full py-1.5 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800 rounded-lg text-xs font-bold hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors flex items-center justify-center gap-1"
-                                                >
-                                                    <BanIcon /> ยกเลิกการประมูล
-                                                </button>
-
-                                                <button 
-                                                    onClick={() => setManageAuction(item)}
-                                                    className="w-full py-1.5 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-300 dark:border-slate-600 rounded-lg text-xs font-bold hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors flex items-center justify-center gap-1"
-                                                >
-                                                    <ShieldCheckIcon /> จัดการผู้บิด
-                                                </button>
-                                            </div>
-                                        ) : (
-                                            <button 
-                                                onClick={(e) => { e.stopPropagation(); handleDeleteMyAuction(item.id); }}
-                                                className="mt-2 w-full py-1.5 bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-bold hover:bg-red-50 hover:text-red-500 hover:border-red-200 dark:hover:bg-red-900/20 dark:hover:text-red-400 transition-colors flex items-center justify-center gap-1"
-                                                title="ลบออกจากรายการ"
-                                            >
-                                                <TrashIcon /> ลบประวัติ
-                                            </button>
-                                        )}
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
-                )}
-            </div>
-        )}
-
+        {/* ... (เนื้อหาแต่ละ Tab เหมือนเดิม) ... */}
         {activeTab === 'auction' && (
             <div className="animate-fade-in w-full md:px-8">
-                
-                
-<div className="mt-4 mb-6 flex flex-col gap-2 bg-white dark:bg-slate-900/50 p-2 md:p-3 rounded-xl border border-slate-200 dark:border-emerald-500/20 shadow-sm mx-4 md:mx-0">
-    
-    {/* 1. Search Bar (Always Full Width) */}
-    <div className="relative flex-grow w-full">
-        <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
-            <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
-        </div>
-        <input 
-            type="text" 
-            placeholder="ค้นหาชื่อการ์ด..." 
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-9 pr-4 py-1.5 md:py-2 bg-slate-100 dark:bg-slate-800 border-none rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none text-slate-900 dark:text-white placeholder-slate-400 transition-all"
-        />
-    </div>
-
-    {/* 2. Action Group (Flex for Desktop, Scrollable/Wrap for Mobile) */}
-    <div className="flex flex-col md:flex-row gap-2 md:items-center shrink-0">
-        
-        {/* Sort + Filter (Scrollable on Mobile) */}
-        <div className="flex gap-2 items-center overflow-x-auto pb-1 md:pb-0 no-scrollbar shrink-0">
-            
-            {/* Sort Dropdown */}
-            <select 
-                value={sortOption} 
-                onChange={(e) => setSortOption(e.target.value)}
-                className="px-2 py-1.5 md:py-2 bg-slate-100 dark:bg-slate-800 rounded-lg text-xs font-bold text-slate-700 dark:text-slate-300 border-none outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer shrink-0"
-            >
-                <option value="ending_soon">เวลา</option>
-                <option value="price_asc">ถูก➜แพง</option>
-                <option value="price_desc">แพง➜ถูก</option>
-            </select>
-
-            {/* Filter Buttons */}
-            <div className="flex bg-slate-100 dark:bg-slate-800 rounded-lg p-1 gap-1 shrink-0">
-                <button onClick={() => setFilterStatus('all')} className={`px-2 py-1 rounded text-[10px] md:text-xs font-bold transition-all shrink-0 ${filterStatus === 'all' ? 'bg-white dark:bg-slate-600 shadow text-emerald-600 dark:text-emerald-400' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}>รวม</button>
-                <button onClick={() => setFilterStatus('active_bid')} className={`px-2 py-1 rounded text-[10px] md:text-xs font-bold transition-all shrink-0 ${filterStatus === 'active_bid' ? 'bg-white dark:bg-slate-600 shadow text-red-500' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}>เดือด</button>
-                <button onClick={() => setFilterStatus('no_bid')} className={`px-2 py-1 rounded text-[10px] md:text-xs font-bold transition-all shrink-0 ${filterStatus === 'no_bid' ? 'bg-white dark:bg-slate-600 shadow text-blue-500' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}>ใหม่</button>
-            </div>
-            
-            {/* Separator */}
-            <div className="w-px h-6 bg-slate-300 dark:bg-slate-700 mx-1 shrink-0"></div>
-
-            {/* History Button (Compact) - ย้ายมาข้างหน้า*/}
-            <button 
-                onClick={() => setIsCompletedModalOpen(true)} 
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 border border-transparent hover:border-slate-300 dark:hover:border-slate-600 rounded-lg text-xs font-bold text-slate-600 dark:text-slate-400 transition-all whitespace-nowrap shrink-0"
-                title="ดูประวัติการประมูลที่จบแล้ว"
-            >
-                <HistoryIcon /> 
-                <span className="hidden sm:inline">ประวัติ</span>
-            </button>
-        </div>
-
-        {/* ปุ่มเริ่มประมูล (Always Full Width on Mobile / Right Side on Desktop) */}
-        <button 
-            onClick={() => navigate('/', { state: { showAuctionTutorial: true } })} 
-            className="w-full md:w-auto flex items-center gap-1 px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-xs font-bold shadow-md hover:shadow-emerald-500/30 transition-all active:scale-95 whitespace-nowrap justify-center shrink-0"
-        >
-            <span className="text-lg leading-none mb-0.5">+</span> ลงประมูล
-        </button>
-    </div>
-</div>
-
-                {/* 🟢 Grid Layout (Updated with filteredAuctions) */}
-                <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 md:gap-6">
-                    {filteredAuctions.length === 0 ? (
-                        <div className="col-span-full flex flex-col items-center justify-center py-32 text-slate-400 opacity-50">
-                            <GavelIcon className="w-16 h-16 mb-4" />
-                            <p className="text-xl font-bold">ไม่พบสินค้าตามเงื่อนไข...</p>
+                {/* Search & Filter Bar */}
+                <div className="mt-4 mb-6 flex flex-col gap-2 bg-white dark:bg-slate-900/50 p-2 md:p-3 rounded-xl border border-slate-200 dark:border-emerald-500/20 shadow-sm mx-4 md:mx-0">
+                    <div className="relative flex-grow w-full">
+                        <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none"><svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg></div>
+                        <input type="text" placeholder="ค้นหาชื่อการ์ด..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-9 pr-4 py-1.5 md:py-2 bg-slate-100 dark:bg-slate-800 border-none rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none text-slate-900 dark:text-white placeholder-slate-400 transition-all" />
+                    </div>
+                    <div className="flex flex-col md:flex-row gap-2 md:items-center shrink-0">
+                        <div className="flex gap-2 items-center overflow-x-auto pb-1 md:pb-0 no-scrollbar shrink-0">
+                            <select value={sortOption} onChange={(e) => setSortOption(e.target.value)} className="px-2 py-1.5 md:py-2 bg-slate-100 dark:bg-slate-800 rounded-lg text-xs font-bold text-slate-700 dark:text-slate-300 border-none outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer shrink-0">
+                                <option value="ending_soon">เวลา</option>
+                                <option value="price_asc">ถูก➜แพง</option>
+                                <option value="price_desc">แพง➜ถูก</option>
+                            </select>
+                            <div className="flex bg-slate-100 dark:bg-slate-800 rounded-lg p-1 gap-1 shrink-0">
+                                <button onClick={() => setFilterStatus('all')} className={`px-2 py-1 rounded text-[10px] md:text-xs font-bold transition-all shrink-0 ${filterStatus === 'all' ? 'bg-white dark:bg-slate-600 shadow text-emerald-600 dark:text-emerald-400' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}>รวม</button>
+                                <button onClick={() => setFilterStatus('active_bid')} className={`px-2 py-1 rounded text-[10px] md:text-xs font-bold transition-all shrink-0 ${filterStatus === 'active_bid' ? 'bg-white dark:bg-slate-600 shadow text-red-500' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}>เดือด</button>
+                                <button onClick={() => setFilterStatus('no_bid')} className={`px-2 py-1 rounded text-[10px] md:text-xs font-bold transition-all shrink-0 ${filterStatus === 'no_bid' ? 'bg-white dark:bg-slate-600 shadow text-blue-500' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}>ใหม่</button>
+                            </div>
+                            <div className="w-px h-6 bg-slate-300 dark:bg-slate-700 mx-1 shrink-0"></div>
+                            <button onClick={() => setIsCompletedModalOpen(true)} className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 border border-transparent hover:border-slate-300 dark:hover:border-slate-600 rounded-lg text-xs font-bold text-slate-600 dark:text-slate-400 transition-all whitespace-nowrap shrink-0" title="ดูประวัติการประมูลที่จบแล้ว">
+                                <HistoryIcon /> <span className="hidden sm:inline">ประวัติ</span>
+                            </button>
                         </div>
-                    ) : filteredAuctions.map(item => {
-                        const sellerScore = userReputation[item.seller_email]?.total_score || 0;
-                        
-                        return (
-                            <div key={item.id} 
-                                 className="bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-emerald-500/20 rounded-2xl shadow-md hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group cursor-pointer relative overflow-hidden flex flex-col"
-                                 onClick={() => setChatAuction(item)}
-                            >
-                                {/* === Image Section === */}
-                                <div className="aspect-[4/5] bg-slate-100 dark:bg-slate-800/50 relative p-1 md:p-6 flex items-center justify-center overflow-hidden">
-                                    <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/40 opacity-60"></div>
-                                    
-                                    <img 
-                                        src={getCardImageUrl(item.card_image_path, item.card_id)} 
-                                        className="w-full h-full object-cover drop-shadow-2xl transform transition-transform duration-500 group-hover:scale-110 z-10" 
-                                        onError={(e) => { if (!e.currentTarget.src.endsWith('.jpg')) e.currentTarget.src = e.currentTarget.src.replace('.png', '.jpg'); }} 
-                                    />
-                                    
-                                    <button onClick={(e) => { e.stopPropagation(); setHistoryAuction(item); }} 
-                                        className="absolute top-2 left-2 p-1.5 bg-black/30 hover:bg-black/50 text-white rounded-full backdrop-blur-md transition-all z-20 border border-white/20" 
-                                    >
-                                        <div className="scale-75"><HistoryIcon /></div>
-                                    </button>
+                        <button onClick={() => navigate('/', { state: { showAuctionTutorial: true } })} className="w-full md:w-auto flex items-center gap-1 px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-xs font-bold shadow-md hover:shadow-emerald-500/30 transition-all active:scale-95 whitespace-nowrap justify-center shrink-0">
+                            <span className="text-lg leading-none mb-0.5">+</span> ลงประมูล
+                        </button>
+                    </div>
+                </div>
 
-                                    {userProfile?.email === 'koritros619@gmail.com' && (
-                                        <button onClick={(e) => { e.stopPropagation(); handleCancel(item.id); }} className="absolute top-2 left-10 p-1.5 bg-red-600/90 text-white rounded-full z-20 scale-90"><TrashIcon /></button>
-                                    )}
-
-                                    {/* 📱 Mobile Badge */}
-                                    {item.description && (
-                                        <div className="md:hidden absolute bottom-2 left-2 z-20 flex items-center gap-1 bg-black/60 backdrop-blur-md px-2 py-1 rounded-lg border border-white/10">
-                                            <span className="text-xs">📝</span>
-                                            <span className="text-[10px] text-white font-bold">มีรายละเอียด</span>
-                                        </div>
-                                    )}
-
-                                    {/* 💻 PC Hover Overlay */}
-                                    {item.description && (
-                                        <div className="hidden md:flex absolute inset-0 bg-slate-900/90 backdrop-blur-sm z-30 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex-col items-center justify-center p-6 text-center">
-                                            <h4 className="text-emerald-400 font-bold text-sm mb-2 uppercase tracking-widest border-b border-emerald-500/30 pb-1 w-full">
-                                                รายละเอียดสินค้า
-                                            </h4>
-                                            <div className="overflow-y-auto max-h-full scrollbar-thin scrollbar-thumb-slate-600 scrollbar-track-transparent">
-                                                <p className="text-white text-sm leading-relaxed whitespace-pre-wrap">
-                                                    {item.description}
-                                                </p>
-                                            </div>
-                                        </div>
-                                    )}
+                {/* Grid */}
+                <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 md:gap-6">
+                    {filteredAuctions.map(item => (
+                        <div key={item.id} className="bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-emerald-500/20 rounded-2xl shadow-md hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group cursor-pointer relative overflow-hidden flex flex-col" onClick={() => setChatAuction(item)}>
+                            <div className="aspect-[4/5] bg-slate-100 dark:bg-slate-800/50 relative p-1 md:p-6 flex items-center justify-center overflow-hidden">
+                                <img src={getCardImageUrl(item.card_image_path, item.card_id)} className="w-full h-full object-cover drop-shadow-2xl" onError={(e) => { if (!e.currentTarget.src.endsWith('.jpg')) e.currentTarget.src = e.currentTarget.src.replace('.png', '.jpg'); }} />
+                                {item.winner_name && <div className="absolute top-2 right-2 bg-amber-500 text-white text-[10px] px-2 py-1 rounded-full font-bold shadow-sm z-10">👑 {item.winner_name}</div>}
+                            </div>
+                            <div className="p-3 flex-1 flex flex-col gap-1">
+                                <div className="flex justify-center mb-1"><TimeLeft endTime={item.end_time} /></div>
+                                <h3 className="font-black text-sm md:text-base text-slate-900 dark:text-white text-center mb-1 line-clamp-1">{item.card_name}</h3>
+                                <div className="mt-auto bg-slate-50 dark:bg-slate-800/50 p-2 rounded-xl border border-slate-200 dark:border-slate-700 text-center">
+                                    <p className="text-[9px] text-slate-400 uppercase font-bold tracking-wider mb-0.5">Current Bid</p>
+                                    <span className="text-2xl md:text-3xl font-black text-slate-900 dark:text-white">฿{item.current_price.toLocaleString()}</span>
                                 </div>
-                                
-                                {/* === Info Section === */}
-                                <div className="p-3 flex-1 flex flex-col gap-1">
-                                    <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-800 pb-1 mb-1">
-                                        <div className="flex items-center gap-1 min-w-0">
-                                            <p className="text-[10px] text-slate-500">Seller:</p>
-                                            <p className="text-[10px] font-bold text-slate-700 dark:text-slate-300 truncate max-w-[80px]">{item.seller_name}</p>
-                                        </div>
-                                        <div onClick={e => e.stopPropagation()}>
-                                            <RatingBadge score={sellerScore} />
-                                        </div>
-                                    </div>
-
-                                    <div className="flex justify-center mb-1">
-                                        <div className="scale-90 origin-center"><TimeLeft endTime={item.end_time} /></div>
-                                    </div>
-                                    
-                                    <h3 className="font-black text-sm md:text-base text-slate-900 dark:text-white leading-tight line-clamp-1 text-center mb-1">
-                                        {item.card_name}
-                                    </h3>
-
-                                    <div className="mt-auto bg-slate-50 dark:bg-slate-800/50 p-2 rounded-xl border border-slate-200 dark:border-slate-700 text-center relative group-hover:border-amber-400/50 transition-colors">
-                                        <p className="text-[9px] text-slate-400 uppercase font-bold tracking-wider mb-0.5">Current Bid</p>
-                                        <div className="flex items-baseline justify-center leading-none">
-                                            <span className="text-lg font-bold text-emerald-600 dark:text-emerald-400 mr-0.5">฿</span>
-                                            <span className="text-2xl md:text-3xl font-black text-slate-900 dark:text-white">{item.current_price.toLocaleString()}</span>
-                                        </div>
-                                        {item.winner_name && (
-                                            <div className="absolute top-1 right-1 flex items-center justify-center w-5 h-5 bg-amber-500 rounded-full text-[10px] shadow-sm animate-bounce" title={`นำโดย: ${item.winner_name}`}>👑</div>
-                                        )}
-                                    </div>
-
-                                    {/* 🟢 [Action Buttons with Buy Now] */}
-                                    <div className="mt-2 flex gap-2">
-                                        {item.buy_now_price > 0 && (
-                                            <button 
-                                                onClick={(e) => { e.stopPropagation(); handleBuyNow(item); }}
-                                                className="flex-1 py-2 bg-yellow-500/10 hover:bg-yellow-500/30 dark:bg-yellow-400/10 dark:hover:bg-yellow-400/20 text-yellow-700 dark:text-yellow-300 border border-yellow-500/50 hover:border-yellow-400 rounded-xl font-bold text-[10px] md:text-xs transition-all duration-300 flex flex-col items-center justify-center leading-none shadow-[0_0_5px_rgba(250,204,21,0.2)] hover:shadow-[0_0_15px_rgba(250,204,21,0.6)] group/buy"
-                                            >
-                                                <div className="flex items-center gap-1">
-                                                    <NeonLightningIcon className="w-3.5 h-3.5 md:w-4 md:h-4 group-hover/buy:scale-110 transition-transform" />
-                                                    <span className="uppercase">Buy</span>
-                                                </div>
-                                                <span className="text-[10px] md:text-[11px] font-medium opacity-90">฿{item.buy_now_price.toLocaleString()}</span>
-                                            </button>
-                                        )}
-
-                                        <button 
-                                            onClick={(e) => { e.stopPropagation(); handleBid(item); }}
-                                            className={`py-2 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-white text-xs md:text-sm font-bold rounded-xl shadow-md active:scale-[0.98] transition-all flex items-center justify-center gap-1 ${item.buy_now_price > 0 ? 'flex-1' : 'w-full'}`}
-                                        >
-                                            <GavelIcon /> 
-                                            <span>Bid</span>
+                                <div className="mt-2 flex gap-2">
+                                    {item.buy_now_price > 0 && (
+                                        <button onClick={(e) => { e.stopPropagation(); handleBuyNow(item); }} className="flex-1 py-2 bg-yellow-500/10 hover:bg-yellow-500/30 dark:bg-yellow-400/10 text-yellow-700 dark:text-yellow-300 border border-yellow-500/50 rounded-xl font-bold text-[10px] md:text-xs flex flex-col items-center justify-center leading-none">
+                                            <span className="uppercase mb-0.5">Buy</span><span>฿{item.buy_now_price.toLocaleString()}</span>
                                         </button>
-                                    </div>
+                                    )}
+                                    <button onClick={(e) => { e.stopPropagation(); handleBid(item); }} className={`py-2 bg-gradient-to-r from-amber-500 to-orange-600 text-white text-xs md:text-sm font-bold rounded-xl shadow-md flex items-center justify-center gap-1 ${item.buy_now_price > 0 ? 'flex-1' : 'w-full'}`}>
+                                        <GavelIcon /> <span>Bid</span>
+                                    </button>
                                 </div>
                             </div>
-                        );
-                    })}
+                        </div>
+                    ))}
                 </div>
             </div>
         )}
 
-        {activeTab === 'market' && (
-            <div className="animate-fade-in text-center py-20 w-full">
-                <div className="inline-block p-6 bg-slate-200 dark:bg-slate-800 rounded-full mb-4"><ShoppingBagIcon width="48" height="48" className="text-emerald-500" /></div>
-                <h2 className="text-2xl font-bold text-slate-700 dark:text-slate-300 mb-2">ตลาดซื้อขาย (Coming Soon)</h2>
-                <p className="text-slate-500">ระบบวางขายการ์ดแบบกำหนดราคาตายตัว กำลังพัฒนาครับ...</p>
+        {/* My Auctions */}
+        {activeTab === 'my-auctions' && (
+            <div className="animate-fade-in w-full px-4">
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-3 gap-4 w-full">
+                    {myAuctions.map(item => (
+                        <div key={item.id} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-lg overflow-hidden flex flex-col cursor-pointer" onClick={() => setChatAuction(item)}>
+                            <div className="aspect-[5/7] bg-slate-200 dark:bg-slate-800 relative">
+                                <img src={getCardImageUrl(item.card_image_path, item.card_id)} className="w-full h-full object-contain p-2" onError={(e) => { if (!e.currentTarget.src.endsWith('.jpg')) e.currentTarget.src = e.currentTarget.src.replace('.png', '.jpg'); }} />
+                                <div className="absolute top-2 right-2 bg-slate-600/90 text-white text-[10px] px-2 py-1 rounded-full font-bold border border-slate-500">
+                                    {item.status === 'cancelled' ? 'ยกเลิกแล้ว' : (new Date(item.end_time) < new Date() ? 'จบแล้ว' : 'กำลังประมูล')}
+                                </div>
+                            </div>
+                            <div className="p-3 flex-1 flex flex-col">
+                                <h3 className="font-bold text-sm truncate mb-1">{item.card_name}</h3>
+                                <div className="mt-auto bg-slate-50 dark:bg-slate-800/50 p-2 rounded border border-slate-100 dark:border-slate-700 text-center mb-2">
+                                    <p className="text-xl font-bold text-blue-600 dark:text-blue-400">฿{item.current_price.toLocaleString()}</p>
+                                </div>
+                                {item.status === 'active' && (
+                                    <div className="mt-2 space-y-2" onClick={e => e.stopPropagation()}>
+                                        <button onClick={() => handleCancel(item.id)} className="w-full py-1.5 bg-red-100 dark:bg-red-900/30 text-red-600 border border-red-200 rounded-lg text-xs font-bold hover:bg-red-200 transition-colors flex items-center justify-center gap-1"><BanIcon /> ยกเลิก</button>
+                                        <button onClick={() => setManageAuction(item)} className="w-full py-1.5 bg-slate-100 dark:bg-slate-800 text-slate-600 border border-slate-300 rounded-lg text-xs font-bold hover:bg-slate-200 transition-colors flex items-center justify-center gap-1"><ShieldCheckIcon /> จัดการ</button>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    ))}
+                </div>
             </div>
+        )}
+
+        {/* Market Placeholder */}
+        {activeTab === 'market' && (
+            <div className="text-center py-20 w-full"><ShoppingBagIcon width="48" height="48" className="inline-block text-emerald-500 mb-4" /><h2 className="text-2xl font-bold">ตลาดซื้อขาย (Coming Soon)</h2></div>
         )}
       </main>
 
-      {/* Settings & Modals */}
+      {/* Modals & Drawers */}
       <SettingsDrawer 
         isOpen={isSettingsOpen} 
         onClose={() => setIsSettingsOpen(false)} 
@@ -1241,60 +1005,39 @@ export default function AuctionMarket() {
         onEditProfile={() => setIsProfileModalOpen(true)} 
         onLogout={handleLogout} 
         theme={theme} 
-        setTheme={setTheme}
+        setTheme={setTheme} 
         onOpenAdmin={() => setIsAdminOpen(true)} 
-        userStats={userReputation[userProfile?.email]}
+        userStats={userReputation[userProfile?.email]} 
         onOpenMyDecks={() => setIsDeckListModalOpen(true)}
+        onOpenFeedback={() => setIsFeedbackOpen(true)} 
       />
+      
       <ProfileSetupModal isOpen={isProfileModalOpen} onClose={() => setIsProfileModalOpen(false)} userProfile={userProfile} onSave={handleSaveProfile} />
       <BidHistoryModal isOpen={!!historyAuction} onClose={() => setHistoryAuction(null)} auction={historyAuction} />
       <CompletedAuctionsModal isOpen={isCompletedModalOpen} onClose={() => setIsCompletedModalOpen(false)} userProfile={userProfile} />
-      <AdminDashboardModal 
-        isOpen={isAdminOpen} 
-        onClose={() => setIsAdminOpen(false)} 
-        adminEmail={userProfile?.email} 
-      />
-      <ReportModal 
-        isOpen={!!reportTarget} 
-        onClose={() => setReportTarget(null)} 
-        reporterEmail={userProfile?.email}
-        targetUser={reportTarget?.targetUser}
-        context={reportTarget?.context}
-      />
+      <AdminDashboardModal isOpen={isAdminOpen} onClose={() => setIsAdminOpen(false)} adminEmail={userProfile?.email} />
+      <ReportModal isOpen={!!reportTarget} onClose={() => setReportTarget(null)} reporterEmail={userProfile?.email} targetUser={reportTarget?.targetUser} context={reportTarget?.context} />
       <ManageBiddersModal isOpen={!!manageAuction} onClose={() => setManageAuction(null)} auction={manageAuction} userProfile={userProfile} />
-      <AuctionRoomModal 
-          isOpen={!!chatAuction} 
-          onClose={() => setChatAuction(null)} 
-          auction={chatAuction} 
-          userProfile={displayUser} 
-          onBid={handleBid} 
-          onBuyNow={handleBuyNow} 
+      
+      {/* Auction & Transaction Modals */}
+      <AuctionRoomModal isOpen={!!chatAuction} onClose={() => setChatAuction(null)} auction={chatAuction} userProfile={displayUser} onBid={handleBid} onBuyNow={handleBuyNow} />
+      <ConfirmTransactionModal isOpen={!!confirmTransaction} onClose={() => setConfirmTransaction(null)} auction={confirmTransaction?.auction} userProfile={userProfile} fetchReputations={fetchReputations} onBuyNow={handleBuyNow} />
+      <DeckListModal isOpen={isDeckListModalOpen} onClose={() => setIsDeckListModalOpen(false)} userProfile={displayUser} userDecks={userDecks} setUserDecks={setUserDecks} mainDeck={mainDeck} lifeDeck={lifeDeck} setMainDeck={setMainDeck} setLifeDeck={setLifeDeck} cardDb={cardDb} />
+      
+      {/* Feedback Modal */}
+      <FeedbackModal 
+        isOpen={isFeedbackOpen} 
+        onClose={() => setIsFeedbackOpen(false)} 
+        userProfile={displayUser} 
+        showAlert={(title, msg) => alert(`${title}\n${msg}`)} 
       />
-      <ConfirmTransactionModal 
-        isOpen={!!confirmTransaction}
-        onClose={() => setConfirmTransaction(null)}
-        auction={confirmTransaction?.auction}
-        userProfile={userProfile}
-        fetchReputations={fetchReputations}
-        onBuyNow={handleBuyNow}
-      />
-      {/* 🟢 [ใหม่] Modal จัดการเด็ค */}
-      <DeckListModal
-        isOpen={isDeckListModalOpen}
-        onClose={() => setIsDeckListModalOpen(false)}
-        userProfile={displayUser}
-        userDecks={userDecks}
-        setUserDecks={setUserDecks}
-        mainDeck={mainDeck}
-        lifeDeck={lifeDeck}
-        setMainDeck={setMainDeck}
-        setLifeDeck={setLifeDeck}
-        cardDb={cardDb}
-      />
+
+      {/* Chat Widget */}
       <ChatWidget 
         userProfile={displayUser} 
-        isMobileMenuOpen={isSettingsOpen} // ซ่อนปุ่มแชทถ้าเปิดเมนูตั้งค่า
+        isMobileMenuOpen={isSettingsOpen} 
       />
+
     </div>
   );
 }

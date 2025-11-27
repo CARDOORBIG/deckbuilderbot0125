@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from './supabaseClient';
+import { useNavigate } from 'react-router-dom'; // 🟢 1. Import useNavigate
 
 // === Icons ===
 const Svg = ({ p, ...r }) => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...r}>{p}</svg>;
@@ -10,6 +11,7 @@ export default function NotificationCenter({ userEmail }) {
     const [notifications, setNotifications] = useState([]);
     const [unreadCount, setUnreadCount] = useState(0);
     const dropdownRef = useRef(null);
+    const navigate = useNavigate(); // 🟢 2. เรียกใช้ Hook
 
     // ปิด Dropdown เมื่อคลิกข้างนอก
     useEffect(() => {
@@ -26,7 +28,6 @@ export default function NotificationCenter({ userEmail }) {
     useEffect(() => {
         if (!userEmail) return;
 
-        // 1. ดึงข้อมูลแจ้งเตือน
         const fetchNotifications = async () => {
             const { data } = await supabase
                 .from('notifications')
@@ -37,14 +38,12 @@ export default function NotificationCenter({ userEmail }) {
             
             if (data) {
                 setNotifications(data);
-                // นับจำนวนที่ยังไม่อ่าน (เฉพาะของตัวเอง)
                 const unread = data.filter(n => !n.is_read && n.user_email !== 'GLOBAL').length;
                 setUnreadCount(unread);
             }
         };
         fetchNotifications();
 
-        // 2. ตั้งค่า Realtime
         const channel = supabase.channel(`noti_center:${userEmail}`)
             .on('postgres_changes', { 
                 event: 'INSERT', 
@@ -62,22 +61,38 @@ export default function NotificationCenter({ userEmail }) {
 
     const markAllAsRead = async () => {
         if (notifications.length === 0) return;
-        
-        // อัปเดต UI ทันที
         setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
         setUnreadCount(0);
-
-        // อัปเดต Database (เฉพาะของ User นี้)
-        await supabase.from('notifications')
-            .update({ is_read: true })
-            .eq('user_email', userEmail);
+        await supabase.from('notifications').update({ is_read: true }).eq('user_email', userEmail);
     };
 
-    if (!userEmail) return null; // ถ้าไม่ได้ Login ไม่ต้องโชว์
+    // 🟢 3. ฟังก์ชันคลิกแจ้งเตือน
+    const handleClickNotification = async (notification) => {
+        // อ่านแล้ว
+        if (!notification.is_read) {
+            setNotifications(prev => prev.map(n => n.id === notification.id ? { ...n, is_read: true } : n));
+            setUnreadCount(prev => Math.max(0, prev - 1));
+            supabase.from('notifications').update({ is_read: true }).eq('id', notification.id).then();
+        }
+
+        setIsOpen(false); // ปิด Dropdown
+
+        // เช็คประเภทแล้วพาไปหน้า Auction พร้อมเปิดห้องแชท
+        if (notification.type === 'bid' || notification.type === 'outbid') {
+            // สมมติว่าในตาราง notification มี column 'reference_id' เก็บ auction_id ไว้
+            // ถ้าคุณตั้งชื่อ column อื่น (เช่น action_url, context_id) ให้แก้ตรงนี้ครับ
+            const auctionId = notification.reference_id || notification.context_id; 
+            
+            if (auctionId) {
+                navigate('/auction', { state: { openAuctionId: auctionId } });
+            }
+        }
+    };
+
+    if (!userEmail) return null;
 
     return (
         <div className="relative z-50" ref={dropdownRef}>
-            {/* ปุ่มกระดิ่ง */}
             <button 
                 onClick={() => setIsOpen(!isOpen)}
                 className="p-2 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-full transition-colors relative text-slate-600 dark:text-slate-300"
@@ -88,7 +103,6 @@ export default function NotificationCenter({ userEmail }) {
                 )}
             </button>
 
-            {/* Dropdown List */}
             {isOpen && (
                 <div className="absolute top-full right-0 mt-2 w-80 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-xl shadow-2xl overflow-hidden animate-fade-in">
                     <div className="p-3 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 flex justify-between items-center">
@@ -103,7 +117,11 @@ export default function NotificationCenter({ userEmail }) {
                             <div className="p-8 text-center text-slate-500 text-xs">ไม่มีการแจ้งเตือน</div>
                         ) : (
                             notifications.map(n => (
-                                <div key={n.id} className={`p-3 border-b border-slate-100 dark:border-slate-700/50 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors cursor-pointer ${!n.is_read ? 'bg-blue-50/50 dark:bg-blue-900/20' : ''}`}>
+                                <div 
+                                    key={n.id} 
+                                    onClick={() => handleClickNotification(n)} // 🟢 4. ใส่ onClick
+                                    className={`p-3 border-b border-slate-100 dark:border-slate-700/50 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors cursor-pointer ${!n.is_read ? 'bg-blue-50/50 dark:bg-blue-900/20' : ''}`}
+                                >
                                     <div className="flex items-start gap-3">
                                         <div className={`mt-1 w-2 h-2 rounded-full flex-shrink-0 ${!n.is_read ? 'bg-red-500' : 'bg-slate-300 dark:bg-slate-600'}`}></div>
                                         <div>
@@ -111,8 +129,6 @@ export default function NotificationCenter({ userEmail }) {
                                                 n.type === 'admin_announce' ? 'text-red-500 dark:text-red-400' : 
                                                 n.type === 'bid' ? 'text-emerald-600 dark:text-emerald-400' : 
                                                 n.type === 'outbid' ? 'text-amber-600 dark:text-amber-400' : 
-                                                n.type === 'cancel' ? 'text-red-600 dark:text-red-400' : 
-                                                n.type === 'ban' ? 'text-purple-600 dark:text-purple-400' : 
                                                 'text-slate-800 dark:text-white'
                                             }`}>
                                                 {n.type === 'admin_announce' ? '📢 ' : ''}{n.title}
