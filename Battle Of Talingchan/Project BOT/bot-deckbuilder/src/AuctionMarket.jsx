@@ -993,66 +993,70 @@ export default function AuctionMarket() {
         {activeTab === 'auction' && (
             <div className="animate-fade-in w-full md:px-8">
                 
-                {/* 🟢 [NEW] Integrated Toolbar (Search + Filter + History + Start Auction) */}
-                <div className="mt-4 mb-6 flex flex-col md:flex-row gap-2 md:items-center bg-white dark:bg-slate-900/50 p-2 md:p-3 rounded-xl border border-slate-200 dark:border-emerald-500/20 shadow-sm mx-4 md:mx-0">
-                    
-                    {/* 1. Search Bar (Left Side - Grow) */}
-                    <div className="relative flex-grow w-full md:w-auto">
-                        <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
-                            <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
-                        </div>
-                        <input 
-                            type="text" 
-                            placeholder="ค้นหาชื่อการ์ด..." 
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-full pl-9 pr-4 py-1.5 md:py-2 bg-slate-100 dark:bg-slate-800 border-none rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none text-slate-900 dark:text-white placeholder-slate-400 transition-all"
-                        />
-                    </div>
+                
+<div className="mt-4 mb-6 flex flex-col gap-2 bg-white dark:bg-slate-900/50 p-2 md:p-3 rounded-xl border border-slate-200 dark:border-emerald-500/20 shadow-sm mx-4 md:mx-0">
+    
+    {/* 1. Search Bar (Always Full Width) */}
+    <div className="relative flex-grow w-full">
+        <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
+            <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+        </div>
+        <input 
+            type="text" 
+            placeholder="ค้นหาชื่อการ์ด..." 
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-9 pr-4 py-1.5 md:py-2 bg-slate-100 dark:bg-slate-800 border-none rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none text-slate-900 dark:text-white placeholder-slate-400 transition-all"
+        />
+    </div>
 
-                    {/* 2. Action Group (Right Side - Sort, Filter, History) */}
-                    <div className="flex gap-2 items-center overflow-x-auto pb-1 md:pb-0 no-scrollbar shrink-0">
-                        
-                        {/* Sort Dropdown */}
-                        <select 
-                            value={sortOption} 
-                            onChange={(e) => setSortOption(e.target.value)}
-                            className="px-2 py-1.5 md:py-2 bg-slate-100 dark:bg-slate-800 rounded-lg text-xs font-bold text-slate-700 dark:text-slate-300 border-none outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer"
-                        >
-                            <option value="ending_soon">⏳ เวลา</option>
-                            <option value="price_asc">💰 ถูก➜แพง</option>
-                            <option value="price_desc">💎 แพง➜ถูก</option>
-                        </select>
+    {/* 2. Action Group (Flex for Desktop, Scrollable/Wrap for Mobile) */}
+    <div className="flex flex-col md:flex-row gap-2 md:items-center shrink-0">
+        
+        {/* Sort + Filter (Scrollable on Mobile) */}
+        <div className="flex gap-2 items-center overflow-x-auto pb-1 md:pb-0 no-scrollbar shrink-0">
+            
+            {/* Sort Dropdown */}
+            <select 
+                value={sortOption} 
+                onChange={(e) => setSortOption(e.target.value)}
+                className="px-2 py-1.5 md:py-2 bg-slate-100 dark:bg-slate-800 rounded-lg text-xs font-bold text-slate-700 dark:text-slate-300 border-none outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer shrink-0"
+            >
+                <option value="ending_soon">เวลา</option>
+                <option value="price_asc">ถูก➜แพง</option>
+                <option value="price_desc">แพง➜ถูก</option>
+            </select>
 
-                        {/* Filter Buttons */}
-                        <div className="flex bg-slate-100 dark:bg-slate-800 rounded-lg p-1 gap-1">
-                            <button onClick={() => setFilterStatus('all')} className={`px-2 py-1 rounded text-[10px] md:text-xs font-bold transition-all ${filterStatus === 'all' ? 'bg-white dark:bg-slate-600 shadow text-emerald-600 dark:text-emerald-400' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}>รวม</button>
-                            <button onClick={() => setFilterStatus('active_bid')} className={`px-2 py-1 rounded text-[10px] md:text-xs font-bold transition-all ${filterStatus === 'active_bid' ? 'bg-white dark:bg-slate-600 shadow text-red-500' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}>เดือด</button>
-                            <button onClick={() => setFilterStatus('no_bid')} className={`px-2 py-1 rounded text-[10px] md:text-xs font-bold transition-all ${filterStatus === 'no_bid' ? 'bg-white dark:bg-slate-600 shadow text-blue-500' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}>ซิง</button>
-                        </div>
+            {/* Filter Buttons */}
+            <div className="flex bg-slate-100 dark:bg-slate-800 rounded-lg p-1 gap-1 shrink-0">
+                <button onClick={() => setFilterStatus('all')} className={`px-2 py-1 rounded text-[10px] md:text-xs font-bold transition-all shrink-0 ${filterStatus === 'all' ? 'bg-white dark:bg-slate-600 shadow text-emerald-600 dark:text-emerald-400' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}>รวม</button>
+                <button onClick={() => setFilterStatus('active_bid')} className={`px-2 py-1 rounded text-[10px] md:text-xs font-bold transition-all shrink-0 ${filterStatus === 'active_bid' ? 'bg-white dark:bg-slate-600 shadow text-red-500' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}>เดือด</button>
+                <button onClick={() => setFilterStatus('no_bid')} className={`px-2 py-1 rounded text-[10px] md:text-xs font-bold transition-all shrink-0 ${filterStatus === 'no_bid' ? 'bg-white dark:bg-slate-600 shadow text-blue-500' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}>ใหม่</button>
+            </div>
+            
+            {/* Separator */}
+            <div className="w-px h-6 bg-slate-300 dark:bg-slate-700 mx-1 shrink-0"></div>
 
-                        {/* Separator */}
-                        <div className="w-px h-6 bg-slate-300 dark:bg-slate-700 mx-1"></div>
+            {/* History Button (Compact) - ย้ายมาข้างหน้า*/}
+            <button 
+                onClick={() => setIsCompletedModalOpen(true)} 
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 border border-transparent hover:border-slate-300 dark:hover:border-slate-600 rounded-lg text-xs font-bold text-slate-600 dark:text-slate-400 transition-all whitespace-nowrap shrink-0"
+                title="ดูประวัติการประมูลที่จบแล้ว"
+            >
+                <HistoryIcon /> 
+                <span className="hidden sm:inline">ประวัติ</span>
+            </button>
+        </div>
 
-                        {/* 🟢 ปุ่มเริ่มประมูล (เพิ่มใหม่ ตรงนี้ครับ) */}
-                        <button 
-                            onClick={() => navigate('/', { state: { showAuctionTutorial: true } })} 
-                            className="flex items-center gap-1 px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-xs font-bold shadow-md hover:shadow-emerald-500/30 transition-all active:scale-95 whitespace-nowrap"
-                        >
-                            <span className="text-lg leading-none mb-0.5">+</span> เริ่ม
-                        </button>
-
-                        {/* History Button (Compact) */}
-                        <button 
-                            onClick={() => setIsCompletedModalOpen(true)} 
-                            className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 border border-transparent hover:border-slate-300 dark:hover:border-slate-600 rounded-lg text-xs font-bold text-slate-600 dark:text-slate-400 transition-all whitespace-nowrap"
-                            title="ดูประวัติการประมูลที่จบแล้ว"
-                        >
-                            <HistoryIcon /> 
-                            <span className="hidden sm:inline">ประวัติ</span>
-                        </button>
-                    </div>
-                </div>
+        {/* ปุ่มเริ่มประมูล (Always Full Width on Mobile / Right Side on Desktop) */}
+        <button 
+            onClick={() => navigate('/', { state: { showAuctionTutorial: true } })} 
+            className="w-full md:w-auto flex items-center gap-1 px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-xs font-bold shadow-md hover:shadow-emerald-500/30 transition-all active:scale-95 whitespace-nowrap justify-center shrink-0"
+        >
+            <span className="text-lg leading-none mb-0.5">+</span> ลงประมูล
+        </button>
+    </div>
+</div>
 
                 {/* 🟢 Grid Layout (Updated with filteredAuctions) */}
                 <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 md:gap-6">
