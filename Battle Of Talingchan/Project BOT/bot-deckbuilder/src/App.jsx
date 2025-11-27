@@ -15,10 +15,12 @@ import {
   query, where, getDocs, addDoc 
 } from 'firebase/firestore';
 import { supabase } from './supabaseClient';
+import ChatWidget from './ChatWidget'; // 🟢 เพิ่มบรรทัดนี้
 
 // Import Components
 import CreateAuctionModal from './CreateAuctionModal';
 import NotificationCenter from './NotificationCenter';
+import AdminDashboardModal from './AdminDashboardModal';
 import SettingsDrawer from './components/SettingsDrawer';
 import ProfileSetupModal from './components/ProfileSetupModal';
 import RatingBadge from './components/RatingBadge';
@@ -537,6 +539,7 @@ export default function App() {
   const [userReputation, setUserReputation] = useState({});
   const [customProfile, setCustomProfile] = useState(null);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [isAdminOpen, setIsAdminOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   // 🟢 [UPDATED] State สำหรับ Tutorial
   const [showAuctionTutorial, setShowAuctionTutorial] = useState(false);
@@ -901,7 +904,7 @@ export default function App() {
                           <h3 className="text-lg font-semibold text-amber-600 dark:text-amber-300 mb-4">สามารถสนับสนุนค่ากาแฟและค่าเซิร์ฟเวอร์ได้ที่นี่นะคะ ❤️❤️❤️</h3>
                           <img src="/assets/QRCODE.png" alt="Donate QR Code" className="w-48 h-48 mx-auto rounded-lg border-4 border-emerald-500/30" onError={(e) => (e.currentTarget.style.display = "none")} />
                         </footer>
-                        <button onClick={scrollToTop} className={`fixed bottom-6 right-6 z-[90] p-3 rounded-full shadow-xl bg-amber-500 text-white border border-amber-400 hover:bg-amber-400 hover:-translate-y-1 transition-all duration-300 ease-in-out ${showScrollTop && !isSidebarOpen ? "opacity-100 scale-100" : "opacity-0 scale-0 pointer-events-none"}`} title="เลื่อนขึ้นบนสุด"><ChevronUpIcon /></button>
+                        <button onClick={scrollToTop} className={`fixed bottom-5 right-20 z-[90] p-3 rounded-full shadow-xl bg-amber-500 text-white border border-amber-400 hover:bg-amber-400 hover:-translate-y-1 transition-all duration-300 ease-in-out ${showScrollTop && !isSidebarOpen ? "opacity-100 scale-100" : "opacity-0 scale-0 pointer-events-none"}`} title="เลื่อนขึ้นบนสุด"><ChevronUpIcon /></button>
                       </>
                     )}
                   </section>
@@ -927,8 +930,14 @@ export default function App() {
     onOpenMyDecks={() => setIsDeckListModalOpen(true)}
     // 🟢 [เติมบรรทัดนี้] ส่งคะแนนเข้าไปแสดงผล
     userStats={userReputation[userProfile?.email]} 
+    onOpenAdmin={() => setIsAdminOpen(true)}
 /><FeedbackModal isOpen={isFeedbackOpen} onClose={() => setIsFeedbackOpen(false)} userProfile={displayUser} showAlert={showAlert} />
-
+  <AdminDashboardModal 
+        isOpen={isAdminOpen} 
+        onClose={() => setIsAdminOpen(false)} 
+        adminEmail={userProfile?.email} 
+      />
+      <ChatWidget userProfile={displayUser} />
        {/* 🟢 [UPDATED] Tutorial Overlay: แบบมีปุ่ม "ไม่ต้องแสดงอีก" */}
       {showAuctionTutorial && (
         <div className="fixed inset-0 z-[9999] bg-black/90 backdrop-blur-md flex items-center justify-center p-4 animate-fade-in" onClick={handleCloseTutorial}>
