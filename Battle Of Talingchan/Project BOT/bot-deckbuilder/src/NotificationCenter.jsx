@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from './supabaseClient';
-import { useNavigate } from 'react-router-dom'; // 🟢 1. Import useNavigate
+import { useNavigate } from 'react-router-dom'; 
 
 // === Icons ===
 const Svg = ({ p, ...r }) => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...r}>{p}</svg>;
@@ -11,7 +11,7 @@ export default function NotificationCenter({ userEmail }) {
     const [notifications, setNotifications] = useState([]);
     const [unreadCount, setUnreadCount] = useState(0);
     const dropdownRef = useRef(null);
-    const navigate = useNavigate(); // 🟢 2. เรียกใช้ Hook
+    const navigate = useNavigate();
 
     // ปิด Dropdown เมื่อคลิกข้างนอก
     useEffect(() => {
@@ -66,26 +66,26 @@ export default function NotificationCenter({ userEmail }) {
         await supabase.from('notifications').update({ is_read: true }).eq('user_email', userEmail);
     };
 
-    // 🟢 3. ฟังก์ชันคลิกแจ้งเตือน
+    // 🟢 ฟังก์ชันหลัก: คลิกปุ๊บ ไปหน้า Chat ปั๊บ
     const handleClickNotification = async (notification) => {
-        // อ่านแล้ว
+        // 1. ทำเครื่องหมายว่าอ่านแล้วใน UI ทันที (User Experience ดีขึ้น)
         if (!notification.is_read) {
             setNotifications(prev => prev.map(n => n.id === notification.id ? { ...n, is_read: true } : n));
             setUnreadCount(prev => Math.max(0, prev - 1));
+            // อัปเดตลง DB แบบเงียบๆ ไม่ต้องรอ
             supabase.from('notifications').update({ is_read: true }).eq('id', notification.id).then();
         }
 
         setIsOpen(false); // ปิด Dropdown
 
-        // เช็คประเภทแล้วพาไปหน้า Auction พร้อมเปิดห้องแชท
-        if (notification.type === 'bid' || notification.type === 'outbid') {
-            // สมมติว่าในตาราง notification มี column 'reference_id' เก็บ auction_id ไว้
-            // ถ้าคุณตั้งชื่อ column อื่น (เช่น action_url, context_id) ให้แก้ตรงนี้ครับ
-            const auctionId = notification.reference_id || notification.context_id; 
-            
-            if (auctionId) {
-                navigate('/auction', { state: { openAuctionId: auctionId } });
-            }
+        // 2. ตรวจสอบประเภท และสั่งเด้งไปหน้า Auction
+        // รองรับ type: 'bid', 'outbid', 'cancel', 'ban' หรืออื่นๆ ที่มี auction_id
+        if (notification.auction_id) {
+            navigate('/auction', { 
+                state: { 
+                    openAuctionId: notification.auction_id // ส่ง ID ไปด้วย
+                } 
+            });
         }
     };
 
@@ -119,7 +119,7 @@ export default function NotificationCenter({ userEmail }) {
                             notifications.map(n => (
                                 <div 
                                     key={n.id} 
-                                    onClick={() => handleClickNotification(n)} // 🟢 4. ใส่ onClick
+                                    onClick={() => handleClickNotification(n)} 
                                     className={`p-3 border-b border-slate-100 dark:border-slate-700/50 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors cursor-pointer ${!n.is_read ? 'bg-blue-50/50 dark:bg-blue-900/20' : ''}`}
                                 >
                                     <div className="flex items-start gap-3">

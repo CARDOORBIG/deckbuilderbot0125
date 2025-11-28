@@ -57,7 +57,6 @@ const getCardImageUrl = (cardImagePath, cardId) => {
     return `/cards/${encodePath(cardImagePath)}/${encodeURIComponent(fileId)}.png`;
 };
 
-// Custom Hook สำหรับ LocalStorage
 function useLocalStorage(key, initial) { 
     const [v, s] = useState(() => { 
         try { 
@@ -78,27 +77,17 @@ const Button = ({ className = "", children, ...props }) => (
     </button>
 );
 
-// === Digital Clock TimeLeft Component ===
 const TimeLeft = ({ endTime }) => {
     const [diff, setDiff] = useState(new Date(endTime) - new Date());
-    
     useEffect(() => {
         const timer = setInterval(() => setDiff(new Date(endTime) - new Date()), 1000);
         return () => clearInterval(timer);
     }, [endTime]);
-
-    if (diff <= 0) return (
-        <div className="px-3 py-1 bg-red-600/90 backdrop-blur text-white text-xs font-bold rounded-lg shadow-lg border border-red-400 animate-pulse">
-            ENDED
-        </div>
-    );
-
+    if (diff <= 0) return <div className="px-3 py-1 bg-red-600/90 backdrop-blur text-white text-xs font-bold rounded-lg shadow-lg border border-red-400 animate-pulse">ENDED</div>;
     const h = Math.floor(diff / 3600000);
     const m = Math.floor((diff % 3600000) / 60000);
     const s = Math.floor((diff % 60000) / 1000);
-
     const textColor = "text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.8)]";
-
     return (
         <div className="flex items-center gap-1 bg-black/80 backdrop-blur-md border border-slate-700 rounded-lg px-2 py-1 shadow-xl">
             <div className={`font-mono text-lg font-black tracking-widest tabular-nums ${textColor} leading-none`} style={{ fontFamily: "'Courier New', monospace" }}>
@@ -108,7 +97,7 @@ const TimeLeft = ({ endTime }) => {
     );
 };
 
-// === 1. Manage Bidders Modal ===
+// ... (ManageBiddersModal - ยังคงเดิม) ...
 const ManageBiddersModal = ({ isOpen, onClose, auction, userProfile }) => {
     const [bidders, setBidders] = useState([]);
     const [loading, setLoading] = useState(false);
@@ -474,7 +463,15 @@ const AuctionRoomModal = ({ isOpen, onClose, auction, userProfile, onBid, onBuyN
                             )}
                          </div>
                          <form onSubmit={handleSendMessage} className="flex gap-2">
-                            <input type="text" value={newMessage} onChange={e => setNewMessage(e.target.value)} placeholder={userProfile ? "พิมพ์ข้อความ..." : "กรุณา Login"} disabled={!userProfile} className="flex-grow bg-slate-100 dark:bg-slate-800 border-none rounded-full px-4 py-2 text-sm text-slate-900 dark:text-white outline-none focus:ring-1 focus:ring-emerald-500" />
+                            <input 
+                                type="text" 
+                                value={newMessage} 
+                                onChange={e => setNewMessage(e.target.value)} 
+                                placeholder={userProfile ? "พิมพ์ข้อความ..." : "กรุณา Login"} 
+                                disabled={!userProfile} 
+                                // 🟢 แก้ไขสีตัวอักษรในช่องแชท
+                                className="flex-grow bg-slate-100 dark:bg-slate-800 border-none rounded-full px-4 py-2 text-sm text-black dark:text-white outline-none focus:ring-1 focus:ring-emerald-500" 
+                            />
                             <button type="submit" disabled={!newMessage.trim() || !userProfile} className="p-2 bg-emerald-600 text-white rounded-full hover:bg-emerald-500 transition-colors"><SendIcon /></button>
                         </form>
                     </div>
@@ -539,247 +536,247 @@ const BidHistoryModal = ({ isOpen, onClose, auction }) => {
 
 // === Confirm Transaction Modal ===
 const ConfirmTransactionModal = ({ isOpen, onClose, auction, userProfile, fetchReputations }) => {
-    const [action, setAction] = useState('good');
-    const [reason, setReason] = useState('transaction_success');
-    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [action, setAction] = useState('good');
+    const [reason, setReason] = useState('transaction_success');
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
-    if (!isOpen || !auction || !userProfile) return null;
+    if (!isOpen || !auction || !userProfile) return null;
 
-    const isSeller = userProfile.email === auction.seller_email;
-    const targetEmail = isSeller ? auction.winner_email : auction.seller_email;
-    const targetName = isSeller ? auction.winner_name : auction.seller_name;
-    
-    if (auction.end_time > new Date().toISOString()) return null;
+    const isSeller = userProfile.email === auction.seller_email;
+    const targetEmail = isSeller ? auction.winner_email : auction.seller_email;
+    const targetName = isSeller ? auction.winner_name : auction.seller_name;
+    
+    if (auction.end_time > new Date().toISOString()) return null;
 
-    const handleSubmit = async () => {
-        const score = action === 'good' ? 1 : -1;
-        
-        if (score === -1 && !confirm(`⚠️ ยืนยันหักเครดิตคุณ ${targetName} ใช่หรือไม่? การกระทำนี้ไม่สามารถย้อนกลับได้`)) return;
+    const handleSubmit = async () => {
+        const score = action === 'good' ? 1 : -1;
+        
+        if (score === -1 && !confirm(`⚠️ ยืนยันหักเครดิตคุณ ${targetName} ใช่หรือไม่? การกระทำนี้ไม่สามารถย้อนกลับได้`)) return;
 
-        setIsSubmitting(true);
-        
-        const { data, error } = await supabase.rpc('submit_reputation', {
-            p_auction_id: auction.id,
-            p_reporter_email: userProfile.email,
-            p_target_email: targetEmail,
-            p_score_change: score,
-            p_reason_code: reason
-        });
+        setIsSubmitting(true);
+        
+        const { data, error } = await supabase.rpc('submit_reputation', {
+            p_auction_id: auction.id,
+            p_reporter_email: userProfile.email,
+            p_target_email: targetEmail,
+            p_score_change: score,
+            p_reason_code: reason
+        });
 
-        setIsSubmitting(false);
+        setIsSubmitting(false);
 
-        if (error) alert("Error: " + error.message);
-        else {
-            alert(data.message);
-            fetchReputations();
-            onClose();
-        }
-    };
+        if (error) alert("Error: " + error.message);
+        else {
+            alert(data.message);
+            fetchReputations();
+            onClose();
+        }
+    };
 
-    return createPortal(
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[850] p-4" onClick={onClose}>
-            <div className="bg-white dark:bg-slate-900 border border-slate-300 dark:border-emerald-500/30 rounded-xl shadow-2xl w-full max-w-lg overflow-hidden" onClick={e => e.stopPropagation()}>
-                <div className="p-4 bg-slate-100 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
-                    <h3 className="font-bold text-lg text-slate-900 dark:text-white">ยืนยันธุรกรรม: {auction.card_name}</h3>
-                    <button onClick={onClose}>✕</button>
-                </div>
-                
-                <div className="p-5 space-y-5">
-                    <p className="text-sm text-slate-600 dark:text-slate-300">
-                        โปรดให้เครดิตการซื้อขายกับ <span className="font-bold">{targetName}</span> (ผู้{isSeller ? 'ชนะ' : 'ขาย'})
-                    </p>
+    return createPortal(
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[850] p-4" onClick={onClose}>
+            <div className="bg-white dark:bg-slate-900 border border-slate-300 dark:border-emerald-500/30 rounded-xl shadow-2xl w-full max-w-lg overflow-hidden" onClick={e => e.stopPropagation()}>
+                <div className="p-4 bg-slate-100 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
+                    <h3 className="font-bold text-lg text-slate-900 dark:text-white">ยืนยันธุรกรรม: {auction.card_name}</h3>
+                    <button onClick={onClose}>✕</button>
+                </div>
+                
+                <div className="p-5 space-y-5">
+                    <p className="text-sm text-slate-600 dark:text-slate-300">
+                        โปรดให้เครดิตการซื้อขายกับ <span className="font-bold">{targetName}</span> (ผู้{isSeller ? 'ชนะ' : 'ขาย'})
+                    </p>
 
-                    <div className="flex gap-4">
-                        <label className={`flex-1 p-3 rounded-lg border-2 cursor-pointer transition-all ${action === 'good' ? 'bg-emerald-100 border-emerald-500' : 'bg-slate-100 border-slate-300'}`}>
-                            <input type="radio" name="score" value="good" checked={action === 'good'} onChange={() => { setAction('good'); setReason('transaction_success'); }} className="mr-2" />
-                            <span className="font-bold text-emerald-600">👍 ให้เครดิต (+1)</span>
-                        </label>
-                        <label className={`flex-1 p-3 rounded-lg border-2 cursor-pointer transition-all ${action === 'bad' ? 'bg-red-100 border-red-500' : 'bg-slate-100 border-slate-300'}`}>
-                            <input type="radio" name="score" value="bad" checked={action === 'bad'} onChange={() => { setAction('bad'); setReason('non_payment'); }} className="mr-2" />
-                            <span className="font-bold text-red-600">👎 หักเครดิต (-1)</span>
-                        </label>
-                    </div>
+                    <div className="flex gap-4">
+                        <label className={`flex-1 p-3 rounded-lg border-2 cursor-pointer transition-all ${action === 'good' ? 'bg-emerald-100 border-emerald-500' : 'bg-slate-100 border-slate-300'}`}>
+                            <input type="radio" name="score" value="good" checked={action === 'good'} onChange={() => { setAction('good'); setReason('transaction_success'); }} className="mr-2" />
+                            <span className="font-bold text-emerald-600">👍 ให้เครดิต (+1)</span>
+                        </label>
+                        <label className={`flex-1 p-3 rounded-lg border-2 cursor-pointer transition-all ${action === 'bad' ? 'bg-red-100 border-red-500' : 'bg-slate-100 border-slate-300'}`}>
+                            <input type="radio" name="score" value="bad" checked={action === 'bad'} onChange={() => { setAction('bad'); setReason('non_payment'); }} className="mr-2" />
+                            <span className="font-bold text-red-600">👎 หักเครดิต (-1)</span>
+                        </label>
+                    </div>
 
-                    {action === 'bad' && (
-                        <div>
-                            <label className="text-xs font-bold text-red-500 uppercase mb-1 block">ระบุสาเหตุ</label>
-                            <select value={reason} onChange={e=>setReason(e.target.value)} className="w-full p-2 rounded border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-red-600 dark:text-red-400 outline-none">
-                                <option value="non_payment">ไม่ชำระเงิน / เงียบหาย</option>
-                                <option value="non_delivery">ผู้ขายไม่จัดส่งสินค้า</option>
-                                <option value="fake_item">สินค้าไม่ตรงปก / ปลอม</option>
-                                <option value="cancellation_abuse">ยกเลิกหลังการบิดจบ</option>
-                            </select>
-                        </div>
-                    )}
-                    
-                    <button onClick={handleSubmit} disabled={isSubmitting} className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg transition-all disabled:opacity-50">
-                        {isSubmitting ? 'กำลังส่ง...' : 'ส่งคะแนนเครดิต'}
-                    </button>
-                </div>
-            </div>
-        </div>, document.body
-    );
+                    {action === 'bad' && (
+                        <div>
+                            <label className="text-xs font-bold text-red-500 uppercase mb-1 block">ระบุสาเหตุ</label>
+                            <select value={reason} onChange={e=>setReason(e.target.value)} className="w-full p-2 rounded border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-red-600 dark:text-red-400 outline-none">
+                                <option value="non_payment">ไม่ชำระเงิน / เงียบหาย</option>
+                                <option value="non_delivery">ผู้ขายไม่จัดส่งสินค้า</option>
+                                <option value="fake_item">สินค้าไม่ตรงปก / ปลอม</option>
+                                <option value="cancellation_abuse">ยกเลิกหลังการบิดจบ</option>
+                            </select>
+                        </div>
+                    )}
+                    
+                    <button onClick={handleSubmit} disabled={isSubmitting} className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg transition-all disabled:opacity-50">
+                        {isSubmitting ? 'กำลังส่ง...' : 'ส่งคะแนนเครดิต'}
+                    </button>
+                </div>
+            </div>
+        </div>, document.body
+    );
 };
 
 // === Completed Auctions Modal (Grid Layout Updated) ===
 const CompletedAuctionsModal = ({ isOpen, onClose, userProfile }) => {
-    const [items, setItems] = useState([]);
-    const [loading, setLoading] = useState(true);
+    const [items, setItems] = useState([]);
+    const [loading, setLoading] = useState(true);
 
-    const fetchCompleted = async () => {
-        setLoading(true);
-        const { data } = await supabase
-            .from('auctions')
-            .select('*')
-            .lt('end_time', new Date().toISOString())
-            .order('end_time', { ascending: false })
-            .limit(20);
-        setItems(data || []);
-        setLoading(false);
-    };
+    const fetchCompleted = async () => {
+        setLoading(true);
+        const { data } = await supabase
+            .from('auctions')
+            .select('*')
+            .lt('end_time', new Date().toISOString())
+            .order('end_time', { ascending: false })
+            .limit(20);
+        setItems(data || []);
+        setLoading(false);
+    };
 
-    useEffect(() => {
-        if (isOpen) {
-            fetchCompleted();
-        }
-    }, [isOpen]);
+    useEffect(() => {
+        if (isOpen) {
+            fetchCompleted();
+        }
+    }, [isOpen]);
 
-    const handleDeleteHistory = async (item) => { // รับทั้ง object item แทนที่จะรับแค่ id
-        if(!confirm("⚠️ ยืนยันลบประวัติรายการนี้ถาวร? (รูปภาพจะถูกลบด้วย)")) return;
-        
-        // 1. ลบรูปภาพออกจาก Storage ก่อน (ถ้ามี)
-        if (item.proof_image) {
-            try {
-                let imagesToDelete = [];
-                // แปลงข้อมูลกลับเป็น Array
-                if (item.proof_image.startsWith('[')) {
-                    const urls = JSON.parse(item.proof_image);
-                    // ดึง Path ออกจาก URL (ตัด domain ทิ้ง)
-                    // ตัวอย่าง URL: .../storage/v1/object/public/auction-images/email/file.jpg
-                    // สิ่งที่ต้องใช้ลบ: email/file.jpg
-                    imagesToDelete = urls.map(url => {
-                        const parts = url.split('/auction-images/');
-                        return parts[1] ? decodeURIComponent(parts[1]) : null;
-                    }).filter(Boolean);
-                } else {
-                    // รองรับข้อมูลเก่าที่เป็น string เดียว
-                    const parts = item.proof_image.split('/auction-images/');
-                    if (parts[1]) imagesToDelete.push(decodeURIComponent(parts[1]));
-                }
+    const handleDeleteHistory = async (item) => { // รับทั้ง object item แทนที่จะรับแค่ id
+        if(!confirm("⚠️ ยืนยันลบประวัติรายการนี้ถาวร? (รูปภาพจะถูกลบด้วย)")) return;
+        
+        // 1. ลบรูปภาพออกจาก Storage ก่อน (ถ้ามี)
+        if (item.proof_image) {
+            try {
+                let imagesToDelete = [];
+                // แปลงข้อมูลกลับเป็น Array
+                if (item.proof_image.startsWith('[')) {
+                    const urls = JSON.parse(item.proof_image);
+                    // ดึง Path ออกจาก URL (ตัด domain ทิ้ง)
+                    // ตัวอย่าง URL: .../storage/v1/object/public/auction-images/email/file.jpg
+                    // สิ่งที่ต้องใช้ลบ: email/file.jpg
+                    imagesToDelete = urls.map(url => {
+                        const parts = url.split('/auction-images/');
+                        return parts[1] ? decodeURIComponent(parts[1]) : null;
+                    }).filter(Boolean);
+                } else {
+                    // รองรับข้อมูลเก่าที่เป็น string เดียว
+                    const parts = item.proof_image.split('/auction-images/');
+                    if (parts[1]) imagesToDelete.push(decodeURIComponent(parts[1]));
+                }
 
-                if (imagesToDelete.length > 0) {
-                    const { error: storageError } = await supabase.storage
-                        .from('auction-images')
-                        .remove(imagesToDelete);
-                    
-                    if (storageError) console.error("Error deleting images:", storageError);
-                    else console.log("Deleted images:", imagesToDelete);
-                }
-            } catch (e) {
-                console.error("Error parsing proof_image:", e);
-            }
-        }
+                if (imagesToDelete.length > 0) {
+                    const { error: storageError } = await supabase.storage
+                        .from('auction-images')
+                        .remove(imagesToDelete);
+                    
+                    if (storageError) console.error("Error deleting images:", storageError);
+                    else console.log("Deleted images:", imagesToDelete);
+                }
+            } catch (e) {
+                console.error("Error parsing proof_image:", e);
+            }
+        }
 
-        // 2. ลบข้อมูลใน Database (ตามปกติ)
-        const { error } = await supabase.rpc('admin_force_delete', { 
-            p_admin_email: userProfile?.email, 
-            p_target_input: item.id, 
-            p_action_type: 'delete_auction' 
-        });
+        // 2. ลบข้อมูลใน Database (ตามปกติ)
+        const { error } = await supabase.rpc('admin_force_delete', { 
+            p_admin_email: userProfile?.email, 
+            p_target_input: item.id, 
+            p_action_type: 'delete_auction' 
+        });
 
-        if(error) alert("Error: " + error.message);
-        else {
-            setItems(prev => prev.filter(i => i.id !== item.id));
-        }
-    };
+        if(error) alert("Error: " + error.message);
+        else {
+            setItems(prev => prev.filter(i => i.id !== item.id));
+        }
+    };
 
-    if (!isOpen) return null;
+    if (!isOpen) return null;
 
-    return createPortal(
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[600] p-4" onClick={onClose}>
-            {/* 🟢 ปรับขนาด Modal ให้กว้างขึ้นเพื่อรองรับ 5 คอลัมน์ */}
-            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-emerald-500/30 rounded-xl shadow-2xl w-full max-w-6xl overflow-hidden flex flex-col max-h-[85vh]" onClick={e => e.stopPropagation()}>
-                
-                {/* Header */}
-                <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center bg-slate-50 dark:bg-slate-800/50">
-                    <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                        <HistoryIcon /> ประวัติการประมูลที่จบแล้ว
-                    </h3>
-                    <button onClick={onClose} className="text-slate-500 hover:text-red-500 transition-colors"><CloseIcon /></button>
-                </div>
+    return createPortal(
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[600] p-4" onClick={onClose}>
+            {/* 🟢 ปรับขนาด Modal ให้กว้างขึ้นเพื่อรองรับ 5 คอลัมน์ */}
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-emerald-500/30 rounded-xl shadow-2xl w-full max-w-6xl overflow-hidden flex flex-col max-h-[85vh]" onClick={e => e.stopPropagation()}>
+                
+                {/* Header */}
+                <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center bg-slate-50 dark:bg-slate-800/50">
+                    <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                        <HistoryIcon /> ประวัติการประมูลที่จบแล้ว
+                    </h3>
+                    <button onClick={onClose} className="text-slate-500 hover:text-red-500 transition-colors"><CloseIcon /></button>
+                </div>
 
-                {/* Content */}
-                <div className="p-4 flex-grow overflow-y-auto bg-slate-100 dark:bg-black/20">
-                    {loading ? (
-                        <div className="text-center py-20 text-slate-500">กำลังโหลด...</div>
-                    ) : items.length === 0 ? (
-                        <div className="text-center py-20 text-slate-500">ยังไม่มีรายการที่จบแล้ว</div>
-                    ) : (
-                        // 🟢 Grid Layout: มือถือ 2, Tablet 3-4, PC 5 ช่อง
-                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-                            {items.map(item => (
-                                <div 
-                                    key={item.id} 
-                                    className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden flex flex-col relative group hover:shadow-lg hover:-translate-y-1 transition-all duration-300"
-                                >
-                                    {/* Image Section */}
-                                    <div className="aspect-[5/7] bg-slate-200 dark:bg-slate-700/50 p-3 relative flex items-center justify-center">
-                                        <img 
-                                            src={getCardImageUrl(item.card_image_path, item.card_id)} 
-                                            className="w-full h-full object-contain drop-shadow-md" 
-                                            onError={(e) => { if (!e.currentTarget.src.endsWith('.jpg')) e.currentTarget.src = e.currentTarget.src.replace('.png', '.jpg'); }} 
-                                        />
-                                        
-                                        {/* Admin Delete Button */}
-                                        {userProfile?.email === 'koritros619@gmail.com' && (
-                                            <button 
-                                                onClick={(e) => { e.stopPropagation(); handleDeleteHistory(item); }}
-                                                className="absolute top-2 right-2 p-1.5 bg-red-600 text-white rounded-full shadow-md opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-700 z-10 scale-90"
-                                                title="Admin Delete"
-                                            >
-                                                <TrashIcon />
-                                            </button>
-                                        )}
-                                    </div>
+                {/* Content */}
+                <div className="p-4 flex-grow overflow-y-auto bg-slate-100 dark:bg-black/20">
+                    {loading ? (
+                        <div className="text-center py-20 text-slate-500">กำลังโหลด...</div>
+                    ) : items.length === 0 ? (
+                        <div className="text-center py-20 text-slate-500">ยังไม่มีรายการที่จบแล้ว</div>
+                    ) : (
+                        // 🟢 Grid Layout: มือถือ 2, Tablet 3-4, PC 5 ช่อง
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+                            {items.map(item => (
+                                <div 
+                                    key={item.id} 
+                                    className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden flex flex-col relative group hover:shadow-lg hover:-translate-y-1 transition-all duration-300"
+                                >
+                                    {/* Image Section */}
+                                    <div className="aspect-[5/7] bg-slate-200 dark:bg-slate-700/50 p-3 relative flex items-center justify-center">
+                                        <img 
+                                            src={getCardImageUrl(item.card_image_path, item.card_id)} 
+                                            className="w-full h-full object-contain drop-shadow-md" 
+                                            onError={(e) => { if (!e.currentTarget.src.endsWith('.jpg')) e.currentTarget.src = e.currentTarget.src.replace('.png', '.jpg'); }} 
+                                        />
+                                        
+                                        {/* Admin Delete Button */}
+                                        {userProfile?.email === 'koritros619@gmail.com' && (
+                                            <button 
+                                                onClick={(e) => { e.stopPropagation(); handleDeleteHistory(item); }}
+                                                className="absolute top-2 right-2 p-1.5 bg-red-600 text-white rounded-full shadow-md opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-700 z-10 scale-90"
+                                                title="Admin Delete"
+                                            >
+                                                <TrashIcon />
+                                            </button>
+                                        )}
+                                    </div>
 
-                                    {/* Info Section */}
-                                    <div className="p-2.5 flex flex-col flex-grow">
-                                        <h4 className="font-bold text-xs md:text-sm text-slate-900 dark:text-white line-clamp-1 mb-0.5" title={item.card_name}>
-                                            {item.card_name}
-                                        </h4>
-                                        <p className="text-[10px] text-slate-500 dark:text-slate-400 mb-2">
-                                            จบเมื่อ: {new Date(item.end_time).toLocaleDateString('th-TH')}
-                                        </p>
-                                        
-                                        <div className="mt-auto pt-2 border-t border-slate-100 dark:border-slate-700">
-                                            <div className="flex justify-between items-end">
-                                                <div>
-                                                    <p className="text-[9px] text-slate-400 uppercase tracking-wide">Sold Price</p>
-                                                    <p className="text-sm md:text-base font-black text-emerald-600 dark:text-emerald-400">
-                                                        ฿{item.current_price.toLocaleString()}
-                                                    </p>
-                                                </div>
-                                                {item.winner_name ? (
-                                                    <div className="text-right max-w-[50%]">
-                                                        <p className="text-[9px] text-slate-400">Winner</p>
-                                                        <p className="text-[10px] font-bold text-amber-600 dark:text-amber-400 truncate flex items-center justify-end gap-0.5">
-                                                            👑 {item.winner_name}
-                                                        </p>
-                                                    </div>
-                                                ) : (
-                                                    <p className="text-[10px] text-slate-400 italic self-center">ไม่มีผู้บิด</p>
-                                                )}
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </div>
-            </div>
-        </div>, document.body
-    );
+                                    {/* Info Section */}
+                                    <div className="p-2.5 flex flex-col flex-grow">
+                                        <h4 className="font-bold text-xs md:text-sm text-slate-900 dark:text-white line-clamp-1 mb-0.5" title={item.card_name}>
+                                            {item.card_name}
+                                        </h4>
+                                        <p className="text-[10px] text-slate-500 dark:text-slate-400 mb-2">
+                                            จบเมื่อ: {new Date(item.end_time).toLocaleDateString('th-TH')}
+                                        </p>
+                                        
+                                        <div className="mt-auto pt-2 border-t border-slate-100 dark:border-slate-700">
+                                            <div className="flex justify-between items-end">
+                                                <div>
+                                                    <p className="text-[9px] text-slate-400 uppercase tracking-wide">Sold Price</p>
+                                                    <p className="text-sm md:text-base font-black text-emerald-600 dark:text-emerald-400">
+                                                        ฿{item.current_price.toLocaleString()}
+                                                    </p>
+                                                </div>
+                                                {item.winner_name ? (
+                                                    <div className="text-right max-w-[50%]">
+                                                        <p className="text-[9px] text-slate-400">Winner</p>
+                                                        <p className="text-[10px] font-bold text-amber-600 dark:text-amber-400 truncate flex items-center justify-end gap-0.5">
+                                                            👑 {item.winner_name}
+                                                        </p>
+                                                    </div>
+                                                ) : (
+                                                    <p className="text-[10px] text-slate-400 italic self-center">ไม่มีผู้บิด</p>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>, document.body
+    );
 };
 
 // === Main Component ===
