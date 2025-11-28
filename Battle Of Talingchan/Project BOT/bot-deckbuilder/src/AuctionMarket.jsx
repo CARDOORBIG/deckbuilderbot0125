@@ -162,7 +162,7 @@ const ManageBiddersModal = ({ isOpen, onClose, auction, userProfile }) => {
     );
 };
 
-// === Auction Room Modal (Live Chat & Card - Updated with Slider V2 & Stats Fix) ===
+// === Auction Room Modal (Live Chat & Card - Updated with Slider V2 & Stats Fix & FIRE BUTTON) ===
 const AuctionRoomModal = ({ isOpen, onClose, auction, userProfile, onBid, onBuyNow }) => {
     const [messages, setMessages] = useState([]);
     const [newMessage, setNewMessage] = useState("");
@@ -209,7 +209,7 @@ const AuctionRoomModal = ({ isOpen, onClose, auction, userProfile, onBid, onBuyN
                     if (docSnap.exists()) setSellerAvatar(docSnap.data().avatarUrl);
                 } catch (e) { console.error("Err fetching avatar", e); }
 
-                // 2. Supabase Stats (Rank) - 🟢 แก้ไข: ใช้ maybeSingle() และ Default Value
+                // 2. Supabase Stats (Rank)
                 try {
                     const { data, error } = await supabase.from('user_stats').select('*').eq('user_email', auction.seller_email).maybeSingle();
                     
@@ -458,7 +458,13 @@ const AuctionRoomModal = ({ isOpen, onClose, auction, userProfile, onBid, onBuyN
                             {userProfile?.email !== auction.seller_email && !isEnded && (
                                 <div className="flex gap-2">
                                     {auction.buy_now_price > 0 && <button onClick={() => onBuyNow(auction)} className="px-3 py-1.5 bg-pink-100 text-pink-700 rounded-lg text-xs font-bold">Buy ฿{auction.buy_now_price}</button>}
-                                    <button onClick={() => onBid(auction)} className="px-4 py-1.5 bg-amber-500 text-white rounded-lg text-xs font-bold shadow-lg">Bid</button>
+                                    {/* 🟢 ปุ่ม Bid ไฟลุก (btn-fire) */}
+                                    <button 
+                                        onClick={() => onBid(auction)} 
+                                        className="px-4 py-1.5 btn-fire text-white rounded-lg text-xs font-bold shadow-lg transition-all"
+                                    >
+                                        Bid
+                                    </button>
                                 </div>
                             )}
                          </div>
@@ -469,7 +475,6 @@ const AuctionRoomModal = ({ isOpen, onClose, auction, userProfile, onBid, onBuyN
                                 onChange={e => setNewMessage(e.target.value)} 
                                 placeholder={userProfile ? "พิมพ์ข้อความ..." : "กรุณา Login"} 
                                 disabled={!userProfile} 
-                                // 🟢 แก้ไขสีตัวอักษรในช่องแชท
                                 className="flex-grow bg-slate-100 dark:bg-slate-800 border-none rounded-full px-4 py-2 text-sm text-black dark:text-white outline-none focus:ring-1 focus:ring-emerald-500" 
                             />
                             <button type="submit" disabled={!newMessage.trim() || !userProfile} className="p-2 bg-emerald-600 text-white rounded-full hover:bg-emerald-500 transition-colors"><SendIcon /></button>
@@ -953,6 +958,57 @@ export default function AuctionMarket() {
 
   return (
     <div className="h-full overflow-y-auto bg-slate-100 dark:bg-black text-slate-900 dark:text-white flex flex-col transition-colors duration-300">
+      
+      <style>{`
+        @keyframes fire-2d-glow {
+          0% {
+            box-shadow: 0 0 5px #ffcc00, 0 0 10px #ff4500; /* แสงเงาเริ่ม */
+            border-color: #ffcc00;
+          }
+          50% {
+            box-shadow: 0 0 15px #ffd700, 0 0 30px #ff0000; /* แสงเงาขยาย (ไฟลุก) */
+            border-color: #ffff00;
+            transform: scale(1.03); /* ขยายปุ่มนิดหน่อย */
+          }
+          100% {
+            box-shadow: 0 0 5px #ffcc00, 0 0 10px #ff4500; /* กลับมาที่เดิม */
+            border-color: #ffcc00;
+          }
+        }
+
+        .btn-fire {
+          /* ไล่สีแนวตั้ง ส้ม -> แดงเข้ม (เหมือนรูปตัวอย่าง) */
+          background: linear-gradient(180deg, #ff5500 0%, #cc0000 100%);
+          
+          /* เส้นขอบสีเหลืองทอง */
+          border: 2px solid #ffcc00;
+          
+          color: white;
+          text-shadow: 1px 1px 2px rgba(0,0,0,0.5); /* เงาตัวหนังสือ */
+          
+          /* เรียกใช้ Animation */
+          animation: fire-2d-glow 1s ease-in-out infinite;
+          
+          position: relative;
+          overflow: hidden;
+        }
+
+        /* เพิ่มเงาสะท้อนด้านบนปุ่ม ให้ดูนูนมีมิติ */
+        .btn-fire::before {
+          content: '';
+          position: absolute;
+          top: 0; left: 0; right: 0;
+          height: 40%;
+          background: linear-gradient(180deg, rgba(255,255,255,0.3) 0%, rgba(255,255,255,0) 100%);
+          pointer-events: none;
+        }
+
+        .btn-fire:active { 
+          transform: scale(0.95); 
+          filter: brightness(0.9);
+        }
+      `}</style>
+
       <header className="px-3 md:px-6 py-2 border-b border-slate-300 dark:border-emerald-700/30 bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm sticky top-0 z-50 h-14 flex flex-col justify-center">
          <div className="flex items-center justify-between gap-2 w-full">  
             <div className="flex items-center gap-1.5 overflow-hidden">
@@ -1059,8 +1115,12 @@ export default function AuctionMarket() {
                                             <span className="uppercase mb-0.5">Buy</span><span>฿{item.buy_now_price.toLocaleString()}</span>
                                         </button>
                                     )}
-                                    <button onClick={(e) => { e.stopPropagation(); handleBid(item); }} className={`py-2 bg-gradient-to-r from-amber-500 to-orange-600 text-white text-xs md:text-sm font-bold rounded-xl shadow-md flex items-center justify-center gap-1 ${item.buy_now_price > 0 ? 'flex-1' : 'w-full'}`}>
-                                        <GavelIcon /> <span>Bid</span>
+                                    {/* 🟢 แก้ไขปุ่ม Bid (Grid) */}
+                                    <button 
+                                        onClick={(e) => { e.stopPropagation(); handleBid(item); }} 
+                                        className={`py-2 btn-fire text-white text-xs md:text-sm font-bold rounded-xl shadow-md flex items-center justify-center gap-1 ${item.buy_now_price > 0 ? 'flex-1' : 'w-full'}`}
+                                    >
+                                        <GavelIcon /> <span>Bid +{item.min_bid_increment.toLocaleString()} B</span>
                                     </button>
                                 </div>
                             </div>
