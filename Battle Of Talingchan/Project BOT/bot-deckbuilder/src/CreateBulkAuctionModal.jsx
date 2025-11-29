@@ -1,8 +1,7 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import { supabase } from './supabaseClient';
-import { CameraIcon, CloseIcon } from './components/Icons'; 
+import { CameraIcon, CloseIcon, ShoppingBagIcon, ShieldCheckIcon } from './components/Icons'; 
 
-// ฟังก์ชันย่อรูป (เหมือนเดิม)
 const resizeImage = (file) => {
   return new Promise((resolve) => {
     const reader = new FileReader();
@@ -31,26 +30,34 @@ const resizeImage = (file) => {
 };
 
 export default function CreateBulkAuctionModal({ isOpen, onClose, userProfile }) {
-  // 🟢 1. เพิ่ม State สำหรับชื่อสินค้า (เพราะไม่ได้เลือกจาก DB)
-  const [customName, setCustomName] = useState('');
-  
-  const [price, setPrice] = useState(100);
-  const [hours, setHours] = useState(24);
-  const [minBid, setMinBid] = useState(50);
-  const [buyNow, setBuyNow] = useState('');
+  const [title, setTitle] = useState('');
+  const [price, setPrice] = useState('');
   const [description, setDescription] = useState('');
+  const [condition, setCondition] = useState('Played');
+  const [category, setCategory] = useState('General');
   
+  // 🟢 State สำหรับระบบ Escrow
+  const [useEscrow, setUseEscrow] = useState(false);
+
   const [imageFiles, setImageFiles] = useState([]);
   const [previewUrls, setPreviewUrls] = useState([]);
   const fileInputRef = useRef(null);
   const [loading, setLoading] = useState(false);
+
+  // 🟢 คำนวณค่าธรรมเนียม Real-time
+  const feeInfo = useMemo(() => {
+      const startPrice = parseInt(price) || 0;
+      const fee = Math.max(25, Math.ceil(startPrice * 0.05)); // 5% ขั้นต่ำ 25 บาท
+      const net = startPrice - fee;
+      return { fee, net };
+  }, [price]);
 
   if (!isOpen) return null;
 
   const handleFileChange = async (e) => {
     const files = Array.from(e.target.files);
     if (files.length === 0) return;
-    if (imageFiles.length + files.length > 6) return alert("อัปโหลดได้สูงสุด 6 รูปครับ");
+    if (imageFiles.length + files.length > 6) return alert("ลงรูปได้สูงสุด 6 รูปครับ");
 
     const newFiles = [];
     const newPreviews = [];
@@ -80,22 +87,32 @@ export default function CreateBulkAuctionModal({ isOpen, onClose, userProfile })
   };
 
   const handleCreate = async () => {
-    if (!userProfile) return alert("กรุณา Login ก่อนตั้งขายครับ");
-    if (!customName.trim()) return alert("กรุณาระบุชื่อสินค้าครับ"); // 🟢 บังคับชื่อ
-    if (imageFiles.length === 0) return alert("การประมูลแบบนี้ **ต้องแนบรูปภาพอย่างน้อย 1 รูป** ครับ"); // 🟢 บังคับรูป
-    
-    if (parseInt(hours) < 1) return alert("ระยะเวลาขั้นต่ำ 1 ชม.");
-    if (parseInt(minBid) < 1) return alert("บิดขั้นต่ำต้อง > 0");
-    if (buyNow && parseInt(buyNow) <= parseInt(price)) return alert("ราคา Buy Now ต้องมากกว่าราคาเริ่ม");
+    if (!userProfile) return alert("กรุณา Login ก่อนลงขายครับ");
+    if (!title.trim()) return alert("กรุณาระบุชื่อสินค้า");
+    if (!price || parseInt(price) < 0) return alert("กรุณาระบุราคาที่ถูกต้อง");
+    if (imageFiles.length === 0) return alert("ต้องแนบรูปสินค้าอย่างน้อย 1 รูป");
+
+    // 🟢 แจ้งเตือนยืนยัน (Escrow)
+    if (useEscrow) {
+        const confirmMsg = 
+`ยืนยันเงื่อนไขระบบประกัน (Escrow):
+
+💰 หากขายได้ที่ราคา: ${parseInt(price).toLocaleString()} บาท
+- ผู้ซื้อจ่ายจริง: ${parseInt(price).toLocaleString()} บาท
+- หักค่าธรรมเนียม: -${feeInfo.fee.toLocaleString()} บาท
+- คุณได้รับสุทธิ: ${feeInfo.net.toLocaleString()} บาท
+
+ยืนยันที่จะลงขายหรือไม่?`;
+        if (!confirm(confirmMsg)) return;
+    }
 
     setLoading(true);
 
     try {
-        // อัปโหลดรูป
         const uploadedUrls = [];
         const uploadPromises = imageFiles.map(async (file) => {
             const fileExt = file.name.split('.').pop();
-            const fileName = `${Date.now()}_${Math.random().toString(36).substring(2)}.${fileExt}`;
+            const fileName = `market_${Date.now()}_${Math.random().toString(36).substring(2)}.${fileExt}`;
             const filePath = `${userProfile.email}/${fileName}`;
             const { error: uploadError } = await supabase.storage.from('auction-images').upload(filePath, file);
             if (uploadError) throw uploadError;
@@ -106,39 +123,25 @@ export default function CreateBulkAuctionModal({ isOpen, onClose, userProfile })
         const results = await Promise.all(uploadPromises);
         uploadedUrls.push(...results);
 
-        const endTime = new Date();
-        endTime.setHours(endTime.getHours() + parseInt(hours));
-
-        // 🟢 สร้าง Payload สำหรับสินค้า Custom
         const payload = {
           seller_email: userProfile.email,
           seller_name: userProfile.name,
-          
-          // ใช้ชื่อที่กรอกเอง
-          card_name: customName.trim(), 
-          
-          // สร้าง ID ปลอมๆ ขึ้นมาเพื่อให้ระบบทำงานได้ (ขึ้นต้นด้วย CUSTOM)
-          card_id: `CUSTOM-${Date.now()}`, 
-          
-          // ใช้ Marker พิเศษเพื่อให้ Frontend รู้ว่าต้องเอารูปจาก proof_image มาโชว์
-          card_image_path: 'CUSTOM_ITEM', 
-          
-          start_price: parseInt(price),
-          current_price: parseInt(price),
-          end_time: endTime.toISOString(),
-          status: 'active',
-          min_bid_increment: parseInt(minBid),
-          buy_now_price: buyNow ? parseInt(buyNow) : null,
+          seller_avatar: userProfile.picture,
+          title: title.trim(),
+          price: parseInt(price),
           description: description.trim(),
-          proof_image: JSON.stringify(uploadedUrls) // เก็บรูปทั้งหมด
+          condition,
+          category,
+          images: JSON.stringify(uploadedUrls),
+          status: 'active',
+          is_escrow: useEscrow // 🟢 บันทึกค่า Escrow
         };
 
-        const { error } = await supabase.from('auctions').insert(payload);
+        const { error } = await supabase.from('market_listings').insert(payload);
         if (error) throw error;
 
-        alert("ลงขายสำเร็จ! 🔨");
+        alert("ลงขายสำเร็จ! 🏪");
         onClose();
-
     } catch (error) {
         console.error(error);
         alert("เกิดข้อผิดพลาด: " + error.message);
@@ -148,73 +151,106 @@ export default function CreateBulkAuctionModal({ isOpen, onClose, userProfile })
   };
 
   return (
-    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[500] p-4">
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[600] p-4">
       <div className="bg-white dark:bg-slate-900 p-6 rounded-xl w-full max-w-lg border border-slate-300 dark:border-emerald-500/30 shadow-2xl max-h-[90vh] overflow-y-auto">
         <h2 className="text-xl font-bold mb-4 text-slate-900 dark:text-white flex items-center gap-2">
-           <span className="text-2xl">📦</span> เปิดประมูล: ยกกล่อง/อื่นๆ
+           <ShoppingBagIcon /> ลงขายสินค้า (ตลาดนัด)
         </h2>
         
-        {/* Warning Box */}
+        {/* กฎการลงขาย */}
         <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-800 p-4 rounded-xl mb-5 text-sm text-amber-800 dark:text-amber-200">
             <p className="font-bold mb-1">💡 คำแนะนำ</p>
-            <ul className="list-disc list-inside">
+            <ul className="list-disc list-inside space-y-1">
                 <li>โหมดนี้สำหรับสินค้าที่ <b>ไม่มีในฐานข้อมูล</b> (เช่น ยกกล่อง, Playmat, ซองสุ่ม)</li>
                 <li><b>จำเป็นต้อง</b> ถ่ายรูปสินค้าจริงให้ชัดเจน (อย่างน้อย 1 รูป)</li>
-                <li>
-            โปรดตรวจสอบให้แน่ใจว่า <b>ท่านมีการ์ดหรือสินค้านี้อยู่จริง</b> และพร้อมส่งมอบเมื่อจบการประมูล
-        </li>
-        <li>
-            การตั้งประมูลเพื่อปั่นป่วน ก่อกวน หรือไม่มีสินค้าจริง ถือเป็นการกระทำผิดร้ายแรงต่อชุมชน
-        </li>
-        <li>
-            หากตรวจสอบพบ <b>ไอดีของท่านจะถูกระงับถาวร (Ban)</b> ทันทีโดยไม่มีการแจ้งเตือนล่วงหน้า
-        </li>
+                <li>โปรดตรวจสอบให้แน่ใจว่า <b>ท่านมีสินค้าอยู่จริง</b> และพร้อมส่งมอบ</li>
             </ul>
         </div>
 
         <div className="space-y-4">
-            {/* 🟢 ชื่อสินค้า (Input ใหม่) */}
             <div>
-                <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">ชื่อสินค้า (ระบุให้ชัดเจน)</label>
-                <input 
-                    type="text" 
-                    value={customName} 
-                    onChange={e => setCustomName(e.target.value)} 
-                    placeholder="เช่น Box BT01 ซีลเดิม, Playmat ลาย..." 
-                    className="w-full p-2.5 rounded border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 dark:text-white outline-none focus:border-emerald-500 font-bold" 
-                    autoFocus
-                />
-            </div>
-
-            {/* Price & Time */}
-            <div className="grid grid-cols-2 gap-4">
-                <div>
-                    <label className="block text-sm text-slate-500 dark:text-gray-400 mb-1">ราคาเริ่มต้น</label>
-                    <input type="number" value={price} onChange={e => setPrice(e.target.value)} className="w-full p-2 rounded border bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-white outline-none focus:border-emerald-500 font-mono" min="0" />
-                </div>
-                <div>
-                    <label className="block text-sm text-slate-500 dark:text-gray-400 mb-1">ระยะเวลา (ชม.)</label>
-                    <input type="number" value={hours} onChange={e => setHours(e.target.value)} className="w-full p-2 rounded border bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-white outline-none focus:border-emerald-500 font-mono" min="1" />
-                </div>
+                <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">ชื่อสินค้า</label>
+                <input type="text" value={title} onChange={e => setTitle(e.target.value)} placeholder="เช่น ขายเหมาฟอย, เด็คเมต้า..." className="w-full p-2.5 rounded border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 dark:text-white outline-none focus:border-emerald-500 font-bold" autoFocus />
             </div>
 
             <div className="grid grid-cols-2 gap-4">
                 <div>
-                    <label className="block text-sm text-emerald-600 dark:text-emerald-400 mb-1 font-bold">บิดขั้นต่ำ</label>
-                    <input type="number" value={minBid} onChange={e => setMinBid(e.target.value)} className="w-full p-2 rounded border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-900/10 dark:text-white outline-none focus:border-emerald-500 font-mono" min="1" />
+                    <label className="block text-sm text-slate-500 dark:text-gray-400 mb-1">หมวดหมู่</label>
+                    <select value={category} onChange={e => setCategory(e.target.value)} className="w-full p-2 rounded border bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-white outline-none focus:border-emerald-500">
+                        <option value="General">ทั่วไป</option>
+                        <option value="Single">การ์ดเดี่ยว</option>
+                        <option value="Bulk">ยกกอง / Box</option>
+                        <option value="Deck">เด็ค</option>
+                        <option value="Accessories">อุปกรณ์เสริม</option>
+                    </select>
                 </div>
                 <div>
-                    <label className="block text-sm text-amber-600 dark:text-amber-400 mb-1 font-bold">Buy Now</label>
-                    <input type="number" value={buyNow} onChange={e => setBuyNow(e.target.value)} placeholder="ไม่บังคับ" className="w-full p-2 rounded border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/10 dark:text-white outline-none focus:border-amber-500 font-mono placeholder:text-slate-400" />
+                    <label className="block text-sm text-slate-500 dark:text-gray-400 mb-1">สภาพสินค้า</label>
+                    <select value={condition} onChange={e => setCondition(e.target.value)} className="w-full p-2 rounded border bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-white outline-none focus:border-emerald-500">
+                        <option value="Played">Played (มีรอยเล่น)</option>
+                        <option value="Mint">Mint (ใหม่กริบ)</option>
+                        <option value="Near Mint">Near Mint (สวยมาก)</option>
+                        <option value="Damaged">Damaged (มีตำหนิเยอะ)</option>
+                    </select>
                 </div>
             </div>
 
-            {/* Image Upload (Required) */}
             <div>
-                <label className="block text-sm text-slate-500 dark:text-gray-400 mb-2">
-                    รูปภาพสินค้าจริง <span className="text-red-500">*จำเป็น</span> ({imageFiles.length}/6)
-                </label>
-                
+                <label className="block text-sm text-slate-500 dark:text-gray-400 mb-1">ราคา (บาท)</label>
+                <input type="number" value={price} onChange={e => setPrice(e.target.value)} className="w-full p-2 rounded border bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-white outline-none focus:border-emerald-500 font-mono text-lg font-bold text-emerald-600" min="0" />
+            </div>
+
+            {/* 🟢 ส่วนระบบ Escrow (ปรับปรุงคำอธิบาย) */}
+                        <div className={`p-4 rounded-xl border transition-all ${useEscrow ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-500 dark:border-blue-400' : 'bg-slate-100 dark:bg-slate-800 border-slate-300 dark:border-slate-600'}`}>
+                            <label className="flex items-start gap-3 cursor-pointer">
+                                <input 
+                                    type="checkbox" 
+                                    checked={useEscrow} 
+                                    onChange={(e) => setUseEscrow(e.target.checked)}
+                                    className="mt-1 w-5 h-5 accent-blue-600 cursor-pointer"
+                                />
+                                <div className="flex-grow">
+                                    <div className="flex items-center gap-2 font-bold text-slate-900 dark:text-white">
+                                        <ShieldCheckIcon /> เปิดใช้ระบบคุ้มครอง (Escrow)
+                                    </div>
+                                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                                        ผู้ซื้อต้องวางเงินประกันเข้าระบบก่อนบิด ช่วยคัดกรองผู้ซื้อและป้องกันการบิดเล่น
+                                    </p>
+                                </div>
+                            </label>
+            
+                            {/* ตารางคำนวณค่าธรรมเนียม */}
+                            {useEscrow && (
+                                <div className="mt-3 pt-3 border-t border-blue-200 dark:border-blue-700/50 text-sm space-y-2 animate-fade-in">
+                                    {/* คำอธิบายเพิ่มเติม */}
+                                    <div className="bg-white/80 dark:bg-black/30 p-3 rounded-lg border border-blue-100 dark:border-blue-800/30 mb-3">
+                                         <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed">
+                                            ℹ️ <b>ค่าธรรมเนียม 5%</b> (ขั้นต่ำ 25 บ.) จะถูกหักจาก <u>ราคาสุดท้ายที่ผู้ประมูลชนะ</u>
+                                            <br/>
+                                            <span className="text-slate-500 dark:text-slate-400 block mt-1">
+                                                (เช่น ราคาเริ่ม 500 แต่จบที่ 1,000 บาท ระบบจะหักจากยอด 1,000 บาท)
+                                            </span>
+                                         </p>
+                                    </div>
+            
+                                    <div className="flex justify-between items-center text-slate-600 dark:text-slate-300">
+                                        <span>ประมาณการจากราคาเริ่ม:</span>
+                                        <span className="font-mono font-bold">{parseInt(price || 0).toLocaleString()} ฿</span>
+                                    </div>
+                                    <div className="flex justify-between items-center text-red-600 dark:text-red-400">
+                                        <span>หักค่าธรรมเนียมโดยประมาณ:</span>
+                                        <span className="font-mono font-bold">- {feeInfo.fee.toLocaleString()} ฿</span>
+                                    </div>
+                                    <div className="flex justify-between items-center pt-2 mt-1 border-t border-blue-200 dark:border-blue-700/50 text-emerald-600 dark:text-emerald-400 font-bold text-base">
+                                        <span>รายรับสุทธิ (เริ่มต้น):</span>
+                                        <span className="font-mono">{feeInfo.net.toLocaleString()} ฿</span>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+            <div>
+                <label className="block text-sm text-slate-500 dark:text-gray-400 mb-2">รูปภาพสินค้า ({imageFiles.length}/6)</label>
                 <div className="grid grid-cols-3 gap-2">
                     {previewUrls.map((url, index) => (
                         <div key={index} className="relative aspect-square rounded-lg overflow-hidden border border-slate-300 dark:border-slate-600 group">
@@ -232,17 +268,15 @@ export default function CreateBulkAuctionModal({ isOpen, onClose, userProfile })
                 <input type="file" ref={fileInputRef} onChange={handleFileChange} accept="image/*" multiple className="hidden" />
             </div>
 
-            {/* Description */}
             <div>
-                <label className="block text-sm text-slate-500 dark:text-gray-400 mb-1">รายละเอียดสินค้า</label>
-                <textarea rows="3" value={description} onChange={e => setDescription(e.target.value)} placeholder="สภาพสินค้า, สิ่งที่ได้รับ, การจัดส่ง..." className="w-full p-2 rounded border bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-white outline-none focus:border-emerald-500 resize-none text-sm" />
+                <label className="block text-sm text-slate-500 dark:text-gray-400 mb-1">รายละเอียดเพิ่มเติม</label>
+                <textarea rows="3" value={description} onChange={e => setDescription(e.target.value)} placeholder="รายละเอียดการ์ด, การจัดส่ง, นัดรับ..." className="w-full p-2 rounded border bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-white outline-none focus:border-emerald-500 resize-none text-sm" />
             </div>
 
             <div className="flex gap-3 pt-4 border-t border-slate-200 dark:border-slate-700 mt-4">
                 <button onClick={onClose} className="flex-1 py-3 rounded-lg bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-700 font-bold text-sm">ยกเลิก</button>
-                <button onClick={handleCreate} disabled={loading} className="flex-1 py-3 rounded-lg bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-bold hover:from-emerald-600 hover:to-teal-700 disabled:opacity-50 text-sm shadow-lg flex items-center justify-center gap-2">
-                    {loading && <span className="animate-spin text-white">⏳</span>}
-                    {loading ? "กำลังอัปโหลด..." : "ลงประมูลเลย"}
+                <button onClick={handleCreate} disabled={loading} className="flex-1 py-3 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold hover:from-blue-700 hover:to-indigo-700 disabled:opacity-50 text-sm shadow-lg flex items-center justify-center gap-2">
+                    {loading ? "กำลังบันทึก..." : "ยืนยันลงขาย"}
                 </button>
             </div>
         </div>

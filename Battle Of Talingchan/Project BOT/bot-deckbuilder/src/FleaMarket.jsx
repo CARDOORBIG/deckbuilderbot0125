@@ -38,18 +38,35 @@ export default function FleaMarket({ userProfile, onChat }) {
     return () => supabase.removeChannel(channel);
   }, []);
 
+  // 🟢 ฟังก์ชันลบสินค้า (ลบรูป + ลบข้อมูล)
   const handleDelete = async (item) => {
-      if (!confirm("ต้องการลบสินค้านี้ใช่หรือไม่?")) return;
+      if (!confirm(`ยืนยันการลบประกาศ "${item.title}" ใช่หรือไม่?`)) return;
+      
+      // 1. ลบรูปภาพออกจาก Storage (ถ้ามี)
       if (item.images) {
           try {
               const urls = JSON.parse(item.images);
-              const paths = urls.map(u => { const p = u.split('/auction-images/'); return p[1] ? decodeURIComponent(p[1]) : null; }).filter(Boolean);
-              if (paths.length > 0) await supabase.storage.from('auction-images').remove(paths);
-          } catch(e) { console.error(e); }
+              // แปลง URL เป็น Path สำหรับลบ
+              const paths = urls.map(u => { 
+                  const parts = u.split('/auction-images/'); 
+                  return parts[1] ? decodeURIComponent(parts[1]) : null; 
+              }).filter(Boolean);
+              
+              if (paths.length > 0) {
+                  await supabase.storage.from('auction-images').remove(paths);
+              }
+          } catch(e) { console.error("Error deleting images:", e); }
       }
+      
+      // 2. ลบข้อมูลจากตาราง
       const { error } = await supabase.from('market_listings').delete().eq('id', item.id);
-      if (error) alert("ลบไม่สำเร็จ: " + error.message);
-      else fetchMarketItems();
+      
+      if (error) {
+          alert("ลบไม่สำเร็จ: " + error.message);
+      } else {
+          // อัปเดตหน้าจอทันทีโดยไม่ต้องรอ fetch ใหม่
+          setMarketItems(prev => prev.filter(i => i.id !== item.id));
+      }
   };
 
   // Logic การกรองและเรียงลำดับ
@@ -61,24 +78,23 @@ export default function FleaMarket({ userProfile, onChat }) {
       }).sort((a, b) => {
           if (sortOption === "price_asc") return a.price - b.price;
           if (sortOption === "price_desc") return b.price - a.price;
-          return new Date(b.created_at) - new Date(a.created_at); // newest
+          return new Date(b.created_at) - new Date(a.created_at);
       });
   }, [marketItems, searchTerm, sortOption, filterCategory]);
 
-  // 🟢 Helper สำหรับเตรียมข้อมูลส่งให้ Chat Modal (ใช้ซ้ำได้ทั้งกดรูปและกดปุ่ม)
+  // Helper สำหรับเตรียมข้อมูลส่งให้ Chat Modal
   const prepareChatData = (item) => {
     return {
         ...item,
-        card_name: item.title,          // แปลง title -> card_name
-        card_id: `MARKET-${item.id}`,   // สร้าง ID ปลอมเพื่อไม่ให้ซ้ำกับ Auction
+        card_name: item.title,
+        card_id: `MARKET-${item.id}`,
         seller_email: item.seller_email,
         seller_name: item.seller_name,
-        card_image_path: 'CUSTOM_ITEM', // Flag บอกว่าเป็นสินค้า Custom
-        proof_image: item.images,       // ส่งรูปไปโชว์
-        // ⚠️ สำคัญ: ต้องส่ง 2 ค่านี้ไปด้วย ไม่งั้น Modal จะพัง (เพราะ Modal ประมูลต้องใช้คำนวณ)
-        end_time: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString(), // Fake เวลาให้ยังไม่จบง่ายๆ
+        card_image_path: 'CUSTOM_ITEM',
+        proof_image: item.images,
+        end_time: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString(),
         current_price: item.price,
-        min_bid_increment: 0 // ตลาดนัดไม่มีบิดขั้นต่ำ
+        min_bid_increment: 0
     };
   };
 
@@ -88,7 +104,8 @@ export default function FleaMarket({ userProfile, onChat }) {
         {/* Header & Filter Bar */}
         <div className="mt-4 mb-6 flex flex-col gap-2 bg-white dark:bg-slate-900/50 p-2 md:p-3 rounded-xl border border-slate-200 dark:border-emerald-500/20 shadow-sm mx-4 md:mx-0">
             
-            <div className="relative flex-grow w-full">
+            {/* Row 1: Search */}
+            <div className="relative w-full">
                 <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none text-slate-400">
                     <SearchIcon />
                 </div>
@@ -97,47 +114,62 @@ export default function FleaMarket({ userProfile, onChat }) {
                     placeholder="ค้นหาสินค้าในตลาด..." 
                     value={searchTerm} 
                     onChange={(e) => setSearchTerm(e.target.value)} 
-                    className="w-full pl-9 pr-4 py-1.5 md:py-2 bg-slate-100 dark:bg-slate-800 border-none rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none text-slate-900 dark:text-white placeholder-slate-400 transition-all" 
+                    className="w-full pl-10 pr-4 py-2.5 bg-slate-100 dark:bg-slate-800 border-none rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none text-slate-900 dark:text-white placeholder-slate-400 transition-all" 
                 />
             </div>
 
-            <div className="flex flex-col md:flex-row gap-2 md:items-center shrink-0">
+            {/* Row 2: Filters & Button */}
+            <div className="flex flex-col md:flex-row gap-2 md:items-center justify-between">
                 <div className="flex gap-2 items-center overflow-x-auto pb-1 md:pb-0 no-scrollbar shrink-0">
-                    <select 
-                        value={sortOption} 
-                        onChange={(e) => setSortOption(e.target.value)} 
-                        className="px-2 py-1.5 md:py-2 bg-slate-100 dark:bg-slate-800 rounded-lg text-xs font-bold text-slate-700 dark:text-slate-300 border-none outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer shrink-0"
-                    >
-                        <option value="newest" className="text-white">ล่าสุด</option>
-                        <option value="price_asc" className="text-white">ราคาต่ำ ➜ สูง</option>
-                        <option value="price_desc" className="text-white">ราคาสูง ➜ ต่ำ</option>
-                    </select>
+                    
+                    {/* Sort Dropdown */}
+                    <div className="flex items-center gap-2 bg-white dark:bg-slate-800 rounded-lg px-3 py-2 border border-slate-300 dark:border-slate-600 min-w-[140px]">
+                        <span className="text-slate-500"><FilterIcon /></span>
+                        <select 
+                            value={sortOption} 
+                            onChange={(e) => setSortOption(e.target.value)} 
+                            className="bg-transparent text-xs font-bold text-black dark:text-white outline-none cursor-pointer w-full"
+                        >
+                            <option value="newest" className="text-black">ล่าสุด</option>
+                            <option value="price_asc" className="text-black">ราคาต่ำ ➜ สูง</option>
+                            <option value="price_desc" className="text-black">ราคาสูง ➜ ต่ำ</option>
+                        </select>
+                    </div>
 
-                    <select 
-                        value={filterCategory} 
-                        onChange={(e) => setFilterCategory(e.target.value)} 
-                        className="px-2 py-1.5 md:py-2 bg-slate-100 dark:bg-slate-800 rounded-lg text-xs font-bold text-slate-700 dark:text-slate-300 border-none outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer shrink-0"
-                    >
-                        <option value="All" className="text-white">หมวดหมู่: ทั้งหมด</option>
-                        <option value="Single" className="text-white">การ์ดเดี่ยว</option>
-                        <option value="Bulk" className="text-white">ยกกอง / Box</option>
-                        <option value="Deck" className="text-white">เด็ค</option>
-                        <option value="Accessories" className="text-white">อุปกรณ์เสริม</option>
-                        <option value="General" className="text-white">ทั่วไป</option>
-                    </select>
+                    <div className="w-px h-8 bg-slate-300 dark:bg-slate-700 mx-1 shrink-0"></div>
+
+                    {/* Category Dropdown */}
+                    <div className="flex items-center gap-2 bg-white dark:bg-slate-800 rounded-lg px-3 py-2 border border-slate-300 dark:border-slate-600 min-w-[160px]">
+                        <span className="text-slate-500"><PackageIcon /></span>
+                        <select 
+                            value={filterCategory} 
+                            onChange={(e) => setFilterCategory(e.target.value)} 
+                            className="bg-transparent text-xs font-bold text-black dark:text-white outline-none cursor-pointer w-full"
+                        >
+                            <option value="All" className="text-black">หมวดหมู่: ทั้งหมด</option>
+                            <option value="Single" className="text-black">การ์ดเดี่ยว</option>
+                            <option value="Bulk" className="text-black">ยกกอง / Box</option>
+                            <option value="Deck" className="text-black">เด็ค</option>
+                            <option value="Accessories" className="text-black">อุปกรณ์เสริม</option>
+                            <option value="General" className="text-black">ทั่วไป</option>
+                        </select>
+                    </div>
                 </div>
 
+                {/* ปุ่มลงขาย */}
                 <button 
                     onClick={() => setIsCreateModalOpen(true)} 
-                    className="w-full md:w-auto flex items-center gap-1 px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-xs font-bold shadow-md hover:shadow-emerald-500/30 transition-all active:scale-95 whitespace-nowrap justify-center shrink-0 md:ml-auto"
+                    className="w-full md:w-auto px-5 py-2 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-bold rounded-lg shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 text-xs md:text-sm"
                 >
-                    <span className="text-lg leading-none mb-0.5">+</span> ลงขายสินค้า
+                    <PlusIcon /> ลงขายสินค้า
                 </button>
             </div>
         </div>
 
+        {/* Loading State */}
         {loading && <div className="text-center py-20 text-slate-500 animate-pulse">กำลังโหลดตลาด...</div>}
 
+        {/* Empty State */}
         {!loading && filteredItems.length === 0 && (
             <div className="text-center py-20 text-slate-500 flex flex-col items-center gap-3">
                 <div className="text-slate-300 dark:text-slate-700 p-4 bg-slate-100 dark:bg-slate-800 rounded-full">
@@ -148,7 +180,7 @@ export default function FleaMarket({ userProfile, onChat }) {
         )}
 
         {/* Grid */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 mx-4 md:mx-0">
             {filteredItems.map(item => {
                 let coverImage = 'https://placehold.co/400x400?text=No+Image';
                 try {
@@ -156,13 +188,14 @@ export default function FleaMarket({ userProfile, onChat }) {
                     if (imgs && imgs.length > 0) coverImage = imgs[0];
                 } catch {}
 
+                // 🟢 ตรวจสอบความเป็นเจ้าของ
                 const isOwner = userProfile?.email === item.seller_email;
 
                 return (
                     <div key={item.id} className="bg-white dark:bg-slate-800 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 shadow-md hover:shadow-xl transition-all group cursor-pointer relative flex flex-col h-full">
                         
-                        {/* Image - 🟢 แก้ไข onClick ให้ส่งข้อมูลครบถ้วน */}
-                        <div className="aspect-[4/5] bg-slate-200 dark:bg-slate-800/50 relative overflow-hidden flex items-center justify-center" 
+                        {/* Image */}
+                        <div className="aspect-square bg-slate-200 dark:bg-slate-900 relative overflow-hidden flex items-center justify-center" 
                              onClick={() => onChat(prepareChatData(item))}
                         >
                              <img src={coverImage} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
@@ -171,8 +204,15 @@ export default function FleaMarket({ userProfile, onChat }) {
                                 {item.condition}
                              </div>
                              
+                             {/* 🟢 ปุ่มลบ (แสดงเฉพาะเจ้าของ) */}
                              {isOwner && (
-                                 <button onClick={(e) => { e.stopPropagation(); handleDelete(item); }} className="absolute top-2 left-2 p-1.5 bg-red-600 text-white rounded-full shadow-md opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-700 z-10"><TrashIcon width="14" height="14"/></button>
+                                 <button 
+                                    onClick={(e) => { e.stopPropagation(); handleDelete(item); }} 
+                                    className="absolute top-2 left-2 p-1.5 bg-red-600 text-white rounded-full shadow-md opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-700 z-20"
+                                    title="ลบสินค้า"
+                                 >
+                                    <TrashIcon width="14" height="14"/>
+                                 </button>
                              )}
                         </div>
 
@@ -188,10 +228,9 @@ export default function FleaMarket({ userProfile, onChat }) {
 
                             <div className="mt-auto bg-slate-50 dark:bg-slate-800/50 p-2 rounded-xl border border-slate-200 dark:border-slate-700 flex justify-between items-center">
                                 <div>
-                                    <p className="text-[9px] text-slate-400 uppercase font-bold tracking-wide">Price</p>
+                                    <p className="text-[9px] text-slate-400 uppercase font-bold tracking-wide">ราคา</p>
                                     <p className="text-lg font-black text-emerald-600 dark:text-emerald-400">฿{item.price.toLocaleString()}</p>
                                 </div>
-                                {/* Button - 🟢 แก้ไข onClick ให้ส่งข้อมูลครบถ้วน */}
                                 <button 
                                     onClick={(e) => {
                                         e.stopPropagation();

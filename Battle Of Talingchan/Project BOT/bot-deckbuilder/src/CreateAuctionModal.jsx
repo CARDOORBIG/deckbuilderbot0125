@@ -1,6 +1,6 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import { supabase } from './supabaseClient';
-import { CameraIcon, CloseIcon } from './components/Icons'; 
+import { CameraIcon, CloseIcon, ShieldCheckIcon } from './components/Icons'; 
 
 const resizeImage = (file) => {
   return new Promise((resolve) => {
@@ -10,28 +10,18 @@ const resizeImage = (file) => {
       img.onload = () => {
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
-        const MAX_SIZE = 1000; // กำหนดด้านกว้างสุดไม่เกิน 1000px
+        const MAX_SIZE = 1000; 
         let width = img.width;
         let height = img.height;
-
-        if (width > height) {
-          if (width > MAX_SIZE) { height *= MAX_SIZE / width; width = MAX_SIZE; }
-        } else {
-          if (height > MAX_SIZE) { width *= MAX_SIZE / height; height = MAX_SIZE; }
-        }
-
+        if (width > height) { if (width > MAX_SIZE) { height *= MAX_SIZE / width; width = MAX_SIZE; } } 
+        else { if (height > MAX_SIZE) { width *= MAX_SIZE / height; height = MAX_SIZE; } }
         canvas.width = width;
         canvas.height = height;
         ctx.drawImage(img, 0, 0, width, height);
-        
-        // แปลงกลับเป็น Blob -> File
         canvas.toBlob((blob) => {
-          const resizedFile = new File([blob], file.name, {
-            type: 'image/jpeg',
-            lastModified: Date.now(),
-          });
+          const resizedFile = new File([blob], file.name, { type: 'image/jpeg', lastModified: Date.now() });
           resolve(resizedFile);
-        }, 'image/jpeg', 0.8); // คุณภาพ 80% (ลดขนาดไฟล์ได้เยอะมาก)
+        }, 'image/jpeg', 0.8); 
       };
       img.src = e.target.result;
     };
@@ -46,57 +36,54 @@ export default function CreateAuctionModal({ isOpen, onClose, card, userProfile 
   const [buyNow, setBuyNow] = useState('');
   const [description, setDescription] = useState('');
   
-  // 🟢 เปลี่ยนจากเก็บรูปเดียว เป็น Array
+  // State สำหรับระบบ Escrow
+  const [useEscrow, setUseEscrow] = useState(false);
+
   const [imageFiles, setImageFiles] = useState([]);
   const [previewUrls, setPreviewUrls] = useState([]);
   const fileInputRef = useRef(null);
   
   const [loading, setLoading] = useState(false);
 
+  // คำนวณค่าธรรมเนียม (ประมาณการจากราคาเริ่ม)
+  const feeInfo = useMemo(() => {
+      const startPrice = parseInt(price) || 0;
+      // สูตร: 5% ของราคา แต่ไม่ต่ำกว่า 25 บาท
+      const fee = Math.max(25, Math.ceil(startPrice * 0.05));
+      const net = startPrice - fee;
+      return { fee, net };
+  }, [price]);
+
   if (!isOpen || !card) return null;
 
-  // 🟢 ฟังก์ชันจัดการเมื่อเลือกรูป (พร้อม Resize)
-  const handleFileChange = async (e) => { // อย่าลืมเติม async
+  const handleFileChange = async (e) => { 
     const files = Array.from(e.target.files);
     if (files.length === 0) return;
-
-    // เช็คจำนวนรูป
-    if (imageFiles.length + files.length > 6) {
-        return alert("อัปโหลดได้สูงสุด 6 รูปครับ");
-    }
+    if (imageFiles.length + files.length > 6) return alert("อัปโหลดได้สูงสุด 6 รูปครับ");
 
     const newFiles = [];
     const newPreviews = [];
 
-    // วนลูปย่อรูปทีละรูป
     for (const file of files) {
-        // ข้ามไฟล์ที่ไม่ใช่รูป
         if (!file.type.startsWith('image/')) continue;
-
         try {
-            // เรียกฟังก์ชันย่อรูป
             const resizedFile = await resizeImage(file);
             newFiles.push(resizedFile);
             newPreviews.push(URL.createObjectURL(resizedFile));
         } catch (err) {
             console.error("Resize error:", err);
-            // ถ้าย่อไม่ได้จริงๆ ให้ใช้ไฟล์เดิม
             newFiles.push(file);
             newPreviews.push(URL.createObjectURL(file));
         }
     }
-
     setImageFiles(prev => [...prev, ...newFiles]);
     setPreviewUrls(prev => [...prev, ...newPreviews]);
-    
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
   
-  // 🟢 ฟังก์ชันลบรูปตาม Index
   const handleRemoveImage = (index) => {
     setImageFiles(prev => prev.filter((_, i) => i !== index));
     setPreviewUrls(prev => {
-        // ลบ URL และ Revoke เพื่อคืน Memory
         const urlToRemove = prev[index];
         URL.revokeObjectURL(urlToRemove);
         return prev.filter((_, i) => i !== index);
@@ -107,46 +94,44 @@ export default function CreateAuctionModal({ isOpen, onClose, card, userProfile 
     if (!userProfile) return alert("กรุณา Login ก่อนตั้งขายครับ");
     if (parseInt(hours) < 1) return alert("ระยะเวลาต้องอย่างน้อย 1 ชั่วโมงครับ");
     if (parseInt(minBid) < 1) return alert("ขั้นต่ำในการบิดต้องมากกว่า 0 ครับ");
-    if (buyNow && parseInt(buyNow) <= parseInt(price)) {
-        return alert("ราคา 'บิดจบ' (Buy Now) ต้องสูงกว่าราคาเริ่มต้นครับ");
+    if (buyNow && parseInt(buyNow) <= parseInt(price)) return alert("ราคา 'บิดจบ' (Buy Now) ต้องสูงกว่าราคาเริ่มต้นครับ");
+
+    // แจ้งเตือนยืนยันเรื่องค่าธรรมเนียมอีกรอบ
+    if (useEscrow) {
+        const confirmMsg = 
+`ยืนยันเงื่อนไขระบบประกัน (Escrow):
+
+⚠️ โปรดทราบ: ค่าธรรมเนียม 5% (ขั้นต่ำ 25 บ.) จะถูกหักจาก "ยอดจบประมูลจริง"
+(ตัวอย่าง: หากเริ่ม 500 แต่จบที่ 1,000 ระบบจะหักจากยอด 1,000)
+
+โดยประมาณการจากราคาเริ่ม:
+- หักค่าธรรมเนียม: ~${feeInfo.fee.toLocaleString()} บาท
+- คุณจะได้รับสุทธิ: ~${feeInfo.net.toLocaleString()} บาท
+
+ยืนยันที่จะลงประมูลหรือไม่?`;
+        if (!confirm(confirmMsg)) return;
     }
 
     setLoading(true);
 
     try {
         const uploadedUrls = [];
-
-        // 🟢 1. วนลูปอัปโหลดรูปทั้งหมด (Upload Multiple)
         if (imageFiles.length > 0) {
-            // ใช้ Promise.all เพื่ออัปโหลดพร้อมกัน (เร็วขึ้น)
             const uploadPromises = imageFiles.map(async (file) => {
                 const fileExt = file.name.split('.').pop();
                 const fileName = `${Date.now()}_${Math.random().toString(36).substring(2)}.${fileExt}`;
                 const filePath = `${userProfile.email}/${fileName}`;
-
-                const { error: uploadError } = await supabase.storage
-                    .from('auction-images')
-                    .upload(filePath, file);
-
+                const { error: uploadError } = await supabase.storage.from('auction-images').upload(filePath, file);
                 if (uploadError) throw uploadError;
-
-                const { data: publicData } = supabase.storage
-                    .from('auction-images')
-                    .getPublicUrl(filePath);
-                
-                return publicData.publicUrl;
+                const { data } = supabase.storage.from('auction-images').getPublicUrl(filePath);
+                return data.publicUrl;
             });
-
-            // รอจนเสร็จครบทุกรูป
             const results = await Promise.all(uploadPromises);
             uploadedUrls.push(...results);
         }
 
         const endTime = new Date();
         endTime.setHours(endTime.getHours() + parseInt(hours));
-
-        // 🟢 2. บันทึกเป็น JSON String (เพราะ Column เดิมเป็น text)
-        // ถ้าไม่มีรูป จะเป็น null
         const proofImageValue = uploadedUrls.length > 0 ? JSON.stringify(uploadedUrls) : null;
 
         const payload = {
@@ -162,11 +147,11 @@ export default function CreateAuctionModal({ isOpen, onClose, card, userProfile 
           min_bid_increment: parseInt(minBid),
           buy_now_price: buyNow ? parseInt(buyNow) : null,
           description: description.trim(),
-          proof_image: proofImageValue // เก็บเป็น Array String ["url1", "url2"]
+          proof_image: proofImageValue,
+          is_escrow: useEscrow 
         };
 
         const { error } = await supabase.from('auctions').insert(payload);
-
         if (error) throw error;
 
         alert("ลงขายสำเร็จ! 🔨");
@@ -187,24 +172,17 @@ export default function CreateAuctionModal({ isOpen, onClose, card, userProfile 
            <span className="text-2xl">⚖️</span> เปิดประมูล: {card.name}
         </h2>
         
-        {/* Warning Box */}
+        {/* 🔴 กฎการประมูล (คงไว้ครบถ้วน) */}
         <div className="bg-red-50 dark:bg-red-900/20 border border-red-300 dark:border-red-800 p-4 rounded-xl mb-5 text-sm md:text-base text-red-700 dark:text-red-300">
             <p className="font-bold mb-2 text-lg">⚠️ คำเตือนสำคัญ</p>
             <ul className="list-disc list-inside space-y-1">
-                <li>
-            โปรดตรวจสอบให้แน่ใจว่า <b>ท่านมีการ์ดใบนี้อยู่จริง</b> และพร้อมส่งมอบเมื่อจบการประมูล
-        </li>
-        <li>
-            การตั้งประมูลเพื่อปั่นป่วน ก่อกวน หรือไม่มีสินค้าจริง ถือเป็นการกระทำผิดร้ายแรงต่อชุมชน
-        </li>
-        <li>
-            หากตรวจสอบพบ <b>ไอดีของท่านจะถูกระงับถาวร (Ban)</b> ทันทีโดยไม่มีการแจ้งเตือนล่วงหน้า
-        </li>
+                <li>โปรดตรวจสอบให้แน่ใจว่า <b>ท่านมีการ์ดใบนี้อยู่จริง</b> และพร้อมส่งมอบเมื่อจบการประมูล</li>
+                <li>การตั้งประมูลเพื่อปั่นป่วน ก่อกวน หรือไม่มีสินค้าจริง ถือเป็นการกระทำผิดร้ายแรงต่อชุมชน</li>
+                <li>หากตรวจสอบพบ <b>ไอดีของท่านจะถูกระงับถาวร (Ban)</b> ทันทีโดยไม่มีการแจ้งเตือนล่วงหน้า</li>
             </ul>
         </div>
 
         <div className="space-y-4">
-            {/* Price & Time Inputs */}
             <div className="grid grid-cols-2 gap-4">
                 <div>
                     <label className="block text-sm text-slate-500 dark:text-gray-400 mb-1">ราคาเริ่มต้น (บาท)</label>
@@ -214,6 +192,55 @@ export default function CreateAuctionModal({ isOpen, onClose, card, userProfile 
                     <label className="block text-sm text-slate-500 dark:text-gray-400 mb-1">ระยะเวลา (ชม.)</label>
                     <input type="number" value={hours} onChange={e => setHours(e.target.value)} className="w-full p-2 rounded border bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-white outline-none focus:border-amber-500 font-mono" min="1" />
                 </div>
+            </div>
+
+            {/* 🟢 ส่วนระบบ Escrow (ปรับปรุงคำอธิบาย) */}
+            <div className={`p-4 rounded-xl border transition-all ${useEscrow ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-500 dark:border-blue-400' : 'bg-slate-100 dark:bg-slate-800 border-slate-300 dark:border-slate-600'}`}>
+                <label className="flex items-start gap-3 cursor-pointer">
+                    <input 
+                        type="checkbox" 
+                        checked={useEscrow} 
+                        onChange={(e) => setUseEscrow(e.target.checked)}
+                        className="mt-1 w-5 h-5 accent-blue-600 cursor-pointer"
+                    />
+                    <div className="flex-grow">
+                        <div className="flex items-center gap-2 font-bold text-slate-900 dark:text-white">
+                            <ShieldCheckIcon /> เปิดใช้ระบบคุ้มครอง (Escrow)
+                        </div>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                            ผู้ซื้อต้องวางเงินประกันเข้าระบบก่อนบิด ช่วยคัดกรองผู้ซื้อและป้องกันการบิดเล่น
+                        </p>
+                    </div>
+                </label>
+
+                {/* ตารางคำนวณค่าธรรมเนียม */}
+                {useEscrow && (
+                    <div className="mt-3 pt-3 border-t border-blue-200 dark:border-blue-700/50 text-sm space-y-2 animate-fade-in">
+                        {/* คำอธิบายเพิ่มเติม */}
+                        <div className="bg-white/80 dark:bg-black/30 p-3 rounded-lg border border-blue-100 dark:border-blue-800/30 mb-3">
+                             <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed">
+                                ℹ️ <b>ค่าธรรมเนียม 5%</b> (ขั้นต่ำ 25 บ.) จะถูกหักจาก <u>ราคาสุดท้ายที่ผู้ประมูลชนะ</u>
+                                <br/>
+                                <span className="text-slate-500 dark:text-slate-400 block mt-1">
+                                    (เช่น ราคาเริ่ม 500 แต่จบที่ 1,000 บาท ระบบจะหักจากยอด 1,000 บาท)
+                                </span>
+                             </p>
+                        </div>
+
+                        <div className="flex justify-between items-center text-slate-600 dark:text-slate-300">
+                            <span>ประมาณการจากราคาเริ่ม:</span>
+                            <span className="font-mono font-bold">{parseInt(price || 0).toLocaleString()} ฿</span>
+                        </div>
+                        <div className="flex justify-between items-center text-red-600 dark:text-red-400">
+                            <span>หักค่าธรรมเนียมโดยประมาณ:</span>
+                            <span className="font-mono font-bold">- {feeInfo.fee.toLocaleString()} ฿</span>
+                        </div>
+                        <div className="flex justify-between items-center pt-2 mt-1 border-t border-blue-200 dark:border-blue-700/50 text-emerald-600 dark:text-emerald-400 font-bold text-base">
+                            <span>รายรับสุทธิ (เริ่มต้น):</span>
+                            <span className="font-mono">{feeInfo.net.toLocaleString()} ฿</span>
+                        </div>
+                    </div>
+                )}
             </div>
 
             <div className="grid grid-cols-2 gap-4">
@@ -227,46 +254,24 @@ export default function CreateAuctionModal({ isOpen, onClose, card, userProfile 
                 </div>
             </div>
 
-            {/* 🟢 Image Upload Section (Multi-File) */}
+            {/* Image Upload */}
             <div>
-                <label className="block text-sm text-slate-500 dark:text-gray-400 mb-2">
-                    รูปภาพสินค้าจริง ({imageFiles.length}/6)
-                </label>
-                
+                <label className="block text-sm text-slate-500 dark:text-gray-400 mb-2">รูปภาพสินค้าจริง ({imageFiles.length}/6)</label>
                 <div className="grid grid-cols-3 gap-2">
-                    {/* Render Previews */}
                     {previewUrls.map((url, index) => (
                         <div key={index} className="relative aspect-square rounded-lg overflow-hidden border border-slate-300 dark:border-slate-600 group">
                             <img src={url} alt={`Preview ${index}`} className="w-full h-full object-cover" />
-                            <button 
-                                onClick={() => handleRemoveImage(index)}
-                                className="absolute top-1 right-1 bg-red-600 text-white p-0.5 rounded-full shadow-lg hover:bg-red-700 transition-colors opacity-0 group-hover:opacity-100"
-                            >
-                                <CloseIcon width="16" height="16" />
-                            </button>
+                            <button onClick={() => handleRemoveImage(index)} className="absolute top-1 right-1 bg-red-600 text-white p-0.5 rounded-full shadow-lg hover:bg-red-700 transition-colors opacity-0 group-hover:opacity-100"><CloseIcon width="16" height="16" /></button>
                         </div>
                     ))}
-
-                    {/* Add Button (แสดงต่อเมื่อยังไม่ครบ 6 รูป) */}
                     {imageFiles.length < 6 && (
-                        <div 
-                            onClick={() => fileInputRef.current.click()}
-                            className="aspect-square border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-lg flex flex-col items-center justify-center cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors gap-1 text-slate-400 hover:text-emerald-500 hover:border-emerald-500"
-                        >
+                        <div onClick={() => fileInputRef.current.click()} className="aspect-square border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-lg flex flex-col items-center justify-center cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors gap-1 text-slate-400 hover:text-emerald-500 hover:border-emerald-500">
                             <CameraIcon />
                             <span className="text-xs">เพิ่มรูป</span>
                         </div>
                     )}
                 </div>
-                
-                <input 
-                    type="file" 
-                    ref={fileInputRef} 
-                    onChange={handleFileChange} 
-                    accept="image/*" 
-                    multiple // 🟢 อนุญาตให้เลือกหลายรูปในหน้าต่างเลือกไฟล์
-                    className="hidden" 
-                />
+                <input type="file" ref={fileInputRef} onChange={handleFileChange} accept="image/*" multiple className="hidden" />
             </div>
 
             {/* Description */}

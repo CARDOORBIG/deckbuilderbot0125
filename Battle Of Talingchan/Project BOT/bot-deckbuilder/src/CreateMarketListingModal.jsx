@@ -1,6 +1,6 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import { supabase } from './supabaseClient';
-import { CameraIcon, CloseIcon, ShoppingBagIcon } from './components/Icons'; 
+import { CameraIcon, CloseIcon, ShoppingBagIcon, ShieldCheckIcon } from './components/Icons'; 
 
 const resizeImage = (file) => {
   return new Promise((resolve) => {
@@ -34,12 +34,24 @@ export default function CreateMarketListingModal({ isOpen, onClose, userProfile 
   const [price, setPrice] = useState('');
   const [description, setDescription] = useState('');
   const [condition, setCondition] = useState('Played');
-  const [category, setCategory] = useState('General'); // 🟢 เพิ่ม State หมวดหมู่
+  const [category, setCategory] = useState('General');
   
+  // 🟢 State สำหรับระบบ Escrow
+  const [useEscrow, setUseEscrow] = useState(false);
+
   const [imageFiles, setImageFiles] = useState([]);
   const [previewUrls, setPreviewUrls] = useState([]);
   const fileInputRef = useRef(null);
   const [loading, setLoading] = useState(false);
+
+  // 🟢 คำนวณค่าธรรมเนียม Real-time
+  const feeInfo = useMemo(() => {
+      const startPrice = parseInt(price) || 0;
+      // สูตร: 5% ของราคา แต่ไม่ต่ำกว่า 25 บาท
+      const fee = Math.max(25, Math.ceil(startPrice * 0.05));
+      const net = startPrice - fee;
+      return { fee, net };
+  }, [price]);
 
   if (!isOpen) return null;
 
@@ -81,6 +93,11 @@ export default function CreateMarketListingModal({ isOpen, onClose, userProfile 
     if (!price || parseInt(price) < 0) return alert("กรุณาระบุราคาที่ถูกต้อง");
     if (imageFiles.length === 0) return alert("ต้องแนบรูปสินค้าอย่างน้อย 1 รูป");
 
+    // 🟢 แจ้งเตือนยืนยันเรื่องค่าธรรมเนียม (ถ้าใช้ Escrow)
+    if (useEscrow) {
+        if (!confirm(`ยืนยันการใช้ระบบ Escrow?\n\nราคาขาย: ${parseInt(price)} บาท\nค่าธรรมเนียมระบบ: ${feeInfo.fee} บาท\nคุณจะได้รับสุทธิ (ประมาณ): ${feeInfo.net} บาท\n\nกด OK เพื่อยืนยัน`)) return;
+    }
+
     setLoading(true);
 
     try {
@@ -106,9 +123,10 @@ export default function CreateMarketListingModal({ isOpen, onClose, userProfile 
           price: parseInt(price),
           description: description.trim(),
           condition,
-          category, // 🟢 ส่งหมวดหมู่ไปด้วย
+          category,
           images: JSON.stringify(uploadedUrls),
-          status: 'active'
+          status: 'active',
+          is_escrow: useEscrow // 🟢 บันทึกค่า Escrow ลง Database
         };
 
         const { error } = await supabase.from('market_listings').insert(payload);
@@ -137,7 +155,6 @@ export default function CreateMarketListingModal({ isOpen, onClose, userProfile 
                 <input type="text" value={title} onChange={e => setTitle(e.target.value)} placeholder="เช่น ขายเหมาฟอย, เด็คเมต้า..." className="w-full p-2.5 rounded border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 dark:text-white outline-none focus:border-emerald-500 font-bold" autoFocus />
             </div>
 
-            {/* หมวดหมู่ & สภาพ */}
             <div className="grid grid-cols-2 gap-4">
                 <div>
                     <label className="block text-sm text-slate-500 dark:text-gray-400 mb-1">หมวดหมู่</label>
@@ -163,6 +180,44 @@ export default function CreateMarketListingModal({ isOpen, onClose, userProfile 
             <div>
                 <label className="block text-sm text-slate-500 dark:text-gray-400 mb-1">ราคา (บาท)</label>
                 <input type="number" value={price} onChange={e => setPrice(e.target.value)} className="w-full p-2 rounded border bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-white outline-none focus:border-emerald-500 font-mono text-lg font-bold text-emerald-600" min="0" />
+            </div>
+
+            {/* 🟢 ส่วนระบบ Escrow (Checkbox + ตารางคำนวณ) */}
+            <div className={`p-4 rounded-xl border transition-all ${useEscrow ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-400' : 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700'}`}>
+                <label className="flex items-start gap-3 cursor-pointer">
+                    <input 
+                        type="checkbox" 
+                        checked={useEscrow} 
+                        onChange={(e) => setUseEscrow(e.target.checked)}
+                        className="mt-1 w-5 h-5 accent-blue-600 cursor-pointer"
+                    />
+                    <div className="flex-grow">
+                        <div className="flex items-center gap-2 font-bold text-slate-900 dark:text-white">
+                            <ShieldCheckIcon /> ระบบคุ้มครอง (Escrow)
+                        </div>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                            เพิ่มความน่าเชื่อถือให้ร้านของคุณ ผู้ซื้อกล้าโอนเงินมากขึ้น
+                        </p>
+                    </div>
+                </label>
+
+                {/* แสดงตารางคำนวณเมื่อติ๊กถูก */}
+                {useEscrow && (
+                    <div className="mt-3 pt-3 border-t border-blue-200 dark:border-blue-700/50 text-sm space-y-1 animate-fade-in">
+                        <div className="flex justify-between items-center text-slate-600 dark:text-slate-300">
+                            <span>ราคาขาย:</span>
+                            <span className="font-mono">{parseInt(price || 0).toLocaleString()} ฿</span>
+                        </div>
+                        <div className="flex justify-between items-center text-red-600 dark:text-red-400">
+                            <span>ค่าธรรมเนียม ({feeInfo.fee === 25 ? 'Min 25฿' : '5%'}):</span>
+                            <span className="font-mono font-bold">- {feeInfo.fee.toLocaleString()} ฿</span>
+                        </div>
+                        <div className="flex justify-between items-center pt-2 mt-1 border-t border-blue-200 dark:border-blue-700/50 text-emerald-600 dark:text-emerald-400 font-bold text-base">
+                            <span>รายรับสุทธิ:</span>
+                            <span className="font-mono">{feeInfo.net.toLocaleString()} ฿</span>
+                        </div>
+                    </div>
+                )}
             </div>
 
             <div>
@@ -191,7 +246,6 @@ export default function CreateMarketListingModal({ isOpen, onClose, userProfile 
 
             <div className="flex gap-3 pt-4 border-t border-slate-200 dark:border-slate-700 mt-4">
                 <button onClick={onClose} className="flex-1 py-3 rounded-lg bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-700 font-bold text-sm">ยกเลิก</button>
-                {/* 🟢 ปุ่มสีเขียว */}
                 <button onClick={handleCreate} disabled={loading} className="flex-1 py-3 rounded-lg bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-bold hover:from-emerald-600 hover:to-teal-700 disabled:opacity-50 text-sm shadow-lg flex items-center justify-center gap-2">
                     {loading ? "กำลังบันทึก..." : "ยืนยันลงขาย"}
                 </button>
