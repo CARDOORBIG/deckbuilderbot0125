@@ -716,33 +716,35 @@ export default function App() {
     if (userProfile?.email) fetchUserProfile(userProfile.email);
   }, []);
 
-  // 🟢 [UPDATED] โหลดคะแนน + Realtime (แก้ตรงนี้)
+ // 🟢 [UPDATED] ดึงข้อมูล User + ยอดเงิน (Wallet)
   useEffect(() => {
     if (userProfile?.email) {
       const fetchStats = async () => {
-        const { data } = await supabase
+        const { data, error } = await supabase
           .from('user_stats')
-          .select('user_email, total_score')
+          .select('user_email, total_score, wallet_balance') // ✅ ต้องมีตรงนี้ ถึงจะโชว์ยอดเงิน
           .eq('user_email', userProfile.email)
           .single();
         
         if (data) {
+          console.log("💰 Wallet Balance:", data.wallet_balance);
           setUserReputation({ [data.user_email]: data });
         }
       };
 
-      // 1. โหลดครั้งแรก
       fetchStats();
 
-      // 2. ดักฟังการเปลี่ยนแปลง (เพื่อให้ยศเปลี่ยนทันทีโดยไม่ต้องรีเฟรช)
+      // Realtime: ฟังการเปลี่ยนแปลงที่ตาราง user_stats
       const channel = supabase
-        .channel('realtime_reputation_app')
+        .channel('realtime_balance')
         .on(
           'postgres_changes',
-          { event: '*', schema: 'public', table: 'user_reputations' },
-          () => {
-            console.log("🔔 คะแนนเปลี่ยน! อัปเดตยศ...");
-            fetchStats();
+          { event: '*', schema: 'public', table: 'user_stats' }, // ✅ ต้องฟัง user_stats
+          (payload) => {
+            if (payload.new && payload.new.user_email === userProfile.email) {
+                console.log("🔔 ยอดเงินเปลี่ยน!", payload.new.wallet_balance);
+                fetchStats(); // โหลดใหม่ทันที
+            }
           }
         )
         .subscribe();

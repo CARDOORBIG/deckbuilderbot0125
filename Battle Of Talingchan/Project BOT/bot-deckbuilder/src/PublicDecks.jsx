@@ -664,20 +664,40 @@ export default function PublicDecks() {
     return { ...userProfile, name: customProfile.displayName || userProfile.name, picture: customProfile.avatarUrl || userProfile.picture };
   }, [userProfile, customProfile]);
 
-  // 🟢 [ใหม่] ดึงข้อมูล User Profile และ Reputation
-  useEffect(() => {
-    if (userProfile?.email) {
-        // 1. ดึง Profile (Firebase)
-        getDoc(doc(db, "users", userProfile.email)).then(s => s.exists() && setCustomProfile(s.data()));
+  // ในไฟล์ PublicDecks.jsx
 
-        // 2. ดึง Stats (Supabase) เพื่อโชว์ยศ
-        const fetchStats = async () => {
-             const { data } = await supabase.from('user_stats').select('user_email, total_score').eq('user_email', userProfile.email).single();
-             if(data) setUserReputation({ [data.user_email]: data });
-        };
-        fetchStats();
-    }
-  }, [userProfile]);
+// 🟢 [UPDATED] แก้ไขให้ดึง wallet_balance มาแสดงใน Drawer
+useEffect(() => {
+  if (userProfile?.email) {
+      // 1. ดึง Profile
+      getDoc(doc(db, "users", userProfile.email)).then(s => s.exists() && setCustomProfile(s.data()));
+
+      // 2. ดึง Stats + เงิน (Supabase)
+      const fetchStats = async () => {
+           const { data } = await supabase
+             .from('user_stats')
+             .select('user_email, total_score, wallet_balance') // ✅ ต้องมี wallet_balance
+             .eq('user_email', userProfile.email)
+             .single();
+             
+           if(data) setUserReputation({ [data.user_email]: data });
+      };
+      fetchStats();
+
+      // 3. Realtime (เฝ้าดูยอดเงินเปลี่ยน)
+      const channel = supabase
+        .channel('public_decks_balance')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'user_stats' }, 
+        (payload) => {
+            if (payload.new.user_email === userProfile.email) {
+                fetchStats();
+            }
+        })
+        .subscribe();
+
+      return () => { supabase.removeChannel(channel); };
+  }
+}, [userProfile]);
 
   const closeModal = () => setModal({ isOpen: false });
   const showAlert = (title, message) => setModal({ isOpen: true, title, message });

@@ -810,12 +810,26 @@ export default function AuctionMarket() {
   }, [userProfile]);
 
   const fetchReputations = async () => {
-      const { data } = await supabase.from('user_stats').select('user_email, total_score, penalty_level');
+    
+      const { data } = await supabase
+      .from('user_stats')
+      .select('user_email, total_score, penalty_level, wallet_balance');
       const map = {};
       data?.forEach(u => map[u.user_email] = u);
       setUserReputation(map);
   };
+  useEffect(() => {
+    const channel = supabase
+      .channel('market_balance_update')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'user_stats' }, 
+      (payload) => {
+          // ถ้ามีการเปลี่ยนแปลง ให้โหลดข้อมูลใหม่
+          fetchReputations();
+      })
+      .subscribe();
 
+    return () => { supabase.removeChannel(channel); };
+}, []);
   useEffect(() => { fetchReputations(); }, []);
 
   useEffect(() => {
