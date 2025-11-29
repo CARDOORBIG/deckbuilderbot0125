@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { googleLogout } from '@react-oauth/google';
 import { db } from './firebase';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import FleaMarket from './FleaMarket';
 
 // --- Local Modals ---
 import AdminDashboardModal from './AdminDashboardModal';
@@ -162,7 +163,7 @@ const ManageBiddersModal = ({ isOpen, onClose, auction, userProfile }) => {
     );
 };
 
-// === Auction Room Modal (Live Chat & Card - Updated with Slider V2 & Stats Fix & FIRE BUTTON) ===
+// === Auction Room Modal (Live Chat & Card - Fix Image Index & Hide Timer for Market) ===
 const AuctionRoomModal = ({ isOpen, onClose, auction, userProfile, onBid, onBuyNow }) => {
     const [messages, setMessages] = useState([]);
     const [newMessage, setNewMessage] = useState("");
@@ -181,47 +182,45 @@ const AuctionRoomModal = ({ isOpen, onClose, auction, userProfile, onBid, onBuyN
 
     const chatEndRef = useRef(null);
     const [sellerAvatar, setSellerAvatar] = useState(null);
-    const [sellerStats, setSellerStats] = useState(null); // เก็บยศผู้ขาย
+    const [sellerStats, setSellerStats] = useState(null); 
     const [toastMessage, setToastMessage] = useState(null);
 
-    // รวมรูปภาพ
+    // 🟢 1. แก้ไข Logic รวมรูปภาพ (แก้ปัญหารูปไปอยู่หน้า 2)
     const allImages = useMemo(() => {
         if (!auction) return [];
-        const mainImage = getCardImageUrl(auction.card_image_path, auction.card_id);
-        let proofImages = [];
+        let images = [];
+        
+        // ถ้าไม่ใช่สินค้า Custom ให้เอารูปการ์ดหลักมาใส่เป็นรูปแรก
+        if (auction.card_image_path !== 'CUSTOM_ITEM') {
+             images.push(getCardImageUrl(auction.card_image_path, auction.card_id));
+        }
+
+        // เพิ่มรูปที่อัปโหลด (Proof Images) ต่อท้าย
         try {
             if (auction.proof_image?.trim().startsWith('[')) {
-                proofImages = JSON.parse(auction.proof_image); 
+                images.push(...JSON.parse(auction.proof_image));
             } else if (auction.proof_image) {
-                proofImages = [auction.proof_image];
+                images.push(auction.proof_image);
             }
-        } catch { proofImages = []; }
-        return [mainImage, ...proofImages].filter(Boolean);
+        } catch { }
+        
+        return images.filter(Boolean);
     }, [auction]);
 
-    // 🟢 ดึงข้อมูลผู้ขาย (Avatar + Stats Fix)
+    // ดึงข้อมูลผู้ขาย
     useEffect(() => {
         if (isOpen && auction?.seller_email) {
             const fetchData = async () => {
-                // 1. Firebase Profile (Avatar)
                 try {
                     const docSnap = await getDoc(doc(db, "users", auction.seller_email));
                     if (docSnap.exists()) setSellerAvatar(docSnap.data().avatarUrl);
                 } catch (e) { console.error("Err fetching avatar", e); }
 
-                // 2. Supabase Stats (Rank)
                 try {
-                    const { data, error } = await supabase.from('user_stats').select('*').eq('user_email', auction.seller_email).maybeSingle();
-                    
-                    if (data) {
-                        setSellerStats(data);
-                    } else {
-                        // ถ้าไม่เจอข้อมูล (คนขายหน้าใหม่) ให้เซ็ตค่าเริ่มต้นเป็น 0 เพื่อให้โชว์ยศ "หน้าใหม่"
-                        setSellerStats({ total_score: 0, penalty_level: 0 });
-                    }
-                } catch (e) { 
-                    console.error("Err fetching stats", e); 
-                }
+                    const { data } = await supabase.from('user_stats').select('*').eq('user_email', auction.seller_email).maybeSingle();
+                    if (data) setSellerStats(data);
+                    else setSellerStats({ total_score: 0, penalty_level: 0 });
+                } catch (e) { console.error("Err fetching stats", e); }
             };
             fetchData();
         }
@@ -240,7 +239,7 @@ const AuctionRoomModal = ({ isOpen, onClose, auction, userProfile, onBid, onBuyN
         }
     }, [isOpen, auction]);
 
-    // Keyboard Navigation Logic
+    // Keyboard Navigation
     useEffect(() => {
         if (!isOpen || allImages.length <= 1) return;
         const handleKeyDown = (e) => {
@@ -269,7 +268,6 @@ const AuctionRoomModal = ({ isOpen, onClose, auction, userProfile, onBid, onBuyN
         setTimeout(() => setToastMessage(null), 3000);
     };
 
-    // Gallery Navigation Logic
     const goToSlide = (index) => {
         if (index < 0) index = 0;
         if (index >= allImages.length) index = allImages.length - 1;
@@ -292,13 +290,9 @@ const AuctionRoomModal = ({ isOpen, onClose, auction, userProfile, onBid, onBuyN
 
     const onTouchEnd = () => {
         setIsSwiping(false);
-        if (touchMove < -minSwipeDistance) {
-            handleNext(); 
-        } else if (touchMove > minSwipeDistance) {
-            handlePrev(); 
-        } else {
-            setTouchMove(0); 
-        }
+        if (touchMove < -minSwipeDistance) { handleNext(); } 
+        else if (touchMove > minSwipeDistance) { handlePrev(); } 
+        else { setTouchMove(0); }
     };
 
     const getTrackStyle = () => {
@@ -320,7 +314,6 @@ const AuctionRoomModal = ({ isOpen, onClose, auction, userProfile, onBid, onBuyN
 
     return createPortal(
         <div className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center z-[700] p-0 md:p-4" onClick={onClose}>
-            
             {toastMessage && (
                 <div className="absolute top-10 left-1/2 transform -translate-x-1/2 z-[800] bg-black/80 text-white px-6 py-3 rounded-full shadow-2xl border border-emerald-500 animate-fade-in-up flex items-center gap-2">
                     <span className="text-xl">✅</span> {toastMessage}
@@ -329,7 +322,7 @@ const AuctionRoomModal = ({ isOpen, onClose, auction, userProfile, onBid, onBuyN
 
             <div className="bg-white dark:bg-slate-900 border-0 md:border border-slate-200 dark:border-emerald-500/30 rounded-none md:rounded-xl shadow-2xl w-full h-full md:h-[90vh] max-w-6xl flex flex-col md:flex-row overflow-hidden" onClick={e => e.stopPropagation()}>
                 
-                {/* 🖼️ ส่วนซ้าย: รูปภาพ (Slider V2) */}
+                {/* 🖼️ ส่วนซ้าย: รูปภาพ */}
                 <div className="w-full md:w-2/3 h-[50vh] md:h-full flex flex-col bg-slate-100 dark:bg-slate-950 relative group">
                     <button onClick={onClose} className="absolute top-4 left-4 z-20 bg-black/50 text-white p-2 rounded-full md:hidden hover:bg-red-500 transition-colors"><ChevronLeftIcon /></button>
                     
@@ -348,10 +341,14 @@ const AuctionRoomModal = ({ isOpen, onClose, auction, userProfile, onBid, onBuyN
                             </>
                         )}
                         <div className="absolute bottom-4 right-4 bg-black/50 text-white p-1.5 rounded-full pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity"><ExpandIcon /></div>
+                        
                         <div className="absolute top-4 right-4 z-10 flex items-center gap-2">
                             {allImages.length > 1 && (<div className="bg-black/60 text-white text-xs px-2 py-1 rounded-full backdrop-blur-md font-mono border border-white/10">{activeProofIndex + 1} / {allImages.length}</div>)}
-                            <TimeLeft endTime={auction.end_time} />
+                            
+                            {/* 🟢 2. แก้ไข: ซ่อนเวลานับถอยหลัง ถ้าเป็นสินค้าตลาดนัด (ดูจาก min_bid_increment) */}
+                            {(auction.min_bid_increment > 0) && <TimeLeft endTime={auction.end_time} />}
                         </div>
+
                         {auction.description && (
                             <div className="absolute bottom-4 left-4 z-20">
                                 <button onClick={(e) => { e.stopPropagation(); setShowDesc(true); }} className="bg-black/60 hover:bg-black/80 text-white px-3 py-1.5 rounded-full text-xs backdrop-blur-md flex items-center gap-1 transition-all border border-white/20">
@@ -405,20 +402,16 @@ const AuctionRoomModal = ({ isOpen, onClose, auction, userProfile, onBid, onBuyN
                     )}
                 </div>
 
-                {/* 🟢 ส่วนขวา: Chat & Action Bar (เพิ่มข้อมูลผู้ขาย) */}
+                {/* ส่วนขวา: Chat & Action Bar */}
                 <div className="w-full md:w-1/3 h-[50vh] md:h-full flex flex-col border-l border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 min-h-0">
                     <div className="p-3 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 flex justify-between items-center shrink-0">
                         <h3 className="font-bold text-slate-700 dark:text-slate-200 flex items-center gap-2"><ChatBubbleIcon /> Live Chat</h3>
                         <button onClick={onClose} className="hidden md:block text-slate-400 hover:text-red-500"><CloseIcon /></button>
                     </div>
                     
-                    {/* 🟢 ส่วนแสดงข้อมูลผู้ขาย (Seller Info) */}
                     <div className="p-3 bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800">
                          <div className="flex items-start gap-3">
-                            <img 
-                                src={sellerAvatar || `https://ui-avatars.com/api/?name=${auction.seller_name}&background=random`} 
-                                className="w-10 h-10 rounded-full border-2 border-slate-200 dark:border-slate-700 object-cover"
-                            />
+                            <img src={sellerAvatar || `https://ui-avatars.com/api/?name=${auction.seller_name}&background=random`} className="w-10 h-10 rounded-full border-2 border-slate-200 dark:border-slate-700 object-cover"/>
                             <div className="flex-grow min-w-0">
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-1.5 flex-wrap">
@@ -426,19 +419,14 @@ const AuctionRoomModal = ({ isOpen, onClose, auction, userProfile, onBid, onBuyN
                                         {sellerStats && <RatingBadge score={sellerStats.total_score} />}
                                     </div>
                                     {userProfile && userProfile.email !== auction.seller_email && (
-                                        <button onClick={handleAddFriend} className="text-[10px] px-2 py-0.5 bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-300 rounded-full font-bold border border-blue-100 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors flex items-center gap-1">
-                                            <UserPlusIcon /> เพิ่มเพื่อน
-                                        </button>
+                                        <button onClick={handleAddFriend} className="text-[10px] px-2 py-0.5 bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-300 rounded-full font-bold border border-blue-100 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors flex items-center gap-1"><UserPlusIcon /> เพิ่มเพื่อน</button>
                                     )}
                                 </div>
-                                <p className="text-[10px] text-slate-400 mt-0.5">
-                                    ลงขายเมื่อ: {new Date(auction.created_at).toLocaleString('th-TH', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
-                                </p>
+                                <p className="text-[10px] text-slate-400 mt-0.5">ลงขายเมื่อ: {new Date(auction.created_at).toLocaleString('th-TH', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</p>
                             </div>
                          </div>
                     </div>
 
-                    {/* Chat Content */}
                     <div className="flex-grow overflow-y-auto p-4 space-y-3 scrollbar-thin scrollbar-thumb-slate-300 dark:scrollbar-thumb-slate-700 min-h-0">
                         {messages.length === 0 ? (<div className="flex flex-col items-center justify-center h-full text-slate-400 text-sm gap-2"><span className="text-4xl opacity-20">💬</span><p>เริ่มการสนทนาได้เลย...</p></div>) : messages.map((msg) => (
                             <div key={msg.id} className={`flex gap-2 ${msg.user_email === userProfile?.email ? 'flex-row-reverse' : ''}`}>
@@ -448,35 +436,27 @@ const AuctionRoomModal = ({ isOpen, onClose, auction, userProfile, onBid, onBuyN
                         ))}
                         <div ref={chatEndRef} />
                     </div>
-                    {/* Action Bar */}
                     <div className="p-3 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-emerald-500/20">
                          <div className="flex items-center justify-between mb-3">
-                            <div>
-                                <span className="text-[10px] text-slate-500 uppercase">Current Bid</span>
-                                <div className="text-xl font-black text-slate-900 dark:text-white">฿{auction.current_price.toLocaleString()}</div>
-                            </div>
+                            <div><span className="text-[10px] text-slate-500 uppercase">Current Bid</span><div className="text-xl font-black text-slate-900 dark:text-white">฿{auction.current_price.toLocaleString()}</div></div>
                             {userProfile?.email !== auction.seller_email && !isEnded && (
                                 <div className="flex gap-2">
                                     {auction.buy_now_price > 0 && <button onClick={() => onBuyNow(auction)} className="px-3 py-1.5 bg-pink-100 text-pink-700 rounded-lg text-xs font-bold">Buy ฿{auction.buy_now_price}</button>}
-                                    {/* 🟢 ปุ่ม Bid ไฟลุก (btn-fire) */}
-                                    <button 
-                                        onClick={() => onBid(auction)} 
-                                        className="px-4 py-1.5 btn-fire text-white rounded-lg text-xs font-bold shadow-lg transition-all"
-                                    >
-                                        Bid
-                                    </button>
+                                    
+                                    {/* 🟢 3. ซ่อนปุ่ม Bid ถ้าเป็นสินค้าตลาดนัด */}
+                                    {(auction.min_bid_increment > 0) && (
+                                        <button 
+                                            onClick={() => onBid(auction)} 
+                                            className="px-4 py-1.5 btn-fire text-white rounded-lg text-xs font-bold shadow-lg transition-all"
+                                        >
+                                            Bid +{auction.min_bid_increment.toLocaleString()} B
+                                        </button>
+                                    )}
                                 </div>
                             )}
                          </div>
                          <form onSubmit={handleSendMessage} className="flex gap-2">
-                            <input 
-                                type="text" 
-                                value={newMessage} 
-                                onChange={e => setNewMessage(e.target.value)} 
-                                placeholder={userProfile ? "พิมพ์ข้อความ..." : "กรุณา Login"} 
-                                disabled={!userProfile} 
-                                className="flex-grow bg-slate-100 dark:bg-slate-800 border-none rounded-full px-4 py-2 text-sm text-black dark:text-white outline-none focus:ring-1 focus:ring-emerald-500" 
-                            />
+                            <input type="text" value={newMessage} onChange={e => setNewMessage(e.target.value)} placeholder={userProfile ? "พิมพ์ข้อความ..." : "กรุณา Login"} disabled={!userProfile} className="flex-grow bg-slate-100 dark:bg-slate-800 border-none rounded-full px-4 py-2 text-sm text-black dark:text-white outline-none focus:ring-1 focus:ring-emerald-500" />
                             <button type="submit" disabled={!newMessage.trim() || !userProfile} className="p-2 bg-emerald-600 text-white rounded-full hover:bg-emerald-500 transition-colors"><SendIcon /></button>
                         </form>
                     </div>
@@ -646,53 +626,37 @@ const CompletedAuctionsModal = ({ isOpen, onClose, userProfile }) => {
         }
     }, [isOpen]);
 
-    const handleDeleteHistory = async (item) => { // รับทั้ง object item แทนที่จะรับแค่ id
+    const handleDeleteHistory = async (item) => { 
         if(!confirm("⚠️ ยืนยันลบประวัติรายการนี้ถาวร? (รูปภาพจะถูกลบด้วย)")) return;
         
-        // 1. ลบรูปภาพออกจาก Storage ก่อน (ถ้ามี)
+        // 1. ลบรูปภาพออกจาก Storage
         if (item.proof_image) {
             try {
                 let imagesToDelete = [];
-                // แปลงข้อมูลกลับเป็น Array
                 if (item.proof_image.startsWith('[')) {
                     const urls = JSON.parse(item.proof_image);
-                    // ดึง Path ออกจาก URL (ตัด domain ทิ้ง)
-                    // ตัวอย่าง URL: .../storage/v1/object/public/auction-images/email/file.jpg
-                    // สิ่งที่ต้องใช้ลบ: email/file.jpg
-                    imagesToDelete = urls.map(url => {
-                        const parts = url.split('/auction-images/');
-                        return parts[1] ? decodeURIComponent(parts[1]) : null;
-                    }).filter(Boolean);
+                    imagesToDelete = urls.map(url => { const parts = url.split('/auction-images/'); return parts[1] ? decodeURIComponent(parts[1]) : null; }).filter(Boolean);
                 } else {
-                    // รองรับข้อมูลเก่าที่เป็น string เดียว
                     const parts = item.proof_image.split('/auction-images/');
                     if (parts[1]) imagesToDelete.push(decodeURIComponent(parts[1]));
                 }
-
-                if (imagesToDelete.length > 0) {
-                    const { error: storageError } = await supabase.storage
-                        .from('auction-images')
-                        .remove(imagesToDelete);
-                    
-                    if (storageError) console.error("Error deleting images:", storageError);
-                    else console.log("Deleted images:", imagesToDelete);
-                }
-            } catch (e) {
-                console.error("Error parsing proof_image:", e);
-            }
+                if (imagesToDelete.length > 0) { await supabase.storage.from('auction-images').remove(imagesToDelete); }
+            } catch (e) { console.error("Error parsing proof_image:", e); }
         }
 
-        // 2. ลบข้อมูลใน Database (ตามปกติ)
-        const { error } = await supabase.rpc('admin_force_delete', { 
-            p_admin_email: userProfile?.email, 
-            p_target_input: item.id, 
-            p_action_type: 'delete_auction' 
-        });
-
-        if(error) alert("Error: " + error.message);
-        else {
-            setItems(prev => prev.filter(i => i.id !== item.id));
+        // 2. ลบข้อมูล (ถ้าเป็น Admin ใช้ RPC, ถ้าเป็นเจ้าของใช้ delete ปกติ)
+        let error;
+        if (userProfile?.email === 'koritros619@gmail.com') {
+             const { error: rpcError } = await supabase.rpc('admin_force_delete', { p_admin_email: userProfile?.email, p_target_input: item.id, p_action_type: 'delete_auction' });
+             error = rpcError;
+        } else {
+             // เจ้าของลบเอง
+             const { error: deleteError } = await supabase.from('auctions').delete().eq('id', item.id);
+             error = deleteError;
         }
+
+        if(error) alert("Error: " + error.message); 
+        else { setItems(prev => prev.filter(i => i.id !== item.id)); }
     };
 
     if (!isOpen) return null;
@@ -726,18 +690,14 @@ const CompletedAuctionsModal = ({ isOpen, onClose, userProfile }) => {
                                 >
                                     {/* Image Section */}
                                     <div className="aspect-[5/7] bg-slate-200 dark:bg-slate-700/50 p-3 relative flex items-center justify-center">
-                                        <img 
-                                            src={getCardImageUrl(item.card_image_path, item.card_id)} 
-                                            className="w-full h-full object-contain drop-shadow-md" 
-                                            onError={(e) => { if (!e.currentTarget.src.endsWith('.jpg')) e.currentTarget.src = e.currentTarget.src.replace('.png', '.jpg'); }} 
-                                        />
+                                        <img src={getAuctionThumbnail(item)} className="w-full h-full object-contain drop-shadow-md" onError={(e) => { if (!e.currentTarget.src.endsWith('.jpg')) e.currentTarget.src = e.currentTarget.src.replace('.png', '.jpg'); }} />
                                         
-                                        {/* Admin Delete Button */}
-                                        {userProfile?.email === 'koritros619@gmail.com' && (
+                                        {/* 🟢 ส่วนที่แก้ไข: ปุ่มลบ (แสดงให้ Admin หรือ เจ้าของเห็น) */}
+                                        {(userProfile?.email === 'koritros619@gmail.com' || userProfile?.email === item.seller_email) && (
                                             <button 
-                                                onClick={(e) => { e.stopPropagation(); handleDeleteHistory(item); }}
-                                                className="absolute top-2 right-2 p-1.5 bg-red-600 text-white rounded-full shadow-md opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-700 z-10 scale-90"
-                                                title="Admin Delete"
+                                                onClick={(e) => { e.stopPropagation(); handleDeleteHistory(item); }} 
+                                                className="absolute top-2 right-2 p-1.5 bg-red-600 text-white rounded-full shadow-md opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-700 z-10 scale-90" 
+                                                title="Delete"
                                             >
                                                 <TrashIcon />
                                             </button>
@@ -945,10 +905,29 @@ export default function AuctionMarket() {
     if (error) alert("Error: " + error.message); else if (!data.success) alert(data.message); else { alert(data.message); fetchAuctions(); fetchMyAuctions(); }
   }
 
-  async function handleDeleteMyAuction(auctionId) {
-    if (!confirm("⚠️ ยืนยันการลบรายการนี้?")) return;
-    const { error } = await supabase.from('auctions').delete().eq('id', auctionId);
-    if (error) alert("ลบไม่ได้: " + error.message); else setMyAuctions(prev => prev.filter(item => item.id !== auctionId));
+  // 🟢 ฟังก์ชันใหม่สำหรับลบรายการของตัวเอง
+  async function handleDeleteMyAuction(item) {
+    if (!confirm("⚠️ ยืนยันการลบประวัติรายการนี้ถาวร? (รูปภาพจะถูกลบด้วย)")) return;
+    
+    // 1. ลบรูปภาพ
+    if (item.proof_image) {
+        try {
+            let imagesToDelete = [];
+            if (item.proof_image.startsWith('[')) {
+                const urls = JSON.parse(item.proof_image);
+                imagesToDelete = urls.map(url => { const parts = url.split('/auction-images/'); return parts[1] ? decodeURIComponent(parts[1]) : null; }).filter(Boolean);
+            } else {
+                const parts = item.proof_image.split('/auction-images/');
+                if (parts[1]) imagesToDelete.push(decodeURIComponent(parts[1]));
+            }
+            if (imagesToDelete.length > 0) { await supabase.storage.from('auction-images').remove(imagesToDelete); }
+        } catch (e) { console.error("Error parsing proof_image:", e); }
+    }
+
+    // 2. ลบข้อมูล
+    const { error } = await supabase.from('auctions').delete().eq('id', item.id);
+    if (error) alert("ลบไม่ได้: " + error.message); 
+    else setMyAuctions(prev => prev.filter(i => i.id !== item.id));
   }
 
   const handleLogout = () => { googleLogout(); localStorage.removeItem("bot-userProfile-v1"); setUserProfile(null); navigate('/'); };
@@ -1152,6 +1131,18 @@ export default function AuctionMarket() {
                                         <button onClick={() => setManageAuction(item)} className="w-full py-1.5 bg-slate-100 dark:bg-slate-800 text-slate-600 border border-slate-300 rounded-lg text-xs font-bold hover:bg-slate-200 transition-colors flex items-center justify-center gap-1"><ShieldCheckIcon /> จัดการ</button>
                                     </div>
                                 )}
+
+                                {/* 🟢 ส่วนที่เพิ่มใหม่: ปุ่มลบประวัติ (แสดงเมื่อจบหรือยกเลิกแล้ว) */}
+                                {item.status !== 'active' && (
+                                    <div className="mt-2" onClick={e => e.stopPropagation()}>
+                                        <button 
+                                            onClick={() => handleDeleteMyAuction(item)} 
+                                            className="w-full py-1.5 bg-red-100 text-red-600 border border-red-200 rounded-lg text-xs font-bold hover:bg-red-200 flex items-center justify-center gap-1"
+                                        >
+                                            <TrashIcon /> ลบประวัติ
+                                        </button>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     ))}
@@ -1160,8 +1151,12 @@ export default function AuctionMarket() {
         )}
 
         {activeTab === 'market' && (
-            <div className="text-center py-20 w-full"><ShoppingBagIcon width="48" height="48" className="inline-block text-emerald-500 mb-4" /><h2 className="text-2xl font-bold">ตลาดซื้อขาย (Coming Soon)</h2></div>
+            <FleaMarket 
+                userProfile={displayUser} 
+                onChat={(item) => setChatAuction(item)} 
+            />
         )}
+
       </main>
 
       {/* Modals & Drawers */}

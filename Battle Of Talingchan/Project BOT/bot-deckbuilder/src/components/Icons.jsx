@@ -27,6 +27,10 @@ export const CloseIcon = () => <Svg p={<><line x1="18" y1="6" x2="6" y2="18"></l
 export const MoreVertIcon = () => <Svg p={<><circle cx="12" cy="5" r="1" /><circle cx="12" cy="12" r="1" /><circle cx="12" cy="19" r="1" /></>} />;
 export const FilterIcon = () => <Svg p={<polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>} />;
 export const HomeIcon = () => <Svg p={<><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></>} />;
+// 🟢 เพิ่ม SearchIcon
+export const SearchIcon = () => <Svg p={<><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></>} />;
+// 🟢 เพิ่ม PlusIcon (เผื่อใช้)
+export const PlusIcon = () => <Svg p={<><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></>} />;
 
 // --- Action Icons ---
 export const TrashIcon = () => <Svg p={<><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></>} />;
@@ -49,25 +53,7 @@ export const UserPlusIcon = () => (
   </svg>
 );
 
-// 🟢 [เพิ่มใหม่] ไอคอนขยายรูป (Expand) - แก้ไข Syntax Error แล้ว
-export const ExpandIcon = () => (
-  <svg 
-    xmlns="http://www.w3.org/2000/svg" 
-    width="20" 
-    height="20" 
-    viewBox="0 0 24 24" 
-    fill="none" 
-    stroke="currentColor" 
-    strokeWidth="2" 
-    strokeLinecap="round" 
-    strokeLinejoin="round"
-  >
-    <polyline points="15 3 21 3 21 9"></polyline>
-    <polyline points="9 21 3 21 3 15"></polyline>
-    <line x1="21" y1="3" x2="14" y2="10"></line>
-    <line x1="3" y1="21" x2="10" y2="14"></line>
-  </svg>
-);
+export const ExpandIcon = () => <Svg p={<><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" y1="3" x2="14" y2="10"></line><line x1="3" y1="21" x2="10" y2="14"></line></>} />;
 
 // --- App Specific ---
 export const GavelIcon = ({ className }) => <Svg className={className} p={<><path d="m14 13-7.5 7.5c-.83.83-2.17.83-3 0 0 0 0 0 0 0a2.12 2.12 0 0 1 0-3L11 10"/><path d="m16 16 6-6"/><path d="m8 8 6-6"/><path d="m9 7 8-8"/><path d="m21 11-8-8"/></>} />;
