@@ -16,6 +16,7 @@ import {
 } from 'firebase/firestore';
 import { supabase } from './supabaseClient';
 import ChatWidget from './ChatWidget'; // 🟢 เพิ่มบรรทัดนี้
+import Header from './components/Header'; // 🟢 เพิ่มบรรทัดนี้
 
 // Import Components
 import CreateAuctionModal from './CreateAuctionModal';
@@ -838,31 +839,15 @@ export default function App() {
             </div>
           ) : (
             <>
-              <header className="px-3 md:px-6 py-2 border-b border-slate-300 dark:border-emerald-700/30 bg-white/60 dark:bg-black/60 backdrop-blur-sm shrink-0 z-40">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5 md:gap-3 overflow-hidden">
-                    <button onClick={() => setIsSettingsOpen(true)} className="p-1.5 md:p-2 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-full text-slate-800 dark:text-white transition-colors shrink-0">
-                      <MenuIcon />
-                    </button>
-                    <h1 className="text-lg sm:text-xl md:text-3xl font-extrabold tracking-tight bg-gradient-to-r from-amber-500 to-emerald-600 dark:from-amber-300 dark:to-emerald-400 bg-clip-text text-transparent truncate">Battle Of Talingchan</h1>
-                  </div>
-                  <div className="flex items-center gap-1.5 md:gap-3 shrink-0">
-                    <Link to="/auction">
-                      <Button className="!px-2 md:!px-4 bg-gradient-to-r from-rose-500 to-orange-600 text-white border-none shadow-md hover:shadow-lg hover:from-rose-400 hover:to-orange-500">
-                        <StoreIcon /> <span className="hidden md:inline ml-1">Market</span>
-                      </Button>
-                    </Link>
-                    <Link to="/public-decks">
-                      <Button as="span" className="!px-2 md:!px-4 bg-gradient-to-r from-blue-500 to-purple-600 text-white border-none shadow-lg hover:from-blue-400 hover:to-purple-500">
-                        <UsersIcon /> <span className="hidden md:inline">Public</span>
-                      </Button>
-                    </Link>
-                    <NotificationCenter userEmail={userProfile?.email} />
-                    <img src={displayUser.picture} alt={displayUser.name} className="w-8 h-8 md:w-9 md:h-9 rounded-full border-2 border-emerald-500 object-cover ml-1 cursor-pointer hover:scale-105 transition-transform" title={`Logged in as ${displayUser.name}`} onClick={() => setIsSettingsOpen(true)} />
-                    <span className="text-slate-900 dark:text-white hidden lg:block text-sm font-semibold max-w-[100px] truncate">{displayUser.name}</span>
-                  </div>
-                </div>
-              </header>
+      {/* 🟢 ใช้งาน Component Header ใหม่ ตรงนี้ */}
+      <Header 
+        userProfile={userProfile}
+        displayUser={displayUser}
+        userReputation={userReputation[userProfile?.email]} // ส่งเฉพาะของ User นี้
+        setIsSettingsOpen={setIsSettingsOpen}
+        setIsAdminOpen={setIsAdminOpen}
+      />
+      
               <main className="flex-1 flex flex-col md:flex-row overflow-hidden">
                 <div className={`fixed inset-0 bg-black/60 backdrop-blur-sm z-[80] transition-opacity duration-300 ease-in-out ${isSidebarOpen ? "opacity-100" : "opacity-0 pointer-events-none"} md:hidden`} onClick={() => isSidebarOpen && toggleSidebar()} />
                 <div className={`fixed top-0 left-0 h-full z-[150] w-[300px] bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-r border-slate-300 dark:border-emerald-500/30 shadow-2xl transition-transform duration-300 ease-in-out ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"} md:relative md:translate-x-0 md:z-0 md:shadow-none md:bg-transparent md:backdrop-blur-none transition-[width,opacity] ${isSidebarOpen ? "md:w-[360px] opacity-100" : "md:w-0 opacity-0 md:overflow-hidden"}`}>

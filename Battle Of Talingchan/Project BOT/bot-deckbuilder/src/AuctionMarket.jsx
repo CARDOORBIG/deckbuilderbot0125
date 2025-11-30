@@ -1053,7 +1053,10 @@ export default function AuctionMarket() {
             </button>
             <button onClick={() => setActiveTab('my-auctions')} className={`flex-1 md:flex-none flex items-center justify-center gap-1 md:gap-2 px-2 md:px-6 py-2 rounded-full font-bold text-xs md:text-sm transition-all whitespace-nowrap ${activeTab === 'my-auctions' ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-md' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}>
                 <PackageIcon /> <span className="hidden sm:inline">สินค้าที่ลงประมูล</span><span className="inline sm:hidden">รายการที่เคยประมูล</span>
-            </button>      
+            </button>
+            <button onClick={() => setActiveTab('to-receive')} className={`flex-1 md:flex-none flex items-center justify-center gap-1 md:gap-2 px-3 md:px-6 py-2 rounded-full font-bold text-xs md:text-sm transition-all whitespace-nowrap ${activeTab === 'to-receive' ? 'bg-white dark:bg-slate-700 text-purple-600 dark:text-purple-400 shadow-md' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}>
+                <ShieldCheckIcon />สินค้าที่ต้องได้รับ
+            </button> 
         </div>
       </div>
 
@@ -1124,20 +1127,23 @@ export default function AuctionMarket() {
         )}
 
         {activeTab === 'my-auctions' && (
-            <div className="animate-fade-in w-full px-4">
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-3 gap-4 w-full">
-                    {myAuctions.map(item => (
-                        <div key={item.id} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-lg overflow-hidden flex flex-col cursor-pointer" onClick={() => setChatAuction(item)}>
-                            <div className="aspect-[5/7] bg-slate-200 dark:bg-slate-800 relative">
-                                <img src={getAuctionThumbnail(item)} className="w-full h-full object-contain p-2" onError={(e) => { if (!e.currentTarget.src.endsWith('.jpg')) e.currentTarget.src = e.currentTarget.src.replace('.png', '.jpg'); }} />
+            <div className="animate-fade-in w-full md:px-8">
+                {/* 🟢 ปรับ Grid: มือถือ 2 ช่อง, PC ใหญ่สุด 5 ช่อง */}
+                <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 md:gap-6">
+                    {/* กรองเฉพาะรายการที่ user เป็นคนขาย */}
+                    {myAuctions.filter(i => i.seller_email === userProfile?.email).map(item => (
+                        <div key={item.id} className="bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-emerald-500/20 rounded-2xl shadow-md hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group cursor-pointer relative overflow-hidden flex flex-col" onClick={() => setChatAuction(item)}>
+                            <div className="aspect-[4/5] bg-slate-100 dark:bg-slate-800/50 relative p-1 md:p-6 flex items-center justify-center overflow-hidden">
+                                <img src={getAuctionThumbnail(item)} className="w-full h-full object-cover drop-shadow-2xl" onError={(e) => { if (!e.currentTarget.src.endsWith('.jpg')) e.currentTarget.src = e.currentTarget.src.replace('.png', '.jpg'); }} />
                                 <div className="absolute top-2 right-2 bg-slate-600/90 text-white text-[10px] px-2 py-1 rounded-full font-bold border border-slate-500">
                                     {item.status === 'cancelled' ? 'ยกเลิกแล้ว' : (new Date(item.end_time) < new Date() ? 'จบแล้ว' : 'กำลังประมูล')}
                                 </div>
                             </div>
-                            <div className="p-3 flex-1 flex flex-col">
-                                <h3 className="font-bold text-sm truncate mb-1">{item.card_name}</h3>
-                                <div className="mt-auto bg-slate-50 dark:bg-slate-800/50 p-2 rounded border border-slate-100 dark:border-slate-700 text-center mb-2">
-                                    <p className="text-xl font-bold text-blue-600 dark:text-blue-400">฿{item.current_price.toLocaleString()}</p>
+                            <div className="p-3 flex-1 flex flex-col gap-1">
+                                <h3 className="font-black text-sm md:text-base text-slate-900 dark:text-white text-center mb-1 line-clamp-1">{item.card_name}</h3>
+                                <div className="mt-auto bg-slate-50 dark:bg-slate-800/50 p-2 rounded-xl border border-slate-200 dark:border-slate-700 text-center">
+                                    <p className="text-[9px] text-slate-400 uppercase font-bold tracking-wider mb-0.5">Current Bid</p>
+                                    <span className="text-2xl md:text-3xl font-black text-slate-900 dark:text-white">฿{item.current_price.toLocaleString()}</span>
                                 </div>
                                 {item.status === 'active' && (
                                     <div className="mt-2 space-y-2" onClick={e => e.stopPropagation()}>
@@ -1145,8 +1151,7 @@ export default function AuctionMarket() {
                                         <button onClick={() => setManageAuction(item)} className="w-full py-1.5 bg-slate-100 dark:bg-slate-800 text-slate-600 border border-slate-300 rounded-lg text-xs font-bold hover:bg-slate-200 transition-colors flex items-center justify-center gap-1"><ShieldCheckIcon /> จัดการ</button>
                                     </div>
                                 )}
-
-                                {/* 🟢 ส่วนที่เพิ่มใหม่: ปุ่มลบประวัติ (แสดงเมื่อจบหรือยกเลิกแล้ว) */}
+                                {/* ปุ่มลบประวัติ (สำหรับเจ้าของ) */}
                                 {item.status !== 'active' && (
                                     <div className="mt-2" onClick={e => e.stopPropagation()}>
                                         <button 
@@ -1169,6 +1174,54 @@ export default function AuctionMarket() {
                 userProfile={displayUser} 
                 onChat={(item) => setChatAuction(item)} 
             />
+        )}
+
+        {/* 🟢 ส่วนใหม่: สินค้าที่ต้องได้รับ (To Receive) */}
+        {activeTab === 'to-receive' && (
+            <div className="animate-fade-in w-full md:px-8">
+                {/* ใช้ Grid 5 คอลัมน์เหมือนหน้าหลัก */}
+                <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 md:gap-6">
+                    {/* กรองเฉพาะรายการที่ user ชนะและจบแล้ว */}
+                    {myAuctions.filter(i => i.winner_email === userProfile?.email && i.status !== 'active').map(item => (
+                        <div key={item.id} className="bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-emerald-500/20 rounded-2xl shadow-md hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group cursor-pointer relative overflow-hidden flex flex-col" onClick={() => setChatAuction(item)}>
+                            <div className="aspect-[4/5] bg-slate-100 dark:bg-slate-800/50 relative p-1 md:p-6 flex items-center justify-center overflow-hidden">
+                                <img src={getAuctionThumbnail(item)} className="w-full h-full object-cover drop-shadow-2xl" onError={(e) => { if (!e.currentTarget.src.endsWith('.jpg')) e.currentTarget.src = e.currentTarget.src.replace('.png', '.jpg'); }} />
+                                <div className="absolute top-2 right-2 bg-emerald-500 text-white text-[10px] px-2 py-1 rounded-full font-bold shadow-sm z-10">ชนะประมูล!</div>
+                            </div>
+                            <div className="p-3 flex-1 flex flex-col gap-1">
+                                <h3 className="font-black text-sm md:text-base text-slate-900 dark:text-white text-center mb-1 line-clamp-1">{item.card_name}</h3>
+                                <div className="mt-auto bg-emerald-50 dark:bg-emerald-900/20 p-2 rounded-xl border border-emerald-200 dark:border-emerald-800 text-center">
+                                    <p className="text-[9px] text-emerald-600 dark:text-emerald-400 uppercase font-bold tracking-wider mb-0.5">ราคาจบ</p>
+                                    <span className="text-2xl md:text-3xl font-black text-emerald-600 dark:text-emerald-400">฿{item.current_price.toLocaleString()}</span>
+                                </div>
+                                <div className="mt-2 space-y-2" onClick={e => e.stopPropagation()}>
+                                    {/* ปุ่มยืนยันรับของ */}
+                                    <button 
+                                        onClick={() => setConfirmTransaction({ auction: item })} 
+                                        className="w-full py-1.5 bg-blue-600 text-white rounded-lg text-xs font-bold hover:bg-blue-700 transition-colors flex items-center justify-center gap-1 shadow-md"
+                                    >
+                                        ✅ ยืนยันรับสินค้า
+                                    </button>
+                                    <div className="flex gap-2">
+                                        {/* ปุ่มแชท */}
+                                        <button onClick={() => setChatAuction(item)} className="flex-1 py-1.5 bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-lg text-xs font-bold hover:bg-slate-300 flex items-center justify-center gap-1"><ChatBubbleIcon/></button>
+                                        {/* ปุ่มลบประวัติ */}
+                                        <button onClick={() => handleDeleteMyAuction(item)} className="flex-1 py-1.5 bg-red-100 text-red-600 border border-red-200 rounded-lg text-xs font-bold hover:bg-red-200 flex items-center justify-center gap-1"><TrashIcon /></button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+                
+                {/* Empty State */}
+                {myAuctions.filter(i => i.winner_email === userProfile?.email && i.status !== 'active').length === 0 && (
+                    <div className="text-center py-20 text-slate-500">
+                        <p className="text-4xl mb-2"></p>
+                        <p>ยังไม่มีรายการที่ต้องได้รับ</p>
+                    </div>
+                )}
+            </div>
         )}
 
       </main>
