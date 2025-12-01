@@ -230,7 +230,8 @@ function DeckViewModal({ isOpen, onClose, deck, rules, onAddCard, onRemoveCard, 
   );
 }
 
-function DeckAnalysisModal({ isOpen, onClose, mainDeck, lifeDeck, showAlert, theme, showChart }) { 
+// ✅ แก้ไข DeckAnalysisModal: เพิ่มปุ่ม Save และ Share ใน Sidebar
+function DeckAnalysisModal({ isOpen, onClose, mainDeck, lifeDeck, showAlert, theme, showChart, onSave, onShare }) { 
     const analysis = useMemo(() => {
         if (!mainDeck || mainDeck.length === 0) return null;
         const typeOrder = { 'Avatar': 1, 'Magic': 2, 'Construction': 3 };
@@ -261,7 +262,9 @@ function DeckAnalysisModal({ isOpen, onClose, mainDeck, lifeDeck, showAlert, the
 
     const isDark = theme === 'dark';
     const radarOptions = { scales: { r: { angleLines: { color: isDark ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.2)' }, grid: { color: isDark ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.2)' }, pointLabels: { color: isDark ? 'rgb(209, 213, 219)' : 'rgb(30, 41, 59)', font: { size: 12 } }, ticks: { color: isDark ? 'rgb(156, 163, 175)' : 'rgb(100, 116, 139)', backdropColor: isDark ? 'rgba(0, 0, 0, 0.5)' : 'rgba(255, 255, 255, 0.75)', stepSize: 20, maxTicksLimit: 6 }, min: 0, max: 100 } }, plugins: { legend: { display: false }, tooltip: { enabled: true } }, maintainAspectRatio: false };
+    
     const handleCopyCode = () => { if (analysis?.deckCode) navigator.clipboard.writeText(analysis.deckCode).then(() => showAlert("Success!", `✅ คัดลอกรหัสเด็คลง Clipboard แล้ว!`)).catch(err => { console.error('Failed to copy code: ', err); showAlert("Error", "ไม่สามารถคัดลอกรหัสเด็คได้"); }); };
+    
     const renderCardSection = (title, cards) => {
         if (!cards || cards.length === 0) return null;
         const groupedCards = Object.values(cards.reduce((m, card) => { const key = card.id; if (!m[key]) m[key] = { card, count: 0 }; m[key].count++; return m; }, {})).sort((a, b) => a.card.name.localeCompare(b.card.name, 'th'));
@@ -295,6 +298,8 @@ function DeckAnalysisModal({ isOpen, onClose, mainDeck, lifeDeck, showAlert, the
                     <Button onClick={onClose}>Close</Button>
                 </header>
                 <div className="flex-grow overflow-hidden grid grid-cols-1 md:grid-cols-3 gap-6 p-4 md:p-6">
+                    
+                    {/* Sidebar (ซ้าย) */}
                     <div className="md:col-span-1 flex flex-col gap-6 overflow-y-auto pr-2">
                         <div>
                             <h3 className="text-xl font-semibold text-amber-600 dark:text-amber-300 border-b border-amber-500/20 pb-1 mb-3">สถิติเด็ค</h3>
@@ -311,8 +316,29 @@ function DeckAnalysisModal({ isOpen, onClose, mainDeck, lifeDeck, showAlert, the
                                 {analysis.cardTypes.map(([type, count]) => <li key={type} className="flex justify-between"><span>{type}</span><span className="text-slate-900 dark:text-white font-semibold">{count} ใบ</span></li>)}
                             </ul>
                         </div>
-                        <div><h3 className="text-xl font-semibold text-amber-600 dark:text-amber-300 border-b border-amber-500/20 pb-1 mb-3">รหัส Export</h3><Button onClick={handleCopyCode} className="w-full"><CopyIcon /> คัดลอกรหัสเด็ค</Button></div>
+                        
+                        {/* 🟢 ส่วนจัดการเด็ค (เพิ่มปุ่ม Save / Share) */}
+                        <div>
+                            <h3 className="text-xl font-semibold text-amber-600 dark:text-amber-300 border-b border-amber-500/20 pb-1 mb-3">จัดการเด็ค</h3>
+                            <div className="flex flex-col gap-3">
+                                <Button onClick={handleCopyCode} className="w-full">
+                                    <CopyIcon /> คัดลอกรหัสเด็ค
+                                </Button>
+                                <div className="grid grid-cols-2 gap-2">
+                                    {/* ✅✅✅ ปุ่ม Save ต้องเรียก onSave ✅✅✅ */}
+                                    <Button onClick={onSave} className="bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800 hover:bg-blue-200">
+                                        <DeckIcon /> บันทึก
+                                    </Button>
+
+                                    <Button onClick={onShare} className="bg-purple-100 text-purple-700 border-purple-200 dark:bg-purple-900/30 dark:text-purple-300 dark:border-purple-800 hover:bg-purple-200">
+                                        <UploadIcon /> แชร์
+                                    </Button>
+                        </div>
+                            </div>
+                        </div>
                     </div>
+
+                    {/* Cards List (ขวา) */}
                     <div className="md:col-span-2 overflow-y-auto pr-2 md:border-l border-slate-300 dark:border-emerald-500/20 md:pl-6">
                         <h3 className="text-xl font-semibold text-amber-600 dark:text-amber-300 border-b border-amber-500/20 pb-1 mb-4">การ์ดในเด็ค ({mainDeck.length} ใบ)</h3>
                         {analysis.only1Card && <div className="mb-6 flex flex-col items-center"><h4 className="text-lg font-semibold text-emerald-600 dark:text-emerald-300 mb-3">Only #1</h4><div className="relative w-36 mx-auto"><img src={`/cards/${encodePath(analysis.only1Card.imagePath)}/${encodeURIComponent(analysis.only1Card.id.replace(' - Only#1', ''))}.png`} alt={analysis.only1Card.name} className="w-full rounded-md shadow" onError={(e) => { e.currentTarget.src = e.currentTarget.src.replace('.png', '.jpg'); }} /></div></div>}
@@ -374,7 +400,7 @@ function DeckListModal({ isOpen, onClose, userProfile, userDecks, setUserDecks, 
   };
 
   return createPortal(
-    <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-[220] p-4">
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-[900] p-4">
       <div className="bg-slate-100 dark:bg-slate-900/90 border border-slate-300 dark:border-emerald-500/30 rounded-xl shadow-2xl w-full max-w-4xl max-h-[85vh] flex flex-col">
         <header className="flex items-center justify-between p-4 border-b border-slate-300 dark:border-emerald-500/20 shrink-0"><h2 className="text-2xl font-bold text-slate-900 dark:text-white">My Decks</h2><Button onClick={onClose} className="px-3 py-1 text-sm">Close</Button></header>
         <div className="flex-grow overflow-y-auto p-4"><p className="text-sm text-slate-600 dark:text-gray-400 mb-4">Account: <span className="font-bold text-amber-600 dark:text-amber-300">{userProfile.name}</span></p><div className="flex flex-col md:grid md:grid-cols-2 gap-4">{slots.map((slot, index) => { const deckSize = slot.main.length + slot.life.length; const only1Card = slot.main.find(c => c.onlyRank === 1); let coverImage = null; if (only1Card) { const encodedImagePath = encodePath(only1Card.imagePath); const fileId = only1Card.id.replace(' - Only#1', ''); coverImage = `/cards/${encodedImagePath}/${encodeURIComponent(fileId)}.png`; } return (<div key={index} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-3 shadow-sm hover:shadow-md transition-shadow"><div className="flex flex-row md:flex-col gap-3 h-full"><div className="shrink-0 w-20 h-28 md:w-full md:h-40 bg-slate-200 dark:bg-slate-900 rounded-lg overflow-hidden relative flex items-center justify-center">{coverImage ? (<img src={coverImage} alt="Cover" className="w-full h-full object-cover md:object-contain" />) : (<span className="text-2xl">🃏</span>)}<div className="absolute bottom-0 right-0 bg-black/60 text-white text-[10px] px-1.5 py-0.5 rounded-tl-md">{deckSize} Cards</div></div><div className="flex-grow flex flex-col justify-between min-w-0"><div className="mb-2"><input type="text" value={slot.name} onChange={(e) => handleNameChange(index, e.target.value)} className="w-full bg-transparent border-b border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white font-bold text-lg focus:border-emerald-500 outline-none py-1" /></div><div className="flex flex-col gap-2"><div className="flex gap-2"><Button onClick={() => handleLoad(index)} disabled={deckSize === 0} className="flex-1 py-1.5 text-xs bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300 border-emerald-200">Load</Button><Button onClick={() => handleSave(index)} className="flex-1 py-1.5 text-xs bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 border-amber-200">Save</Button></div><div className="flex items-center justify-between gap-1 mt-1"><button onClick={() => onShowCards({ main: slot.main, life: slot.life })} disabled={deckSize === 0} className="p-2 rounded-lg text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/20 disabled:opacity-30" title="Show Cards"><EyeIcon /></button><button onClick={() => handleImport(index)} className="p-2 rounded-lg text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-700" title="Import"><ImportIcon /></button><button onClick={() => handleExport(index)} disabled={deckSize === 0} className="p-2 rounded-lg text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-700 disabled:opacity-30" title="Export"><ExportIcon /></button><button onClick={() => handleShareDeck(index)} disabled={deckSize === 0} className="p-2 rounded-lg text-purple-600 hover:bg-purple-50 dark:text-purple-400 dark:hover:bg-purple-900/20 disabled:opacity-30" title="Share"><ShareIconNew /></button><div className="w-px h-4 bg-slate-300 dark:bg-slate-600 mx-1"></div><button onClick={() => handleClearSlot(index)} className="p-2 rounded-lg text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20" title="Clear"><TrashIcon /></button></div></div></div></div></div>); })}</div></div></div>
@@ -619,7 +645,7 @@ export default function App() {
         setUserDecks(prev => ({
           ...prev,
           [profileData.email]: {
-            slots: [{ name: "Slot 1", main: [], life: [] }, { name: "Slot 2", main: [], life: [] }]
+            slots: [{ name: "ใส่ชื่อเด็คของคุณ", main: [], life: [] }, { name: "ใส่ชื่อเด็คของคุณ", main: [], life: [] }]
           }
         }));
       }
@@ -755,6 +781,68 @@ export default function App() {
       };
     }
   }, [userProfile]);
+
+  // ✅ ฟังก์ชันแชร์เด็คปัจจุบัน (ทำงานเหมือน DeckListModal แต่ใช้ข้อมูลปัจจุบัน)
+  const handleShareCurrentDeck = async () => {
+    if (!userProfile) return showAlert("Login", "กรุณาเข้าสู่ระบบก่อนแชร์เด็คครับ");
+    
+    const only1 = mainDeck.find(c => c.onlyRank === 1);
+    if (!only1) return showAlert("Error", "เด็คต้องมี 'Only #1' Card (การ์ดหลัก) ก่อนจึงจะแชร์ได้ครับ");
+
+    try {
+      // เช็คโควต้า 2 เด็ค
+      const q = query(collection(db, "publicDecks"), where("user.email", "==", userProfile.email));
+      const snap = await getDocs(q);
+      const existing = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+      const performShare = async (targetId = null) => {
+        closeModal(); // ปิด Modal ยืนยัน
+        try {
+            const batch = writeBatch(db);
+            const ref = targetId ? doc(db, "publicDecks", targetId) : doc(collection(db, "publicDecks"));
+            const allCards = [...mainDeck, ...lifeDeck];
+            const factions = [...new Set(allCards.map(c => c.faction).filter(Boolean))];
+            
+            // ตั้งชื่อเด็ค (ใช้ชื่อ Only #1 หรือตั้ง Default)
+            const deckName = `Deck: ${only1.name}`;
+
+            batch.set(ref, {
+                deckName: deckName,
+                only1CardData: { id: only1.id, name: only1.name, imagePath: only1.imagePath },
+                user: { name: userProfile.name, picture: userProfile.picture, email: userProfile.email },
+                sharedAt: serverTimestamp(),
+                likeCount: 0, likedBy: [], factions, viewCount: 0
+            });
+            batch.set(doc(db, "publicDeckDetails", ref.id), { 
+                mainDeck: mainDeck.map(c=>c.id), 
+                lifeDeck: lifeDeck.map(c=>c.id) 
+            });
+            
+            await batch.commit();
+            showAlert("Shared!", "แชร์เด็คสู่สาธารณะเรียบร้อยแล้ว!");
+        } catch (e) { 
+            console.error(e); 
+            showAlert("Error", "แชร์ไม่สำเร็จ โปรดลองใหม่"); 
+        }
+      };
+
+      if (existing.length >= 2) {
+        setModal({
+            isOpen: true, title: "โควตาเต็ม (Max 2)", 
+            message: <div className="flex flex-col gap-2"><p>คุณแชร์ครบ 2 เด็คแล้ว เลือกเด็คที่ต้องการเขียนทับ:</p>{existing.map(d => <button key={d.id} onClick={() => performShare(d.id)} className="p-2 border rounded hover:bg-red-100 dark:hover:bg-red-900/30 text-left text-slate-900 dark:text-white font-bold">ทับเด็ค: {d.deckName}</button>)}</div>,
+            confirmText: null
+        });
+      } else {
+        setModal({ 
+            isOpen: true, title: "Share Deck", 
+            message: `ยืนยันการแชร์เด็ค "${only1.name}" สู่สาธารณะ?`, 
+            onConfirm: () => performShare(null), 
+            confirmText: "Share Public", 
+            confirmIcon: <UploadIcon /> 
+        });
+      }
+    } catch (e) { console.error(e); showAlert("Error", "ตรวจสอบข้อมูลไม่สำเร็จ"); }
+  };
 
   const handleAnalyzeDeck = () => {
     if (mainDeck.length === 0) { showAlert("ไม่มีการ์ดในเด็ค", "โปรดใส่การ์ดใน Main Deck ก่อนทำการสร้างเด็ค"); return; }
@@ -899,8 +987,20 @@ export default function App() {
               </main>
               <Modal isOpen={modal.isOpen} title={modal.title} onClose={closeModal} onConfirm={modal.onConfirm} confirmText={modal.onConfirm ? modal.confirmText || "Confirm" : undefined} confirmIcon={modal.onConfirm ? modal.confirmIcon || <TrashIcon /> : undefined}>{modal.message}</Modal>
               <ImportDeckModal isOpen={isImportModalOpen} onClose={closeImportModal} onImport={confirmImport} />
-              <DeckAnalysisModal isOpen={analysisDeck.deck !== null} onClose={() => setAnalysisDeck({ deck: null, showChart: true })} mainDeck={analysisDeck.deck ? analysisDeck.deck.main : []} lifeDeck={analysisDeck.deck ? analysisDeck.deck.life : []} showChart={analysisDeck.showChart} showAlert={showAlert} theme={theme} />
-              <DeckViewModal isOpen={viewingDeck !== null} onClose={() => setViewingDeck(null)} deck={viewingDeck === "main" ? mainDeck : lifeDeck} rules={viewingDeck === "main" ? RULES.main : RULES.life} onAddCard={viewingDeck === "main" ? addToMain : addToLife} onRemoveCard={viewingDeck === "main" ? removeFromMain : removeFromLife} title={viewingDeck === "main" ? "Main Deck" : "Life Deck"} />
+              <DeckAnalysisModal 
+          isOpen={analysisDeck.deck !== null} 
+          onClose={() => setAnalysisDeck({ deck: null, showChart: true })} 
+          mainDeck={analysisDeck.deck ? analysisDeck.deck.main : []} 
+          lifeDeck={analysisDeck.deck ? analysisDeck.deck.life : []} 
+          showChart={analysisDeck.showChart} 
+          showAlert={showAlert} 
+          theme={theme} 
+
+          // ✅✅✅ เพิ่มบรรทัดนี้ครับ: สั่งให้เปิดหน้าเลือก Slot เมื่อกดปุ่ม Save ✅✅✅
+          onSave={() => setIsDeckListModalOpen(true)} 
+
+          onShare={handleShareCurrentDeck}
+      /><DeckViewModal isOpen={viewingDeck !== null} onClose={() => setViewingDeck(null)} deck={viewingDeck === "main" ? mainDeck : lifeDeck} rules={viewingDeck === "main" ? RULES.main : RULES.life} onAddCard={viewingDeck === "main" ? addToMain : addToLife} onRemoveCard={viewingDeck === "main" ? removeFromMain : removeFromLife} title={viewingDeck === "main" ? "Main Deck" : "Life Deck"} />
               <CardDetailModal card={zoomedCard} onClose={() => setZoomedCard(null)} onSell={(card) => { setAuctionTargetCard(card); setIsAuctionModalOpen(true); setZoomedCard(null); }} />
               <CreateAuctionModal isOpen={isAuctionModalOpen} onClose={() => setIsAuctionModalOpen(false)} card={auctionTargetCard} userProfile={displayUser} />
               <DeckListModal isOpen={isDeckListModalOpen} onClose={() => setIsDeckListModalOpen(false)} userProfile={displayUser} userDecks={userDecks} setUserDecks={setUserDecks} mainDeck={mainDeck} lifeDeck={lifeDeck} setMainDeck={setMainDeck} setLifeDeck={setLifeDeck} showAlert={showAlert} setModal={setModal} closeModal={closeModal} encodeDeckCode={encodeDeckCode} decodeDeckCode={decodeDeckCode} allCards={cardDb} onShowCards={(deck) => setAnalysisDeck({ deck: deck, showChart: false })} key={userProfile?.email || "guest"} />

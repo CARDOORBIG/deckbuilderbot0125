@@ -187,39 +187,28 @@ const ManageBiddersModal = ({ isOpen, onClose, auction, userProfile }) => {
     );
 };
 
-// === Auction Room Modal (Live Chat & Card - Fix Image Index & Hide Timer for Market) ===
+// ✅ แก้ไข AuctionRoomModal: เพิ่มเงื่อนไขปิดแชทเมื่อ status === 'completed'
 const AuctionRoomModal = ({ isOpen, onClose, auction, userProfile, onBid, onBuyNow }) => {
     const [messages, setMessages] = useState([]);
     const [newMessage, setNewMessage] = useState("");
-    
-    // UI States
     const [showDesc, setShowDesc] = useState(false);
     const [showFullGallery, setShowFullGallery] = useState(false); 
     const [activeProofIndex, setActiveProofIndex] = useState(0); 
-
-    // Swipe Logic States
     const [touchStart, setTouchStart] = useState(0);
     const [touchMove, setTouchMove] = useState(0);
     const [isSwiping, setIsSwiping] = useState(false);
-    
     const minSwipeDistance = 50; 
-
     const chatEndRef = useRef(null);
     const [sellerAvatar, setSellerAvatar] = useState(null);
     const [sellerStats, setSellerStats] = useState(null); 
     const [toastMessage, setToastMessage] = useState(null);
 
-    // 🟢 1. แก้ไข Logic รวมรูปภาพ (แก้ปัญหารูปไปอยู่หน้า 2)
     const allImages = useMemo(() => {
         if (!auction) return [];
         let images = [];
-        
-        // ถ้าไม่ใช่สินค้า Custom ให้เอารูปการ์ดหลักมาใส่เป็นรูปแรก
         if (auction.card_image_path !== 'CUSTOM_ITEM') {
              images.push(getCardImageUrl(auction.card_image_path, auction.card_id));
         }
-
-        // เพิ่มรูปที่อัปโหลด (Proof Images) ต่อท้าย
         try {
             if (auction.proof_image?.trim().startsWith('[')) {
                 images.push(...JSON.parse(auction.proof_image));
@@ -227,11 +216,9 @@ const AuctionRoomModal = ({ isOpen, onClose, auction, userProfile, onBid, onBuyN
                 images.push(auction.proof_image);
             }
         } catch { }
-        
         return images.filter(Boolean);
     }, [auction]);
 
-    // ดึงข้อมูลผู้ขาย
     useEffect(() => {
         if (isOpen && auction?.seller_email) {
             const fetchData = async () => {
@@ -239,7 +226,6 @@ const AuctionRoomModal = ({ isOpen, onClose, auction, userProfile, onBid, onBuyN
                     const docSnap = await getDoc(doc(db, "users", auction.seller_email));
                     if (docSnap.exists()) setSellerAvatar(docSnap.data().avatarUrl);
                 } catch (e) { console.error("Err fetching avatar", e); }
-
                 try {
                     const { data } = await supabase.from('user_stats').select('*').eq('user_email', auction.seller_email).maybeSingle();
                     if (data) setSellerStats(data);
@@ -250,7 +236,6 @@ const AuctionRoomModal = ({ isOpen, onClose, auction, userProfile, onBid, onBuyN
         }
     }, [isOpen, auction]);
 
-    // Realtime Chat
     useEffect(() => {
         if (isOpen && auction) {
             const fetchMessages = async () => {
@@ -263,7 +248,6 @@ const AuctionRoomModal = ({ isOpen, onClose, auction, userProfile, onBid, onBuyN
         }
     }, [isOpen, auction]);
 
-    // Keyboard Navigation
     useEffect(() => {
         if (!isOpen || allImages.length <= 1) return;
         const handleKeyDown = (e) => {
@@ -282,9 +266,8 @@ const AuctionRoomModal = ({ isOpen, onClose, auction, userProfile, onBid, onBuyN
         if (!userProfile) return alert("กรุณา Login ก่อนครับ");
         if (userProfile.email === auction.seller_email) return;
         const { data: existing } = await supabase.from('friendships').select('*').or(`and(requester_id.eq.${userProfile.email},receiver_id.eq.${auction.seller_email}),and(requester_id.eq.${auction.seller_email},receiver_id.eq.${userProfile.email})`);
-        if (existing && existing.length > 0) {
-            setToastMessage("เป็นเพื่อนกันแล้ว หรือส่งคำขอไปแล้ว");
-        } else {
+        if (existing && existing.length > 0) { setToastMessage("เป็นเพื่อนกันแล้ว หรือส่งคำขอไปแล้ว"); } 
+        else {
             const { error } = await supabase.from('friendships').insert({ requester_id: userProfile.email, receiver_id: auction.seller_email });
             if (!error) setToastMessage(`ส่งคำขอเป็นเพื่อนหา ${auction.seller_name} แล้ว!`);
             else alert(error.message);
@@ -292,200 +275,68 @@ const AuctionRoomModal = ({ isOpen, onClose, auction, userProfile, onBid, onBuyN
         setTimeout(() => setToastMessage(null), 3000);
     };
 
-    const goToSlide = (index) => {
-        if (index < 0) index = 0;
-        if (index >= allImages.length) index = allImages.length - 1;
-        setActiveProofIndex(index);
-        setTouchMove(0); 
-    };
-
+    const goToSlide = (index) => { if (index < 0) index = 0; if (index >= allImages.length) index = allImages.length - 1; setActiveProofIndex(index); setTouchMove(0); };
     const handleNext = (e) => { e?.stopPropagation(); goToSlide(activeProofIndex + 1); };
     const handlePrev = (e) => { e?.stopPropagation(); goToSlide(activeProofIndex - 1); };
-
-    const onTouchStart = (e) => {
-        setIsSwiping(true);
-        setTouchStart(e.targetTouches[0].clientX);
-    };
-
-    const onTouchMove = (e) => {
-        const currentX = e.targetTouches[0].clientX;
-        setTouchMove(currentX - touchStart); 
-    };
-
-    const onTouchEnd = () => {
-        setIsSwiping(false);
-        if (touchMove < -minSwipeDistance) { handleNext(); } 
-        else if (touchMove > minSwipeDistance) { handlePrev(); } 
-        else { setTouchMove(0); }
-    };
-
+    const onTouchStart = (e) => { setIsSwiping(true); setTouchStart(e.targetTouches[0].clientX); };
+    const onTouchMove = (e) => { const currentX = e.targetTouches[0].clientX; setTouchMove(currentX - touchStart); };
+    const onTouchEnd = () => { setIsSwiping(false); if (touchMove < -minSwipeDistance) { handleNext(); } else if (touchMove > minSwipeDistance) { handlePrev(); } else { setTouchMove(0); } };
+    
     const getTrackStyle = () => {
         const count = allImages.length || 1;
         const percentagePerSlide = 100 / count;
         const baseTranslate = activeProofIndex * percentagePerSlide; 
         const translateValue = isSwiping ? `calc(-${baseTranslate}% + ${touchMove}px)` : `-${baseTranslate}%`;
-        return {
-            transform: `translateX(${translateValue})`,
-            transition: isSwiping ? 'none' : 'transform 0.3s cubic-bezier(0.25, 1, 0.5, 1)', 
-            width: `${count * 100}%`,
-            display: 'flex',
-            height: '100%'
-        };
+        return { transform: `translateX(${translateValue})`, transition: isSwiping ? 'none' : 'transform 0.3s cubic-bezier(0.25, 1, 0.5, 1)', width: `${count * 100}%`, display: 'flex', height: '100%' };
     };
 
     if (!isOpen || !auction) return null;
     const isEnded = auction.status !== 'active' || new Date(auction.end_time) < new Date();
+    
+    // 🟢 เช็คสถานะว่าจบการขายหรือยัง (ถ้าจบแล้วห้ามแชท)
+    const isCompleted = auction.status === 'completed';
+    const isChatDisabled = isCompleted || !userProfile;
 
     return createPortal(
         <div className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center z-[700] p-0 md:p-4" onClick={onClose}>
-            {toastMessage && (
-                <div className="absolute top-10 left-1/2 transform -translate-x-1/2 z-[800] bg-black/80 text-white px-6 py-3 rounded-full shadow-2xl border border-emerald-500 animate-fade-in-up flex items-center gap-2">
-                    <span className="text-xl">✅</span> {toastMessage}
-                </div>
-            )}
-
+            {toastMessage && (<div className="absolute top-10 left-1/2 transform -translate-x-1/2 z-[800] bg-black/80 text-white px-6 py-3 rounded-full shadow-2xl border border-emerald-500 animate-fade-in-up flex items-center gap-2"><span className="text-xl">✅</span> {toastMessage}</div>)}
             <div className="bg-white dark:bg-slate-900 border-0 md:border border-slate-200 dark:border-emerald-500/30 rounded-none md:rounded-xl shadow-2xl w-full h-full md:h-[90vh] max-w-6xl flex flex-col md:flex-row overflow-hidden" onClick={e => e.stopPropagation()}>
-                
-                {/* 🖼️ ส่วนซ้าย: รูปภาพ */}
                 <div className="w-full md:w-2/3 h-[50vh] md:h-full flex flex-col bg-slate-100 dark:bg-slate-950 relative group">
                     <button onClick={onClose} className="absolute top-4 left-4 z-20 bg-black/50 text-white p-2 rounded-full md:hidden hover:bg-red-500 transition-colors"><ChevronLeftIcon /></button>
-                    
                     <div className="flex-grow relative overflow-hidden bg-black/5 touch-pan-y" onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}>
-                        <div style={getTrackStyle()}>
-                            {allImages.map((img, index) => (
-                                <div key={index} className="h-full flex items-center justify-center relative shrink-0" style={{ width: `${100 / allImages.length}%` }}>
-                                    <img src={img} className="max-h-full max-w-full object-contain drop-shadow-2xl select-none pointer-events-none" onClick={(e) => { e.stopPropagation(); setShowFullGallery(true); }} />
-                                </div>
-                            ))}
-                        </div>
-                        {allImages.length > 1 && (
-                            <>
-                                <button onClick={handlePrev} className={`absolute left-2 top-1/2 -translate-y-1/2 z-30 p-2 bg-black/30 hover:bg-black/60 text-white rounded-full transition-all hidden md:block ${activeProofIndex === 0 ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}><ChevronLeftIcon width="24" height="24" /></button>
-                                <button onClick={handleNext} className={`absolute right-2 top-1/2 -translate-y-1/2 z-30 p-2 bg-black/30 hover:bg-black/60 text-white rounded-full transition-all hidden md:block ${activeProofIndex === allImages.length - 1 ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}><ChevronRightIcon width="24" height="24" /></button>
-                            </>
-                        )}
+                        <div style={getTrackStyle()}>{allImages.map((img, index) => (<div key={index} className="h-full flex items-center justify-center relative shrink-0" style={{ width: `${100 / allImages.length}%` }}><img src={img} className="max-h-full max-w-full object-contain drop-shadow-2xl select-none pointer-events-none" onClick={(e) => { e.stopPropagation(); setShowFullGallery(true); }} /></div>))}</div>
+                        {allImages.length > 1 && (<><button onClick={handlePrev} className={`absolute left-2 top-1/2 -translate-y-1/2 z-30 p-2 bg-black/30 hover:bg-black/60 text-white rounded-full transition-all hidden md:block ${activeProofIndex === 0 ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}><ChevronLeftIcon width="24" height="24" /></button><button onClick={handleNext} className={`absolute right-2 top-1/2 -translate-y-1/2 z-30 p-2 bg-black/30 hover:bg-black/60 text-white rounded-full transition-all hidden md:block ${activeProofIndex === allImages.length - 1 ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}><ChevronRightIcon width="24" height="24" /></button></>)}
                         <div className="absolute bottom-4 right-4 bg-black/50 text-white p-1.5 rounded-full pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity"><ExpandIcon /></div>
-                        
-                        <div className="absolute top-4 right-4 z-10 flex items-center gap-2">
-                            {allImages.length > 1 && (<div className="bg-black/60 text-white text-xs px-2 py-1 rounded-full backdrop-blur-md font-mono border border-white/10">{activeProofIndex + 1} / {allImages.length}</div>)}
-                            
-                            {/* 🟢 2. แก้ไข: ซ่อนเวลานับถอยหลัง ถ้าเป็นสินค้าตลาดนัด (ดูจาก min_bid_increment) */}
-                            {(auction.min_bid_increment > 0) && <TimeLeft endTime={auction.end_time} />}
-                        </div>
-
-                        {auction.description && (
-                            <div className="absolute bottom-4 left-4 z-20">
-                                <button onClick={(e) => { e.stopPropagation(); setShowDesc(true); }} className="bg-black/60 hover:bg-black/80 text-white px-3 py-1.5 rounded-full text-xs backdrop-blur-md flex items-center gap-1 transition-all border border-white/20">
-                                    <span className="text-lg">📝</span> อ่านรายละเอียด
-                                </button>
-                            </div>
-                        )}
+                        <div className="absolute top-4 right-4 z-10 flex items-center gap-2">{allImages.length > 1 && (<div className="bg-black/60 text-white text-xs px-2 py-1 rounded-full backdrop-blur-md font-mono border border-white/10">{activeProofIndex + 1} / {allImages.length}</div>)}{(auction.min_bid_increment > 0) && <TimeLeft endTime={auction.end_time} />}</div>
+                        {auction.description && (<div className="absolute bottom-4 left-4 z-20"><button onClick={(e) => { e.stopPropagation(); setShowDesc(true); }} className="bg-black/60 hover:bg-black/80 text-white px-3 py-1.5 rounded-full text-xs backdrop-blur-md flex items-center gap-1 transition-all border border-white/20"><span className="text-lg">📝</span> อ่านรายละเอียด</button></div>)}
                     </div>
-
-                    {showDesc && (
-                        <div className="absolute inset-0 z-30 bg-black/80 backdrop-blur-sm flex items-center justify-center p-8 animate-fade-in" onClick={(e) => { e.stopPropagation(); setShowDesc(false); }}>
-                            <div className="bg-white dark:bg-slate-900 p-6 rounded-xl max-w-md w-full max-h-[80vh] overflow-y-auto border border-slate-700 shadow-2xl relative" onClick={e => e.stopPropagation()}>
-                                <h3 className="font-bold text-lg mb-4 dark:text-white border-b border-slate-200 dark:border-slate-700 pb-2">รายละเอียดสินค้า</h3>
-                                <p className="text-slate-700 dark:text-slate-300 whitespace-pre-wrap leading-relaxed text-sm">{auction.description}</p>
-                                <button onClick={() => setShowDesc(false)} className="absolute top-4 right-4 text-slate-400 hover:text-red-500"><CloseIcon/></button>
-                            </div>
-                        </div>
-                    )}
-
-                    {showFullGallery && (
-                        <div className="fixed inset-0 z-[9999] bg-black/95 backdrop-blur-xl flex flex-col touch-pan-y" onClick={() => setShowFullGallery(false)} onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}>
-                            <div className="absolute top-0 left-0 right-0 p-4 flex justify-between items-center z-50">
-                                <div className="text-white font-mono text-sm opacity-80">{activeProofIndex + 1} / {allImages.length}</div>
-                                <button onClick={() => setShowFullGallery(false)} className="text-white p-2 rounded-full hover:bg-white/10"><CloseIcon /></button>
-                            </div>
-                            <div className="flex-grow overflow-hidden relative flex items-center" onClick={(e) => e.stopPropagation()}>
-                                <div style={getTrackStyle()}>
-                                    {allImages.map((img, index) => (
-                                        <div key={index} className="h-full flex items-center justify-center shrink-0" style={{ width: `${100 / allImages.length}%` }}>
-                                            <img src={img} className="max-h-full max-w-full object-contain select-none pointer-events-none" />
-                                        </div>
-                                    ))}
-                                </div>
-                                {allImages.length > 1 && (
-                                    <>
-                                        <button onClick={handlePrev} className="absolute left-4 p-3 bg-white/10 hover:bg-white/20 text-white rounded-full hidden md:block"><ChevronLeftIcon /></button>
-                                        <button onClick={handleNext} className="absolute right-4 p-3 bg-white/10 hover:bg-white/20 text-white rounded-full hidden md:block"><ChevronRightIcon /></button>
-                                    </>
-                                )}
-                            </div>
-                            {allImages.length > 1 && (
-                                <div className="h-20 md:h-24 bg-black/40 flex justify-center items-center gap-2 p-2 overflow-x-auto z-50" onClick={e => e.stopPropagation()}>
-                                    {allImages.map((img, idx) => (
-                                        <button key={idx} onClick={() => goToSlide(idx)} className={`h-14 w-14 md:h-16 md:w-16 rounded-lg overflow-hidden border-2 flex-shrink-0 transition-all ${activeProofIndex === idx ? 'border-emerald-500 scale-110 opacity-100' : 'border-transparent opacity-50'}`}>
-                                            <img src={img} className="w-full h-full object-cover" />
-                                        </button>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-                    )}
+                    {showDesc && (<div className="absolute inset-0 z-30 bg-black/80 backdrop-blur-sm flex items-center justify-center p-8 animate-fade-in" onClick={(e) => { e.stopPropagation(); setShowDesc(false); }}><div className="bg-white dark:bg-slate-900 p-6 rounded-xl max-w-md w-full max-h-[80vh] overflow-y-auto border border-slate-700 shadow-2xl relative" onClick={e => e.stopPropagation()}><h3 className="font-bold text-lg mb-4 dark:text-white border-b border-slate-200 dark:border-slate-700 pb-2">รายละเอียดสินค้า</h3><p className="text-slate-700 dark:text-slate-300 whitespace-pre-wrap leading-relaxed text-sm">{auction.description}</p><button onClick={() => setShowDesc(false)} className="absolute top-4 right-4 text-slate-400 hover:text-red-500"><CloseIcon/></button></div></div>)}
+                    {showFullGallery && (<div className="fixed inset-0 z-[9999] bg-black/95 backdrop-blur-xl flex flex-col touch-pan-y" onClick={() => setShowFullGallery(false)} onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}><div className="absolute top-0 left-0 right-0 p-4 flex justify-between items-center z-50"><div className="text-white font-mono text-sm opacity-80">{activeProofIndex + 1} / {allImages.length}</div><button onClick={() => setShowFullGallery(false)} className="text-white p-2 rounded-full hover:bg-white/10"><CloseIcon /></button></div><div className="flex-grow overflow-hidden relative flex items-center" onClick={(e) => e.stopPropagation()}><div style={getTrackStyle()}>{allImages.map((img, index) => (<div key={index} className="h-full flex items-center justify-center shrink-0" style={{ width: `${100 / allImages.length}%` }}><img src={img} className="max-h-full max-w-full object-contain select-none pointer-events-none" /></div>))}</div>{allImages.length > 1 && (<><button onClick={handlePrev} className="absolute left-4 p-3 bg-white/10 hover:bg-white/20 text-white rounded-full hidden md:block"><ChevronLeftIcon /></button><button onClick={handleNext} className="absolute right-4 p-3 bg-white/10 hover:bg-white/20 text-white rounded-full hidden md:block"><ChevronRightIcon /></button></>)}</div>{allImages.length > 1 && (<div className="h-20 md:h-24 bg-black/40 flex justify-center items-center gap-2 p-2 overflow-x-auto z-50" onClick={e => e.stopPropagation()}>{allImages.map((img, idx) => (<button key={idx} onClick={() => goToSlide(idx)} className={`h-14 w-14 md:h-16 md:w-16 rounded-lg overflow-hidden border-2 flex-shrink-0 transition-all ${activeProofIndex === idx ? 'border-emerald-500 scale-110 opacity-100' : 'border-transparent opacity-50'}`}><img src={img} className="w-full h-full object-cover" /></button>))}</div>)}</div>)}
                 </div>
-
-                {/* ส่วนขวา: Chat & Action Bar */}
                 <div className="w-full md:w-1/3 h-[50vh] md:h-full flex flex-col border-l border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 min-h-0">
-                    <div className="p-3 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 flex justify-between items-center shrink-0">
-                        <h3 className="font-bold text-slate-700 dark:text-slate-200 flex items-center gap-2"><ChatBubbleIcon /> Live Chat</h3>
-                        <button onClick={onClose} className="hidden md:block text-slate-400 hover:text-red-500"><CloseIcon /></button>
-                    </div>
-                    
-                    <div className="p-3 bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800">
-                         <div className="flex items-start gap-3">
-                            <img src={sellerAvatar || `https://ui-avatars.com/api/?name=${auction.seller_name}&background=random`} className="w-10 h-10 rounded-full border-2 border-slate-200 dark:border-slate-700 object-cover"/>
-                            <div className="flex-grow min-w-0">
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-1.5 flex-wrap">
-                                        <span className="font-bold text-sm text-slate-900 dark:text-white truncate max-w-[120px]">{auction.seller_name}</span>
-                                        {sellerStats && <RatingBadge score={sellerStats.total_score} />}
-                                    </div>
-                                    {userProfile && userProfile.email !== auction.seller_email && (
-                                        <button onClick={handleAddFriend} className="text-[10px] px-2 py-0.5 bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-300 rounded-full font-bold border border-blue-100 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors flex items-center gap-1"><UserPlusIcon /> เพิ่มเพื่อน</button>
-                                    )}
-                                </div>
-                                <p className="text-[10px] text-slate-400 mt-0.5">ลงขายเมื่อ: {new Date(auction.created_at).toLocaleString('th-TH', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</p>
-                            </div>
-                         </div>
-                    </div>
-
-                    <div className="flex-grow overflow-y-auto p-4 space-y-3 scrollbar-thin scrollbar-thumb-slate-300 dark:scrollbar-thumb-slate-700 min-h-0">
-                        {messages.length === 0 ? (<div className="flex flex-col items-center justify-center h-full text-slate-400 text-sm gap-2"><span className="text-4xl opacity-20">💬</span><p>เริ่มการสนทนาได้เลย...</p></div>) : messages.map((msg) => (
-                            <div key={msg.id} className={`flex gap-2 ${msg.user_email === userProfile?.email ? 'flex-row-reverse' : ''}`}>
-                                <img src={msg.user_picture} className="w-8 h-8 rounded-full bg-slate-700 object-cover shrink-0" />
-                                <div className={`max-w-[85%] px-3 py-2 rounded-xl text-sm ${msg.user_email === userProfile?.email ? 'bg-emerald-600 text-white rounded-tr-none' : 'bg-slate-200 dark:bg-slate-800 text-slate-900 dark:text-slate-200 rounded-tl-none'}`}><p className="text-[10px] opacity-70 mb-0.5">{msg.user_name}</p><p>{msg.message}</p></div>
-                            </div>
-                        ))}
-                        <div ref={chatEndRef} />
-                    </div>
+                    <div className="p-3 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 flex justify-between items-center shrink-0"><h3 className="font-bold text-slate-700 dark:text-slate-200 flex items-center gap-2"><ChatBubbleIcon /> Live Chat</h3><button onClick={onClose} className="hidden md:block text-slate-400 hover:text-red-500"><CloseIcon /></button></div>
+                    <div className="p-3 bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800"><div className="flex items-start gap-3"><img src={sellerAvatar || `https://ui-avatars.com/api/?name=${auction.seller_name}&background=random`} className="w-10 h-10 rounded-full border-2 border-slate-200 dark:border-slate-700 object-cover"/><div className="flex-grow min-w-0"><div className="flex items-center justify-between"><div className="flex items-center gap-1.5 flex-wrap"><span className="font-bold text-sm text-slate-900 dark:text-white truncate max-w-[120px]">{auction.seller_name}</span>{sellerStats && <RatingBadge score={sellerStats.total_score} />}</div>{userProfile && userProfile.email !== auction.seller_email && (<button onClick={handleAddFriend} className="text-[10px] px-2 py-0.5 bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-300 rounded-full font-bold border border-blue-100 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors flex items-center gap-1"><UserPlusIcon /> เพิ่มเพื่อน</button>)}</div><p className="text-[10px] text-slate-400 mt-0.5">ลงขายเมื่อ: {new Date(auction.created_at).toLocaleString('th-TH', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</p></div></div></div>
+                    <div className="flex-grow overflow-y-auto p-4 space-y-3 scrollbar-thin scrollbar-thumb-slate-300 dark:scrollbar-thumb-slate-700 min-h-0">{messages.length === 0 ? (<div className="flex flex-col items-center justify-center h-full text-slate-400 text-sm gap-2"><span className="text-4xl opacity-20">💬</span><p>เริ่มการสนทนาได้เลย...</p></div>) : messages.map((msg) => (<div key={msg.id} className={`flex gap-2 ${msg.user_email === userProfile?.email ? 'flex-row-reverse' : ''}`}><img src={msg.user_picture} className="w-8 h-8 rounded-full bg-slate-700 object-cover shrink-0" /><div className={`max-w-[85%] px-3 py-2 rounded-xl text-sm ${msg.user_email === userProfile?.email ? 'bg-emerald-600 text-white rounded-tr-none' : 'bg-slate-200 dark:bg-slate-800 text-slate-900 dark:text-slate-200 rounded-tl-none'}`}><p className="text-[10px] opacity-70 mb-0.5">{msg.user_name}</p><p>{msg.message}</p></div></div>))}<div ref={chatEndRef} /></div>
                     <div className="p-3 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-emerald-500/20">
                          <div className="flex items-center justify-between mb-3">
                             <div><span className="text-[10px] text-slate-500 uppercase">Current Bid</span><div className="text-xl font-black text-slate-900 dark:text-white">฿{auction.current_price.toLocaleString()}</div></div>
-                            {userProfile?.email !== auction.seller_email && !isEnded && (
-                                <div className="flex gap-2">
-                                    {auction.buy_now_price > 0 && <button onClick={() => onBuyNow(auction)} className="px-3 py-1.5 bg-pink-100 text-pink-700 rounded-lg text-xs font-bold">Buy ฿{auction.buy_now_price}</button>}
-                                    
-                                    {/* 🟢 3. ซ่อนปุ่ม Bid ถ้าเป็นสินค้าตลาดนัด */}
-                                    {(auction.min_bid_increment > 0) && (
-                                        <button 
-                                            onClick={() => onBid(auction)} 
-                                            className="px-4 py-1.5 btn-fire text-white rounded-lg text-xs font-bold shadow-lg transition-all"
-                                        >
-                                            Bid +{auction.min_bid_increment.toLocaleString()} B
-                                        </button>
-                                    )}
-                                </div>
-                            )}
+                            {userProfile?.email !== auction.seller_email && !isEnded && (<div className="flex gap-2">{auction.buy_now_price > 0 && <button onClick={() => onBuyNow(auction)} className="px-3 py-1.5 bg-pink-100 text-pink-700 rounded-lg text-xs font-bold">Buy ฿{auction.buy_now_price}</button>}{(auction.min_bid_increment > 0) && (<button onClick={() => onBid(auction)} className="px-4 py-1.5 btn-fire text-white rounded-lg text-xs font-bold shadow-lg transition-all">Bid +{auction.min_bid_increment.toLocaleString()} B</button>)}</div>)}
                          </div>
+                         
+                         {/* 🟢 ปิดช่องแชทถ้าสถานะเป็น completed */}
                          <form onSubmit={handleSendMessage} className="flex gap-2">
-                            <input type="text" value={newMessage} onChange={e => setNewMessage(e.target.value)} placeholder={userProfile ? "พิมพ์ข้อความ..." : "กรุณา Login"} disabled={!userProfile} className="flex-grow bg-slate-100 dark:bg-slate-800 border-none rounded-full px-4 py-2 text-sm text-black dark:text-white outline-none focus:ring-1 focus:ring-emerald-500" />
-                            <button type="submit" disabled={!newMessage.trim() || !userProfile} className="p-2 bg-emerald-600 text-white rounded-full hover:bg-emerald-500 transition-colors"><SendIcon /></button>
+                            <input 
+                                type="text" 
+                                value={newMessage} 
+                                onChange={e => setNewMessage(e.target.value)} 
+                                placeholder={isChatDisabled ? "⛔ การสนทนาปิดแล้ว" : (userProfile ? "พิมพ์ข้อความ..." : "กรุณา Login")} 
+                                disabled={isChatDisabled} 
+                                className={`flex-grow bg-slate-100 dark:bg-slate-800 border-none rounded-full px-4 py-2 text-sm text-black dark:text-white outline-none focus:ring-1 focus:ring-emerald-500 ${isChatDisabled ? 'opacity-50 cursor-not-allowed' : ''}`} 
+                            />
+                            <button type="submit" disabled={!newMessage.trim() || isChatDisabled} className={`p-2 bg-emerald-600 text-white rounded-full hover:bg-emerald-500 transition-colors ${isChatDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}><SendIcon /></button>
                         </form>
                     </div>
                 </div>
-
             </div>
         </div>, document.body
     );
@@ -1374,20 +1225,28 @@ export default function AuctionMarket() {
         {activeTab === 'to-receive' && (
             <div className="animate-fade-in w-full md:px-8">
                 <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 md:gap-6">
-                    {myAuctions.filter(i => i.winner_email === userProfile?.email && i.status !== 'active').map(item => (
-                        <div key={item.id} className="bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-emerald-500/20 rounded-2xl shadow-md hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group cursor-pointer relative overflow-hidden flex flex-col" onClick={() => setChatAuction(item)}>
+                    {myAuctions.filter(i => i.winner_email === userProfile?.email && i.status !== 'active').map(item => {
+                        // 🟢 เช็คสถานะ Completed (ยืนยันแล้ว)
+                        const isCompleted = item.status === 'completed';
+
+                        return (
+                        <div 
+                            key={item.id} 
+                            // 🟢 ถ้าจบแล้วให้เป็นสีเทา
+                            className={`bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-emerald-500/20 rounded-2xl shadow-md hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group cursor-pointer relative overflow-hidden flex flex-col ${isCompleted ? 'grayscale opacity-80' : ''}`} 
+                            onClick={() => setChatAuction(item)}
+                        >
                             {/* ... Image Section ... */}
                             <div className="aspect-[4/5] bg-slate-100 dark:bg-slate-800/50 relative p-1 md:p-6 flex items-center justify-center overflow-hidden">
                                 <img src={getAuctionThumbnail(item)} className="w-full h-full object-cover drop-shadow-2xl" onError={(e) => { if (!e.currentTarget.src.endsWith('.jpg')) e.currentTarget.src = e.currentTarget.src.replace('.png', '.jpg'); }} />
                                 
-                                {/* 🟢 ไอคอน Escrow (ซ้ายบน) */}
                                 {item.is_escrow && (
                                     <div className="absolute top-2 left-2 bg-blue-600 text-white p-1 rounded-full shadow-md z-20" title="ระบบ Escrow คุ้มครอง">
                                         <ShieldCheckIcon width="16" height="16" />
                                     </div>
                                 )}
                                 
-                                {/* 🟢 สถานะการส่ง (เฉพาะ Escrow) */}
+                                {/* 🟢 สถานะการส่ง */}
                                 {item.is_escrow ? (
                                     <div className={`absolute bottom-2 left-0 right-0 text-center text-[10px] font-bold py-1 mx-4 rounded-full shadow-md ${item.is_shipped ? 'bg-emerald-500 text-white' : 'bg-slate-500 text-white'}`}>
                                         {item.is_shipped ? `🚚 ส่งแล้ว: ${item.tracking_number}` : '⏳ รอผู้ขายจัดส่ง'}
@@ -1406,9 +1265,13 @@ export default function AuctionMarket() {
                                 </div>
 
                                 <div className="mt-2 space-y-2" onClick={e => e.stopPropagation()}>
-                                    {/* 🟢 ปุ่ม Action (แยก Escrow/Non-Escrow) */}
-                                    {item.is_escrow ? (
-                                        // Case 1: Escrow -> ต้องรอส่งของก่อนถึงกดได้
+                                    {/* 🟢 ปุ่ม Action: แยกเงื่อนไข Completed */}
+                                    {isCompleted ? (
+                                        <button disabled className="w-full py-1.5 bg-slate-400 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1 cursor-not-allowed">
+                                            ✅ ทำรายการเสร็จสิ้น
+                                        </button>
+                                    ) : item.is_escrow ? (
+                                        // Case 1: Escrow
                                         <button 
                                             onClick={() => handleConfirmReceipt(item)} 
                                             disabled={!item.is_shipped} 
@@ -1417,7 +1280,7 @@ export default function AuctionMarket() {
                                             <CheckIcon /> ยืนยันรับสินค้า
                                         </button>
                                     ) : (
-                                        // Case 2: ธรรมดา -> กดให้คะแนนได้เลย
+                                        // Case 2: Non-Escrow
                                         <button 
                                             onClick={() => setConfirmTransaction({ auction: item })} 
                                             className="w-full py-1.5 bg-blue-600 text-white rounded-lg text-xs font-bold hover:bg-blue-700 transition-colors flex items-center justify-center gap-1 shadow-md"
@@ -1428,12 +1291,13 @@ export default function AuctionMarket() {
 
                                     <div className="flex gap-2">
                                         <button onClick={() => setChatAuction(item)} className="flex-1 py-1.5 bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-lg text-xs font-bold hover:bg-slate-300 flex items-center justify-center gap-1"><ChatBubbleIcon/></button>
+                                        {/* ซ่อนปุ่มลบถ้าจบงานแล้ว (หรือจะให้ลบก็ได้ แต่ปกติควรเก็บประวัติไว้สักพัก) */}
                                         <button onClick={() => handleDeleteMyAuction(item)} className="flex-1 py-1.5 bg-red-100 text-red-600 border border-red-200 rounded-lg text-xs font-bold hover:bg-red-200 flex items-center justify-center gap-1"><TrashIcon /></button>
                                     </div>
                                 </div>
                             </div>
                         </div>
-                    ))}
+                    );})}
                 </div>
                 
                 {/* Empty State */}
