@@ -16,6 +16,8 @@ import NotificationCenter from './NotificationCenter';
 import ChatWidget from './ChatWidget';
 
 // --- Imported Components ---
+import Header from './components/Header'; // ✅ 1. เพิ่ม Header
+import AdminDashboardModal from './AdminDashboardModal'; // ✅ 2. เพิ่ม Admin Modal
 import SettingsDrawer from './components/SettingsDrawer';
 import ProfileSetupModal from './components/ProfileSetupModal';
 import RatingBadge from './components/RatingBadge';
@@ -640,6 +642,7 @@ export default function PublicDecks() {
   const [userDecks, setUserDecks] = useLocalStorage("bot-userDecks-v1", {});
   const [customProfile, setCustomProfile] = useState(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isAdminOpen, setIsAdminOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
   const [theme, setTheme] = useLocalStorage('bot-theme', 'dark');
@@ -907,75 +910,14 @@ useEffect(() => {
     <div className="h-screen flex flex-col text-slate-900 dark:text-gray-200 bg-slate-100 dark:bg-black">
       <style>{`::-webkit-scrollbar{width:8px}::-webkit-scrollbar-track{background:#0f172a}::-webkit-scrollbar-thumb{background:#1e293b;border-radius:4px}::-webkit-scrollbar-thumb:hover{background:#334155}.image-render-target{position:fixed;top:-9999px;left:0;width:1280px;height:auto;background:#1e293b;padding:24px;box-shadow:0 0 30px rgba(0,0,0,0.5);display:flex;gap:24px;flex-shrink:0;flex-grow:0;}`}</style>
       
-      {/* Header: Redesigned (Consistent with App.jsx) */}
-      <header className="px-3 md:px-6 py-2 border-b border-slate-200 dark:border-emerald-700/30 bg-white/80 dark:bg-black/60 backdrop-blur-sm shrink-0 z-40 h-14 flex flex-col justify-center">
-         <div className="flex items-center justify-between gap-2">
-          
-          {/* 🟢 ฝั่งซ้าย: Menu + Title */}
-          <div className="flex items-center gap-1.5 overflow-hidden">
-             {userProfile && (
-                 <button onClick={() => setIsSettingsOpen(true)} className="p-1.5 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-full text-slate-800 dark:text-white transition-colors shrink-0">
-                    <div className="scale-90"><MenuIcon /></div>
-                 </button>
-             )}
-             <h1 className="text-lg md:text-3xl font-extrabold tracking-tight bg-gradient-to-r from-amber-500 to-emerald-600 dark:from-amber-300 dark:to-emerald-400 bg-clip-text text-transparent truncate pt-0.5">
-                Public Decks
-             </h1>
-          </div>
-          
-          {/* 🟢 ฝั่งขวา: ปุ่มต่างๆ เรียงตามลำดับ (Market -> Public -> My Decks -> Bell -> Profile) */}
-          <div className="flex items-center gap-1.5 md:gap-3 shrink-0">
-            
-            {/* 1. Market */}
-            <Link to="/auction">
-                <Button className="!px-2 md:!px-4 bg-gradient-to-r from-rose-500 to-orange-600 text-white border-none shadow-md hover:shadow-lg hover:from-rose-400 hover:to-orange-500">
-                    <StoreIcon /> 
-                    <span className="hidden md:inline ml-1">Market</span>
-                </Button>
-            </Link>
-
-            {/* 2. Public (หน้าหลัก) */}
-            <Link to="/">
-                <Button
-                    as="span"
-                    className="!px-2 md:!px-4 bg-gradient-to-r from-blue-500 to-purple-600 text-white border-none shadow-lg hover:from-blue-400 hover:to-purple-500 ring-2 ring-offset-2 ring-blue-500/50 dark:ring-offset-slate-900"
-                >
-                    <HomeIcon />{" "}
-                    <span className="hidden md:inline">Home</span>
-                </Button>
-            </Link>
-
-            {/* 4. Bell (Notification) */}
-            <NotificationCenter userEmail={userProfile?.email} />
-
-            {/* 5. Profile Picture */}
-            {/* 5. Profile Picture (แก้ไขแล้ว: ตรวจสอบก่อนแสดงผล) */}
-            {displayUser ? (
-              <>
-                <img
-                    src={displayUser.picture}
-                    alt={displayUser.name}
-                    className="w-8 h-8 md:w-9 md:h-9 rounded-full border-2 border-emerald-500 object-cover ml-1 cursor-pointer hover:scale-105 transition-transform"
-                    title={`Logged in as ${displayUser.name}`}
-                    onClick={() => setIsSettingsOpen(true)} 
-                />
-                <span className="text-slate-900 dark:text-white hidden lg:block text-sm font-semibold max-w-[100px] truncate">
-                    {displayUser.name}
-                </span>
-              </>
-            ) : (
-              // กรณีไม่ได้ Login: แสดงปุ่มให้กดไป Login แทน
-              <button 
-                onClick={() => navigate('/')} 
-                className="ml-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-full shadow transition-all"
-              >
-                Login
-              </button>
-            )}
-          </div>
-
-        </div>
-      </header>
+      {/* ✅ 4. เรียกใช้ Header Component แทนโค้ดเดิม */}
+      <Header 
+        userProfile={userProfile}
+        displayUser={displayUser}
+        userReputation={userReputation[userProfile?.email]}
+        setIsSettingsOpen={setIsSettingsOpen}
+        setIsAdminOpen={setIsAdminOpen}
+      />
 
       <main className="flex-1 overflow-y-auto p-4 md:p-8 lg:p-12">
         <h2 className="text-3xl font-bold text-slate-900 dark:text-white mb-6">Public Shared Decks</h2>
@@ -1099,6 +1041,7 @@ useEffect(() => {
         onOpenFeedback={() => setIsFeedbackOpen(true)}
         onOpenMyDecks={() => setIsDeckListModalOpen(true)} // 🟢 เปิด Modal My Decks
         userStats={userReputation[userProfile?.email]} // 🟢 ส่งคะแนนไปแสดงยศ
+        onOpenAdmin={() => setIsAdminOpen(true)}
       />
       <ProfileSetupModal
         isOpen={isProfileModalOpen}
@@ -1125,6 +1068,11 @@ useEffect(() => {
         setMainDeck={setMainDeck}
         setLifeDeck={setLifeDeck}
         cardDb={cardDb}
+      />
+      <AdminDashboardModal 
+        isOpen={isAdminOpen} 
+        onClose={() => setIsAdminOpen(false)} 
+        adminEmail={userProfile?.email} 
       />
       <ChatWidget 
         userProfile={displayUser} 

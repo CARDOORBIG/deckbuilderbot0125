@@ -10,23 +10,25 @@ import FleaMarket from './FleaMarket';
 // --- Local Modals ---
 import AdminDashboardModal from './AdminDashboardModal';
 import ReportModal from './ReportModal';
-import NotificationCenter from './NotificationCenter';
 import ChatWidget from './ChatWidget';
 import FeedbackModal from './components/FeedbackModal';
 import CreateBulkAuctionModal from './CreateBulkAuctionModal'; 
+import TopUpModal from './components/TopUpModal';
+import ShipmentModal from './components/ShipmentModal';
 
 // --- Imported Components ---
+import Header from './components/Header';
 import SettingsDrawer from './components/SettingsDrawer';
 import ProfileSetupModal from './components/ProfileSetupModal';
 import RatingBadge from './components/RatingBadge';
 import DeckListModal from './components/DeckListModal';
 import { 
-    MenuIcon, GavelIcon, ShoppingBagIcon, UserCogIcon, 
+    GavelIcon, ShoppingBagIcon, UserCogIcon, 
     CloseIcon, SunIcon, MoonIcon, HistoryIcon, 
-    PackageIcon, BanIcon, CrownIcon, FlagIcon, 
+    PackageIcon, BanIcon, FlagIcon, 
     ShieldCheckIcon, ChatBubbleIcon, SendIcon, 
-    TrashIcon, UsersIcon, DeckIcon, StoreIcon, 
-    HomeIcon, MessageIcon, NeonLightningIcon, 
+    TrashIcon, DeckIcon, StoreIcon, 
+    MessageIcon, NeonLightningIcon, 
     ImageIcon, ArchiveIcon,
     ChevronLeftIcon,
     ChevronRightIcon, 
@@ -34,6 +36,28 @@ import {
     EyeIcon,
     ExpandIcon 
 } from './components/Icons';
+
+const WarningIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-16 h-16 text-yellow-400">
+    <path fillRule="evenodd" d="M9.401 3.003c1.155-2 4.043-2 5.197 0l7.355 12.748c1.154 2-.29 4.5-2.599 4.5H4.645c-2.309 0-3.752-2.5-2.598-4.5L9.4 3.003zM12 8.25a.75.75 0 01.75.75v3.75a.75.75 0 01-1.5 0V9a.75.75 0 01.75-.75zm0 8.25a.75.75 0 100-1.5.75.75 0 000 1.5z" clipRule="evenodd" />
+  </svg>
+);
+
+const CheckIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="20 6 9 17 4 12"></polyline>
+  </svg>
+);
+
+// ✅✅✅ เพิ่ม TruckIcon ที่หายไปกลับมาครับ ✅✅✅
+const TruckIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="1" y="3" width="15" height="13"></rect>
+    <polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon>
+    <circle cx="5.5" cy="18.5" r="2.5"></circle>
+    <circle cx="18.5" cy="18.5" r="2.5"></circle>
+  </svg>
+);
 
 // === Helper Functions ===
 const encodePath = (p) => p ? p.split('/').map(encodeURIComponent).join('/') : '';
@@ -524,6 +548,9 @@ const ConfirmTransactionModal = ({ isOpen, onClose, auction, userProfile, fetchR
     const [action, setAction] = useState('good');
     const [reason, setReason] = useState('transaction_success');
     const [isSubmitting, setIsSubmitting] = useState(false);
+    
+    // State สำหรับเปิด/ปิด Pop-up ยืนยันขั้นสุดท้าย
+    const [showFinalConfirm, setShowFinalConfirm] = useState(false);
 
     if (!isOpen || !auction || !userProfile) return null;
 
@@ -533,12 +560,25 @@ const ConfirmTransactionModal = ({ isOpen, onClose, auction, userProfile, fetchR
     
     if (auction.end_time > new Date().toISOString()) return null;
 
-    const handleSubmit = async () => {
+    // ฟังก์ชันเมื่อกดปุ่ม "ส่งคะแนนเครดิต" (ด่านแรก)
+    const handlePreSubmit = () => {
         const score = action === 'good' ? 1 : -1;
-        
-        if (score === -1 && !confirm(`⚠️ ยืนยันหักเครดิตคุณ ${targetName} ใช่หรือไม่? การกระทำนี้ไม่สามารถย้อนกลับได้`)) return;
 
+        if (score === -1) {
+            // กรณีหักเครดิต (ใช้ confirm ปกติ หรือจะทำ Pop-up แยกก็ได้)
+            if (!confirm(`⚠️ ยืนยันหักเครดิตคุณ ${targetName} ใช่หรือไม่? การกระทำนี้ไม่สามารถย้อนกลับได้`)) return;
+            submitReputation();
+        } else {
+            // 🟢 กรณีให้เครดิต (ยืนยันรับของ) -> เปิด Pop-up สวยๆ
+            setShowFinalConfirm(true);
+        }
+    };
+
+    // ฟังก์ชันส่งข้อมูลเข้า Server (ทำงานเมื่อยืนยันแล้ว)
+    const submitReputation = async () => {
+        const score = action === 'good' ? 1 : -1;
         setIsSubmitting(true);
+        setShowFinalConfirm(false); // ปิด Pop-up ยืนยัน
         
         const { data, error } = await supabase.rpc('submit_reputation', {
             p_auction_id: auction.id,
@@ -594,11 +634,44 @@ const ConfirmTransactionModal = ({ isOpen, onClose, auction, userProfile, fetchR
                         </div>
                     )}
                     
-                    <button onClick={handleSubmit} disabled={isSubmitting} className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg transition-all disabled:opacity-50">
+                    <button onClick={handlePreSubmit} disabled={isSubmitting} className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg transition-all disabled:opacity-50">
                         {isSubmitting ? 'กำลังส่ง...' : 'ส่งคะแนนเครดิต'}
                     </button>
                 </div>
             </div>
+
+            {/* ✅✅✅ แก้ไขส่วน Pop-up ยืนยันสุดท้าย ให้ข้อความครบถ้วน ✅✅✅ */}
+            {showFinalConfirm && (
+                <div className="fixed inset-0 z-[900] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in" onClick={(e) => e.stopPropagation()}>
+                    <div className="bg-white dark:bg-slate-900 border-[3px] border-red-500 rounded-2xl p-6 max-w-sm w-full shadow-[0_0_30px_rgba(239,68,68,0.4)] transform scale-100 animate-bounce-in relative overflow-hidden flex flex-col items-center text-center">
+                        
+                        <div className="absolute top-0 left-0 w-full h-2 bg-red-500"></div>
+                        <div className="mb-4 animate-pulse"><WarningIcon /></div>
+                        
+                        <h3 className="text-xl font-black text-slate-900 dark:text-white mb-3">
+                            ยืนยันรับสินค้า?
+                        </h3>
+
+                        {/* 👇 ข้อความเตือนแบบละเอียดที่ต้องการ 👇 */}
+                        <div className="text-slate-600 dark:text-slate-300 mb-6 space-y-3 text-xs md:text-sm text-left bg-slate-50 dark:bg-slate-800 p-3 rounded-lg border border-slate-200 dark:border-slate-700">
+                            <p>✅ ท่านได้รับสินค้าและตรวจสอบเรียบร้อยแล้ว</p>
+                            <p>❌ <b>จะไม่มีการคืนเงินทุกกรณี</b> หลังจากกดยืนยัน</p>
+                            <p>⏳ หากไม่กดยืนยันภายใน 7 วัน ระบบจะโอนเงินให้ผู้ขายอัตโนมัติ</p>
+                            
+                            <div className="mt-2 p-2 bg-red-100 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded text-center">
+                                <p className="text-red-600 dark:text-red-400 font-bold">
+                                    ⚠️ การกดปุ่มนี้จะเป็นการ<br/>อนุมัติเงินประกันให้ผู้ขายทันที
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="flex gap-3 w-full">
+                            <button onClick={() => setShowFinalConfirm(false)} className="flex-1 py-3 bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold rounded-xl hover:bg-slate-300 dark:hover:bg-slate-700 transition-colors">ยกเลิก</button>
+                            <button onClick={submitReputation} className="flex-1 py-3 bg-emerald-600 text-white font-bold rounded-xl shadow-lg hover:bg-emerald-500 transition-transform active:scale-95">ยืนยันอนุมัติ</button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>, document.body
     );
 };
@@ -744,11 +817,69 @@ const CompletedAuctionsModal = ({ isOpen, onClose, userProfile }) => {
     );
 };
 
+// ✅ Action Confirm Modal (Popup Bid/Buy)
+const ActionConfirmModal = ({ isOpen, onClose, actionData, userBalance, onConfirm, onTopUp }) => {
+    const [bidAmount, setBidAmount] = useState(0);
+    useEffect(() => { if (isOpen && actionData?.type === 'bid') setBidAmount(actionData.auction.current_price + actionData.auction.min_bid_increment); }, [isOpen, actionData]);
+    if (!isOpen || !actionData) return null;
+
+    const { type, auction } = actionData;
+    const isEscrow = auction.is_escrow;
+    const requiredAmount = type === 'buy' ? auction.buy_now_price : bidAmount;
+    const isInsufficient = userBalance < requiredAmount;
+    const canProceed = !isEscrow || !isInsufficient;
+
+    const handleSubmit = () => { if (!canProceed) return; onConfirm(type === 'bid' ? bidAmount : null); };
+
+    return createPortal(
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-[950] p-4 animate-fade-in" onClick={onClose}>
+            <div className="bg-white dark:bg-slate-900 border border-slate-300 dark:border-emerald-500/30 rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden transform scale-100 transition-all" onClick={e => e.stopPropagation()}>
+                <div className={`p-4 flex items-center gap-3 border-b ${type === 'buy' ? 'bg-pink-100 dark:bg-pink-900/20 border-pink-200' : 'bg-amber-100 dark:bg-amber-900/20 border-amber-200'}`}>
+                    <div className={`p-2 rounded-full ${type === 'buy' ? 'bg-pink-500' : 'bg-amber-500'} text-white`}>{type === 'buy' ? <ShoppingBagIcon /> : <GavelIcon />}</div>
+                    <h3 className="font-bold text-lg text-slate-900 dark:text-white">{type === 'buy' ? 'ยืนยันการซื้อ (Buy Now)' : 'ยืนยันการประมูล (Bid)'}</h3>
+                </div>
+                <div className="p-6 space-y-4">
+                    <div><p className="text-sm text-slate-500 dark:text-slate-400">สินค้า:</p><p className="font-bold text-slate-900 dark:text-white text-lg truncate">{auction.card_name}</p></div>
+                    {isEscrow ? (
+                        <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 p-3 rounded-xl">
+                            <div className="flex items-start gap-2 mb-2"><ShieldCheckIcon className="text-blue-500 mt-0.5" /><span className="font-bold text-blue-700 dark:text-blue-300 text-sm">ระบบ Escrow (คุ้มครอง)</span></div>
+                            <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">ผู้ขายเลือกขายแบบระบบ Escrow (มัดจำเงิน) ท่านจำเป็นต้องใช้ Credit ในการซื้อขาย</p>
+                        </div>
+                    ) : (
+                        <div className="bg-slate-100 dark:bg-slate-800 p-3 rounded-xl border border-slate-200 dark:border-slate-700"><p className="text-xs text-slate-500 dark:text-slate-400 text-center">ผู้ขายไม่ได้ใช้ระบบ Escrow (ตกลงการชำระเงินโดยตรง)</p></div>
+                    )}
+                    {type === 'bid' ? (
+                        <div><label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">ระบุยอดเงินประมูล</label><input type="number" value={bidAmount} onChange={e => setBidAmount(parseInt(e.target.value))} className="w-full p-3 bg-slate-100 dark:bg-black/50 border border-slate-300 dark:border-slate-600 rounded-xl text-center text-xl font-bold font-mono outline-none focus:border-amber-500 text-slate-900 dark:text-white"/><p className="text-xs text-center mt-1 text-slate-500">ขั้นต่ำ: {(auction.current_price + auction.min_bid_increment).toLocaleString()} ฿</p></div>
+                    ) : (
+                        <div className="text-center"><p className="text-sm text-slate-500">ราคาสินค้า</p><p className="text-3xl font-black text-pink-600 dark:text-pink-400 font-mono">฿{requiredAmount.toLocaleString()}</p></div>
+                    )}
+                    {isEscrow && isInsufficient && (
+                        <div className="animate-pulse bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-3 rounded-xl flex items-center gap-3">
+                            <div className="shrink-0"><AlertTriangleIcon /></div>
+                            <div><p className="font-bold text-red-600 dark:text-red-400 text-sm">ยอดเงินไม่เพียงพอ!</p><p className="text-xs text-red-500 dark:text-red-300">กระเป๋าของคุณ: {userBalance.toLocaleString()} ฿</p></div>
+                        </div>
+                    )}
+                    <div className="flex gap-3 mt-2">
+                        {isEscrow && isInsufficient ? (
+                            <button onClick={onTopUp} className="w-full py-3 bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-bold rounded-xl shadow-lg hover:scale-105 transition-transform flex items-center justify-center gap-2"><span className="text-lg">💰</span> เติมเครดิตทันที</button>
+                        ) : (
+                            <>
+                                <button onClick={onClose} className="flex-1 py-3 bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold rounded-xl hover:brightness-95">ยกเลิก</button>
+                                <button onClick={handleSubmit} className={`flex-1 py-3 font-bold rounded-xl text-white shadow-lg transition-transform active:scale-95 ${type === 'buy' ? 'bg-pink-600 hover:bg-pink-500' : 'bg-amber-500 hover:bg-amber-600'}`}>{type === 'buy' ? 'ยืนยันซื้อเลย' : 'ยืนยันประมูล'}</button>
+                            </>
+                        )}
+                    </div>
+                </div>
+            </div>
+        </div>, document.body
+    );
+};
+
 // === Main Component ===
 export default function AuctionMarket() {
   const navigate = useNavigate();
   const location = useLocation();
-  const [activeTab, setActiveTab] = useState('auction');
+  const [activeTab, setActiveTab] = useLocalStorage('bot-market-active-tab', 'auction');
   const [auctions, setAuctions] = useState([]);
   const [myAuctions, setMyAuctions] = useState([]);
   
@@ -766,6 +897,12 @@ export default function AuctionMarket() {
   const [isDeckListModalOpen, setIsDeckListModalOpen] = useState(false);
   const [isTypeSelectionOpen, setIsTypeSelectionOpen] = useState(false); 
   const [isBulkModalOpen, setIsBulkModalOpen] = useState(false); 
+
+  // ✅✅✅ โค้ดใหม่ 2: State สำหรับ Modal ยืนยัน ✅✅✅
+  const [actionModalData, setActionModalData] = useState(null); // เก็บข้อมูลว่าจะ Bid หรือ Buy
+  const [isTopUpOpen, setIsTopUpOpen] = useState(false); // เปิด/ปิด Modal เติมเงิน
+  const [shipmentData, setShipmentData] = useState(null); 
+
 
   const [userDecks, setUserDecks] = useLocalStorage("bot-userDecks-v1", {});
   const [mainDeck, setMainDeck] = useLocalStorage("bot-mainDeck-v32-final", []);
@@ -891,24 +1028,61 @@ export default function AuctionMarket() {
     });
   }, [auctions, searchTerm, sortOption, filterStatus]);
 
+  // ✅✅✅ โค้ดใหม่ 3: ฟังก์ชันจัดการ Bid/Buy แบบใหม่ ✅✅✅
+
+  // 1. กดปุ่ม Bid -> เปิด Modal
   async function handleBid(auction) {
-    if (!userProfile) return alert("กรุณา Login ที่หน้าแรกก่อนครับ");
+    if (!userProfile) return alert("กรุณา Login ก่อนครับ");
     if (userProfile.email === auction.seller_email) return alert("ห้ามบิดของตัวเองครับ!");
-    const minBid = auction.current_price + auction.min_bid_increment;
-    const amountStr = prompt(`🔥 บิดสินค้า: ${auction.card_name}\n💰 ราคาปัจจุบัน: ${auction.current_price.toLocaleString()} บาท\n📈 ขั้นต่ำที่ต้องบิด: ${minBid.toLocaleString()} บาท\nกรอกราคาที่คุณต้องการสู้:`, minBid);
-    if (!amountStr) return;
-    const amount = parseInt(amountStr);
-    if (amount < minBid) return alert(`ต้องบิดอย่างน้อย ${minBid} บาทครับ`);
-    const { data, error } = await supabase.rpc('place_bid', { p_auction_id: auction.id, p_bidder_email: userProfile.email, p_bidder_name: displayUser.name, p_amount: amount });
-    if (error) alert("Error: " + error.message); else if (!data.success) alert(data.message); else alert("บิดสำเร็จ! 🎉");
+    
+    // เปิด Modal ยืนยัน
+    setActionModalData({ type: 'bid', auction });
   }
 
+  // 2. กดปุ่ม Buy Now -> เปิด Modal
   async function handleBuyNow(auction) {
     if (!userProfile) return alert("กรุณา Login ก่อนครับ");
     if (userProfile.email === auction.seller_email) return alert("ซื้อของตัวเองไม่ได้ครับ");
-    if (!confirm(`⚡ ยืนยันการซื้อทันที (Buy Now)?\n\n💰 ราคา: ${auction.buy_now_price.toLocaleString()} บาท\n\n(การประมูลจะจบลงทันทีและคุณจะเป็นผู้ชนะ)`)) return;
-    const { data, error } = await supabase.rpc('buy_now_auction', { p_auction_id: auction.id, p_buyer_email: userProfile.email, p_buyer_name: displayUser.name, p_amount: auction.buy_now_price });
-    if (error) alert("Error: " + error.message); else if (!data.success) alert(data.message); else { alert("🎉 ยินดีด้วย! คุณชนะการประมูลด้วยระบบ Buy Now"); setChatAuction(null); fetchAuctions(); }
+    
+    // เปิด Modal ยืนยัน
+    setActionModalData({ type: 'buy', auction });
+  }
+
+  // 3. ฟังก์ชันที่จะถูกเรียกเมื่อกดยืนยันใน Modal
+  async function handleFinalSubmit(amount) {
+    if (!actionModalData) return;
+    const { type, auction } = actionModalData;
+    
+    // ปิด Modal
+    setActionModalData(null);
+
+    if (type === 'bid') {
+        if (!amount) return;
+        const { data, error } = await supabase.rpc('place_bid', { 
+            p_auction_id: auction.id, 
+            p_bidder_email: userProfile.email, 
+            p_bidder_name: displayUser.name, 
+            p_amount: amount 
+        });
+        if (error) alert("Error: " + error.message); 
+        else if (!data.success) alert(data.message); 
+        else alert("บิดสำเร็จ! 🎉");
+    } 
+    else if (type === 'buy') {
+        const { data, error } = await supabase.rpc('buy_now_auction', { 
+            p_auction_id: auction.id, 
+            p_buyer_email: userProfile.email, 
+            p_buyer_name: displayUser.name, 
+            p_amount: auction.buy_now_price 
+        });
+        if (error) alert("Error: " + error.message); 
+        else if (!data.success) alert(data.message); 
+        else { 
+            alert("🎉 ยินดีด้วย! คุณชนะการประมูล (Buy Now)"); 
+            setChatAuction(null); 
+            fetchAuctions(); 
+        }
+    }
   }
 
   async function handleCancel(auctionId) {
@@ -948,6 +1122,29 @@ export default function AuctionMarket() {
   const handleSaveProfile = async (data) => { if (!userProfile) return; try { await setDoc(doc(db, "users", userProfile.email), { displayName: data.displayName, avatarUrl: data.avatarUrl, isSetup: true, updatedAt: serverTimestamp() }, { merge: true }); setCustomProfile(p => ({ ...p, ...data })); setIsProfileModalOpen(false); alert("บันทึกข้อมูลเรียบร้อย!"); } catch (e) { console.error(e); alert("บันทึกไม่สำเร็จ"); } };
   const handleStartAuctionClick = () => { setIsTypeSelectionOpen(true); };
   const handleSelectType = (type) => { setIsTypeSelectionOpen(false); if (type === 'single') { navigate('/', { state: { showAuctionTutorial: true } }); } else { setIsBulkModalOpen(true); } };
+  
+  // ✅ ฟังก์ชันจัดการปุ่มยืนยันรับสินค้า (Escrow Only)
+  const handleConfirmReceipt = (item) => {
+      // ถ้ายังไม่ส่ง -> ห้ามกด
+      if (!item.is_shipped) {
+          return alert("ผู้ขายยังไม่ได้กดส่งสินค้าครับ กรุณารอผู้ขายจัดส่งก่อน");
+      }
+      // ถ้ากดแล้ว -> เปิด Modal ยืนยัน (Escrow)
+      const warningMsg = 
+`⚠️ กรุณาตรวจสอบสินค้า!
+
+ท่านได้รับสินค้าและตรวจดูสินค้าภายในเรียบร้อยแล้วใช่หรือไม่?
+
+- หากกดยืนยัน: ยอดเงินจะถูกโอนให้ผู้ขายทันที
+- จะไม่มีการคืนเงินทุกกรณี
+- หากท่านไม่กดยืนยันภายใน 7 วัน ระบบจะโอนเงินอัตโนมัติ
+
+ยืนยันการรับสินค้าหรือไม่?`;
+
+      if (confirm(warningMsg)) {
+          setConfirmTransaction({ auction: item });
+      }
+  };
 
   return (
     <div className="h-full overflow-y-auto bg-slate-100 dark:bg-black text-slate-900 dark:text-white flex flex-col transition-colors duration-300">
@@ -1002,49 +1199,16 @@ export default function AuctionMarket() {
         }
       `}</style>
 
-      <header className="px-3 md:px-6 py-2 border-b border-slate-300 dark:border-emerald-700/30 bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm sticky top-0 z-50 h-14 flex flex-col justify-center">
-         <div className="flex items-center justify-between gap-2 w-full">  
-            <div className="flex items-center gap-1.5 overflow-hidden">
-                <button onClick={() => setIsSettingsOpen(true)} className="p-1.5 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-full text-slate-800 dark:text-white transition-colors shrink-0">
-                    <div className="scale-90"><MenuIcon /></div>
-                </button>
-                {userProfile?.email === 'koritros619@gmail.com' && (
-                    <button onClick={() => setIsAdminOpen(true)} className="flex items-center gap-1 px-2 py-1 bg-red-600 hover:bg-red-500 text-white rounded-full shadow-lg shadow-red-500/20 transition-all animate-pulse font-bold text-[10px] md:text-xs shrink-0">
-                        <div className="scale-75"><CrownIcon /></div> <span className="hidden md:inline">ADMIN</span>
-                    </button>
-                )}
-                <h1 className="text-lg md:text-3xl font-extrabold tracking-tight bg-gradient-to-r from-amber-500 to-emerald-600 dark:from-amber-300 dark:to-emerald-400 bg-clip-text text-transparent truncate pt-0.5">
-                    Marketplace
-                </h1>
-            </div>
-            <div className="flex items-center gap-1.5 md:gap-3 shrink-0">
-                <Link to="/">
-                    <Button className="!px-2 md:!px-4 bg-gradient-to-r from-rose-500 to-orange-600 text-white border-none shadow-md hover:shadow-lg hover:from-rose-400 hover:to-orange-500 ring-2 ring-offset-2 ring-rose-500/50 dark:ring-offset-slate-900">
-                        <HomeIcon /> <span className="hidden md:inline ml-1">Home</span>
-                    </Button>
-                </Link>
-                <Link to="/public-decks">
-                    <Button as="span" className="!px-2 md:!px-4 bg-gradient-to-r from-blue-500 to-purple-600 text-white border-none shadow-lg hover:from-blue-400 hover:to-purple-500">
-                        <UsersIcon /> <span className="hidden md:inline">Public</span>
-                    </Button>
-                </Link>
-                <NotificationCenter userEmail={userProfile?.email} />
-                <img
-                    src={displayUser.picture}
-                    alt={displayUser.name}
-                    className="w-8 h-8 md:w-9 md:h-9 rounded-full border-2 border-emerald-500 object-cover ml-1 cursor-pointer hover:scale-105 transition-transform"
-                    title={`Logged in as ${displayUser.name}`}
-                    onClick={() => setIsSettingsOpen(true)} 
-                />
-                <span className="text-slate-900 dark:text-white hidden lg:block text-sm font-semibold max-w-[100px] truncate">
-                    {displayUser.name} <span className="hidden">{userReputation[userProfile?.email]?.total_score || 0}</span>
-                </span>
-            </div>
-         </div>
-      </header>
+      <Header 
+        userProfile={userProfile}
+        displayUser={displayUser}
+        userReputation={userReputation[userProfile?.email]} // ส่งข้อมูล Wallet/Score ของ User คนนี้
+        setIsSettingsOpen={setIsSettingsOpen}
+        setIsAdminOpen={setIsAdminOpen}
+      />
 
-      <div className="flex justify-center mt-4 px-2 md:px-4">
-        <div className="flex w-full md:w-auto bg-slate-200 dark:bg-slate-800 rounded-full p-1 shadow-inner">
+      <div className="flex justify-center mt-4 px-2 md:px-4 shrink-0">
+        <div className="flex w-full md:w-auto bg-slate-200 dark:bg-slate-800 rounded-2xl md:rounded-full p-1 shadow-inner overflow-hidden">
             <button onClick={() => setActiveTab('auction')} className={`flex-1 md:flex-none flex items-center justify-center gap-1 md:gap-2 px-2 md:px-6 py-2 rounded-full font-bold text-xs md:text-sm transition-all whitespace-nowrap ${activeTab === 'auction' ? 'bg-white dark:bg-slate-700 text-amber-600 dark:text-amber-400 shadow-md' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}>
                 <GavelIcon /> ลานประมูล
             </button>
@@ -1052,7 +1216,7 @@ export default function AuctionMarket() {
                 <ShoppingBagIcon /> <span className="hidden sm:inline">ตลาดซื้อขาย</span><span className="inline sm:hidden">ตลาด</span>
             </button>
             <button onClick={() => setActiveTab('my-auctions')} className={`flex-1 md:flex-none flex items-center justify-center gap-1 md:gap-2 px-2 md:px-6 py-2 rounded-full font-bold text-xs md:text-sm transition-all whitespace-nowrap ${activeTab === 'my-auctions' ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-md' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}>
-                <PackageIcon /> <span className="hidden sm:inline">สินค้าที่ลงประมูล</span><span className="inline sm:hidden">รายการที่เคยประมูล</span>
+                <PackageIcon /> <span className="hidden sm:inline">สินค้าที่ลงประมูล</span><span className="inline sm:hidden">การจัดการ</span>
             </button>
             <button onClick={() => setActiveTab('to-receive')} className={`flex-1 md:flex-none flex items-center justify-center gap-1 md:gap-2 px-3 md:px-6 py-2 rounded-full font-bold text-xs md:text-sm transition-all whitespace-nowrap ${activeTab === 'to-receive' ? 'bg-white dark:bg-slate-700 text-purple-600 dark:text-purple-400 shadow-md' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}>
                 <ShieldCheckIcon />สินค้าที่ต้องได้รับ
@@ -1095,7 +1259,12 @@ export default function AuctionMarket() {
                     {filteredAuctions.map(item => (
                         <div key={item.id} className="bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-emerald-500/20 rounded-2xl shadow-md hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group cursor-pointer relative overflow-hidden flex flex-col" onClick={() => setChatAuction(item)}>
                             <div className="aspect-[4/5] bg-slate-100 dark:bg-slate-800/50 relative p-1 md:p-6 flex items-center justify-center overflow-hidden">
-                                <img src={getAuctionThumbnail(item)} className="w-full h-full object-cover drop-shadow-2xl" onError={(e) => { if (!e.currentTarget.src.endsWith('.jpg')) e.currentTarget.src = e.currentTarget.src.replace('.png', '.jpg'); }} />
+                                <img src={getAuctionThumbnail(item)} className="w-full h-full object-cover drop-shadow-2xl" onError={(e) => { if (!e.currentTarget.src.endsWith('.jpg')) e.currentTarget.src = e.currentTarget.src.replace('.png', '.jpg'); }} />   
+                            {item.is_escrow && (
+                                    <div className="absolute top-2 left-2 bg-blue-600 text-white p-1 rounded-full shadow-md z-20" title="ระบบ Escrow คุ้มครอง">
+                                        <ShieldCheckIcon width="16" height="16" />
+                                    </div>
+                                )}
                                 {item.winner_name && <div className="absolute top-2 right-2 bg-amber-500 text-white text-[10px] px-2 py-1 rounded-full font-bold shadow-sm z-10">👑 {item.winner_name}</div>}
                             </div>
                             <div className="p-3 flex-1 flex flex-col gap-1">
@@ -1128,16 +1297,31 @@ export default function AuctionMarket() {
 
         {activeTab === 'my-auctions' && (
             <div className="animate-fade-in w-full md:px-8">
-                {/* 🟢 ปรับ Grid: มือถือ 2 ช่อง, PC ใหญ่สุด 5 ช่อง */}
+                <h2 className="text-lg md:text-2xl font-bold text-slate-900 dark:text-white mb-4 mt-4 px-2 md:px-0 flex items-center gap-2">
+                    <PackageIcon className="w-6 h-6"/> การจัดการประวัติการซื้อขายของคุณ
+                </h2>
                 <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 md:gap-6">
-                    {/* กรองเฉพาะรายการที่ user เป็นคนขาย */}
-                    {myAuctions.filter(i => i.seller_email === userProfile?.email).map(item => (
+                    {myAuctions.filter(i => i.seller_email === userProfile?.email).map(item => {
+                        // 🟢 Logic เช็คว่าต้องส่งของไหม (เฉพาะ Escrow)
+                        // ถ้าไม่ใช้ Escrow (is_escrow = false) ก็จะไม่เข้าเงื่อนไขนี้
+                        const needShipping = item.is_escrow && item.winner_email && !item.is_shipped && (item.status === 'completed' || item.status === 'ended');
+
+                        return (
                         <div key={item.id} className="bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-emerald-500/20 rounded-2xl shadow-md hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group cursor-pointer relative overflow-hidden flex flex-col" onClick={() => setChatAuction(item)}>
                             <div className="aspect-[4/5] bg-slate-100 dark:bg-slate-800/50 relative p-1 md:p-6 flex items-center justify-center overflow-hidden">
                                 <img src={getAuctionThumbnail(item)} className="w-full h-full object-cover drop-shadow-2xl" onError={(e) => { if (!e.currentTarget.src.endsWith('.jpg')) e.currentTarget.src = e.currentTarget.src.replace('.png', '.jpg'); }} />
-                                <div className="absolute top-2 right-2 bg-slate-600/90 text-white text-[10px] px-2 py-1 rounded-full font-bold border border-slate-500">
-                                    {item.status === 'cancelled' ? 'ยกเลิกแล้ว' : (new Date(item.end_time) < new Date() ? 'จบแล้ว' : 'กำลังประมูล')}
-                                </div>
+                                {item.is_escrow && (<div className="absolute top-2 left-2 bg-blue-600 text-white p-1 rounded-full shadow-md z-20" title="ระบบ Escrow คุ้มครอง"><ShieldCheckIcon width="16" height="16" /></div>)}
+                                
+                                {/* 🟢 Badge สถานะการส่ง (เฉพาะ Escrow) */}
+                                {item.is_escrow && item.winner_email && (
+                                    <div className={`absolute bottom-2 left-0 right-0 text-center text-[10px] font-bold py-1 mx-4 rounded-full shadow-md ${item.is_shipped ? 'bg-emerald-500 text-white' : 'bg-amber-500 text-white'}`}>
+                                        {item.is_shipped ? '🚚 จัดส่งแล้ว' : '📦 ต้องจัดส่งสินค้า'}
+                                    </div>
+                                )}
+
+                                {!item.is_escrow && (
+                                    <div className="absolute top-2 right-2 bg-slate-600/90 text-white text-[10px] px-2 py-1 rounded-full font-bold border border-slate-500">{item.status === 'cancelled' ? 'ยกเลิกแล้ว' : (new Date(item.end_time) < new Date() ? 'จบแล้ว' : 'กำลังประมูล')}</div>
+                                )}
                             </div>
                             <div className="p-3 flex-1 flex flex-col gap-1">
                                 <h3 className="font-black text-sm md:text-base text-slate-900 dark:text-white text-center mb-1 line-clamp-1">{item.card_name}</h3>
@@ -1145,67 +1329,105 @@ export default function AuctionMarket() {
                                     <p className="text-[9px] text-slate-400 uppercase font-bold tracking-wider mb-0.5">Current Bid</p>
                                     <span className="text-2xl md:text-3xl font-black text-slate-900 dark:text-white">฿{item.current_price.toLocaleString()}</span>
                                 </div>
-                                {item.status === 'active' && (
-                                    <div className="mt-2 space-y-2" onClick={e => e.stopPropagation()}>
-                                        <button onClick={() => handleCancel(item.id)} className="w-full py-1.5 bg-red-100 dark:bg-red-900/30 text-red-600 border border-red-200 rounded-lg text-xs font-bold hover:bg-red-200 transition-colors flex items-center justify-center gap-1"><BanIcon /> ยกเลิก</button>
-                                        <button onClick={() => setManageAuction(item)} className="w-full py-1.5 bg-slate-100 dark:bg-slate-800 text-slate-600 border border-slate-300 rounded-lg text-xs font-bold hover:bg-slate-200 transition-colors flex items-center justify-center gap-1"><ShieldCheckIcon /> จัดการ</button>
-                                    </div>
-                                )}
-                                {/* ปุ่มลบประวัติ (สำหรับเจ้าของ) */}
-                                {item.status !== 'active' && (
-                                    <div className="mt-2" onClick={e => e.stopPropagation()}>
-                                        <button 
-                                            onClick={() => handleDeleteMyAuction(item)} 
-                                            className="w-full py-1.5 bg-red-100 text-red-600 border border-red-200 rounded-lg text-xs font-bold hover:bg-red-200 flex items-center justify-center gap-1"
-                                        >
-                                            <TrashIcon /> ลบประวัติ
-                                        </button>
-                                    </div>
-                                )}
+                                
+                                {/* 🟢 ปุ่ม Action (แยก Escrow/Non-Escrow) */}
+                                <div className="mt-2 space-y-2" onClick={e => e.stopPropagation()}>
+                                    {item.is_escrow ? (
+                                        // Case: Escrow
+                                        needShipping ? (
+                                            <button onClick={() => setShipmentData(item)} className="w-full py-2 bg-blue-600 text-white rounded-lg text-xs font-bold hover:bg-blue-700 shadow-lg animate-pulse flex justify-center items-center gap-2">
+                                                <TruckIcon /> แจ้งส่งสินค้า (Shipping)
+                                            </button>
+                                        ) : (
+                                            item.is_shipped && <div className="text-center text-xs text-emerald-500 font-bold border border-emerald-500/30 rounded p-1">ส่งแล้ว: {item.tracking_number}</div>
+                                        )
+                                    ) : (
+                                        // Case: Non-Escrow (ปกติ)
+                                        <div className="text-center text-[10px] text-slate-500 bg-slate-100 dark:bg-slate-800 rounded p-1">นัดรับ/โอนโดยตรง</div>
+                                    )}
+
+                                    {item.status === 'active' && (
+                                        <div className="mt-2 space-y-2">
+                                            <button onClick={() => handleCancel(item.id)} className="w-full py-1.5 bg-red-100 dark:bg-red-900/30 text-red-600 border border-red-200 rounded-lg text-xs font-bold hover:bg-red-200 transition-colors flex items-center justify-center gap-1"><BanIcon /> ยกเลิก</button>
+                                            <button onClick={() => setManageAuction(item)} className="w-full py-1.5 bg-slate-100 dark:bg-slate-800 text-slate-600 border border-slate-300 rounded-lg text-xs font-bold hover:bg-slate-200 transition-colors flex items-center justify-center gap-1"><ShieldCheckIcon /> จัดการ</button>
+                                        </div>
+                                    )}
+
+                                    {item.status !== 'active' && (
+                                        <div className="mt-2">
+                                            <button onClick={() => handleDeleteMyAuction(item)} className="w-full py-1.5 bg-red-100 text-red-600 border border-red-200 rounded-lg text-xs font-bold hover:bg-red-200 flex items-center justify-center gap-1"><TrashIcon /> ลบประวัติ</button>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                         </div>
-                    ))}
+                    );})}
                 </div>
             </div>
         )}
 
         {activeTab === 'market' && (
-            <FleaMarket 
-                userProfile={displayUser} 
-                onChat={(item) => setChatAuction(item)} 
-            />
+            <FleaMarket userProfile={displayUser} onChat={(item) => setChatAuction(item)} />
         )}
 
-        {/* 🟢 ส่วนใหม่: สินค้าที่ต้องได้รับ (To Receive) */}
+        {/* === Tab 4: To Receive (Buyer) === */}
         {activeTab === 'to-receive' && (
             <div className="animate-fade-in w-full md:px-8">
-                {/* ใช้ Grid 5 คอลัมน์เหมือนหน้าหลัก */}
                 <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 md:gap-6">
-                    {/* กรองเฉพาะรายการที่ user ชนะและจบแล้ว */}
                     {myAuctions.filter(i => i.winner_email === userProfile?.email && i.status !== 'active').map(item => (
                         <div key={item.id} className="bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-emerald-500/20 rounded-2xl shadow-md hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group cursor-pointer relative overflow-hidden flex flex-col" onClick={() => setChatAuction(item)}>
+                            {/* ... Image Section ... */}
                             <div className="aspect-[4/5] bg-slate-100 dark:bg-slate-800/50 relative p-1 md:p-6 flex items-center justify-center overflow-hidden">
                                 <img src={getAuctionThumbnail(item)} className="w-full h-full object-cover drop-shadow-2xl" onError={(e) => { if (!e.currentTarget.src.endsWith('.jpg')) e.currentTarget.src = e.currentTarget.src.replace('.png', '.jpg'); }} />
-                                <div className="absolute top-2 right-2 bg-emerald-500 text-white text-[10px] px-2 py-1 rounded-full font-bold shadow-sm z-10">ชนะประมูล!</div>
+                                
+                                {/* 🟢 ไอคอน Escrow (ซ้ายบน) */}
+                                {item.is_escrow && (
+                                    <div className="absolute top-2 left-2 bg-blue-600 text-white p-1 rounded-full shadow-md z-20" title="ระบบ Escrow คุ้มครอง">
+                                        <ShieldCheckIcon width="16" height="16" />
+                                    </div>
+                                )}
+                                
+                                {/* 🟢 สถานะการส่ง (เฉพาะ Escrow) */}
+                                {item.is_escrow ? (
+                                    <div className={`absolute bottom-2 left-0 right-0 text-center text-[10px] font-bold py-1 mx-4 rounded-full shadow-md ${item.is_shipped ? 'bg-emerald-500 text-white' : 'bg-slate-500 text-white'}`}>
+                                        {item.is_shipped ? `🚚 ส่งแล้ว: ${item.tracking_number}` : '⏳ รอผู้ขายจัดส่ง'}
+                                    </div>
+                                ) : (
+                                    <div className="absolute top-2 right-2 bg-emerald-500 text-white text-[10px] px-2 py-1 rounded-full font-bold shadow-sm z-10">ชนะประมูล!</div>
+                                )}
                             </div>
+
                             <div className="p-3 flex-1 flex flex-col gap-1">
+                                {/* ... Info ... */}
                                 <h3 className="font-black text-sm md:text-base text-slate-900 dark:text-white text-center mb-1 line-clamp-1">{item.card_name}</h3>
                                 <div className="mt-auto bg-emerald-50 dark:bg-emerald-900/20 p-2 rounded-xl border border-emerald-200 dark:border-emerald-800 text-center">
                                     <p className="text-[9px] text-emerald-600 dark:text-emerald-400 uppercase font-bold tracking-wider mb-0.5">ราคาจบ</p>
                                     <span className="text-2xl md:text-3xl font-black text-emerald-600 dark:text-emerald-400">฿{item.current_price.toLocaleString()}</span>
                                 </div>
+
                                 <div className="mt-2 space-y-2" onClick={e => e.stopPropagation()}>
-                                    {/* ปุ่มยืนยันรับของ */}
-                                    <button 
-                                        onClick={() => setConfirmTransaction({ auction: item })} 
-                                        className="w-full py-1.5 bg-blue-600 text-white rounded-lg text-xs font-bold hover:bg-blue-700 transition-colors flex items-center justify-center gap-1 shadow-md"
-                                    >
-                                        ✅ ยืนยันรับสินค้า
-                                    </button>
+                                    {/* 🟢 ปุ่ม Action (แยก Escrow/Non-Escrow) */}
+                                    {item.is_escrow ? (
+                                        // Case 1: Escrow -> ต้องรอส่งของก่อนถึงกดได้
+                                        <button 
+                                            onClick={() => handleConfirmReceipt(item)} 
+                                            disabled={!item.is_shipped} 
+                                            className={`w-full py-1.5 rounded-lg text-xs font-bold flex items-center justify-center gap-1 shadow-md transition-colors ${item.is_shipped ? 'bg-emerald-600 text-white hover:bg-emerald-700' : 'bg-slate-300 text-slate-500 cursor-not-allowed'}`}
+                                        >
+                                            <CheckIcon /> ยืนยันรับสินค้า
+                                        </button>
+                                    ) : (
+                                        // Case 2: ธรรมดา -> กดให้คะแนนได้เลย
+                                        <button 
+                                            onClick={() => setConfirmTransaction({ auction: item })} 
+                                            className="w-full py-1.5 bg-blue-600 text-white rounded-lg text-xs font-bold hover:bg-blue-700 transition-colors flex items-center justify-center gap-1 shadow-md"
+                                        >
+                                            ให้คะแนนผู้ขาย
+                                        </button>
+                                    )}
+
                                     <div className="flex gap-2">
-                                        {/* ปุ่มแชท */}
                                         <button onClick={() => setChatAuction(item)} className="flex-1 py-1.5 bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-lg text-xs font-bold hover:bg-slate-300 flex items-center justify-center gap-1"><ChatBubbleIcon/></button>
-                                        {/* ปุ่มลบประวัติ */}
                                         <button onClick={() => handleDeleteMyAuction(item)} className="flex-1 py-1.5 bg-red-100 text-red-600 border border-red-200 rounded-lg text-xs font-bold hover:bg-red-200 flex items-center justify-center gap-1"><TrashIcon /></button>
                                     </div>
                                 </div>
@@ -1216,10 +1438,7 @@ export default function AuctionMarket() {
                 
                 {/* Empty State */}
                 {myAuctions.filter(i => i.winner_email === userProfile?.email && i.status !== 'active').length === 0 && (
-                    <div className="text-center py-20 text-slate-500">
-                        <p className="text-4xl mb-2"></p>
-                        <p>ยังไม่มีรายการที่ต้องได้รับ</p>
-                    </div>
+                    <div className="text-center py-20 text-slate-500"><p className="text-4xl mb-2"></p><p>ยังไม่มีรายการที่ต้องได้รับ</p></div>
                 )}
             </div>
         )}
@@ -1227,53 +1446,26 @@ export default function AuctionMarket() {
       </main>
 
       {/* Modals & Drawers */}
-      <SettingsDrawer 
-        isOpen={isSettingsOpen} 
-        onClose={() => setIsSettingsOpen(false)} 
-        userProfile={displayUser} 
-        onEditProfile={() => setIsProfileModalOpen(true)} 
-        onLogout={handleLogout} 
-        theme={theme} 
-        setTheme={setTheme} 
-        onOpenAdmin={() => setIsAdminOpen(true)} 
-        userStats={userReputation[userProfile?.email]} 
-        onOpenMyDecks={() => setIsDeckListModalOpen(true)}
-        onOpenFeedback={() => setIsFeedbackOpen(true)} 
-      />
-      
+      <SettingsDrawer isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} userProfile={displayUser} onEditProfile={() => setIsProfileModalOpen(true)} onLogout={handleLogout} theme={theme} setTheme={setTheme} onOpenAdmin={() => setIsAdminOpen(true)} userStats={userReputation[userProfile?.email]} onOpenMyDecks={() => setIsDeckListModalOpen(true)} onOpenFeedback={() => setIsFeedbackOpen(true)} />
       <ProfileSetupModal isOpen={isProfileModalOpen} onClose={() => setIsProfileModalOpen(false)} userProfile={userProfile} onSave={handleSaveProfile} />
       <BidHistoryModal isOpen={!!historyAuction} onClose={() => setHistoryAuction(null)} auction={historyAuction} />
       <CompletedAuctionsModal isOpen={isCompletedModalOpen} onClose={() => setIsCompletedModalOpen(false)} userProfile={userProfile} />
       <AdminDashboardModal isOpen={isAdminOpen} onClose={() => setIsAdminOpen(false)} adminEmail={userProfile?.email} />
       <ReportModal isOpen={!!reportTarget} onClose={() => setReportTarget(null)} reporterEmail={userProfile?.email} targetUser={reportTarget?.targetUser} context={reportTarget?.context} />
       <ManageBiddersModal isOpen={!!manageAuction} onClose={() => setManageAuction(null)} auction={manageAuction} userProfile={userProfile} />
-      
-      {/* Auction & Transaction Modals */}
       <AuctionRoomModal isOpen={!!chatAuction} onClose={() => setChatAuction(null)} auction={chatAuction} userProfile={displayUser} onBid={handleBid} onBuyNow={handleBuyNow} />
       <ConfirmTransactionModal isOpen={!!confirmTransaction} onClose={() => setConfirmTransaction(null)} auction={confirmTransaction?.auction} userProfile={userProfile} fetchReputations={fetchReputations} onBuyNow={handleBuyNow} />
       <DeckListModal isOpen={isDeckListModalOpen} onClose={() => setIsDeckListModalOpen(false)} userProfile={displayUser} userDecks={userDecks} setUserDecks={setUserDecks} mainDeck={mainDeck} lifeDeck={lifeDeck} setMainDeck={setMainDeck} setLifeDeck={setLifeDeck} cardDb={cardDb} />
       
-      {/* 🟢 5. Modal เลือกประเภทการประมูล */}
+      {/* ... Create Modals ... */}
       {isTypeSelectionOpen && (
         createPortal(
             <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[900] p-4 animate-fade-in" onClick={() => setIsTypeSelectionOpen(false)}>
                 <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl w-full max-w-sm shadow-2xl border border-slate-200 dark:border-slate-700 transform scale-100 transition-transform" onClick={e => e.stopPropagation()}>
                     <h3 className="text-xl font-bold text-center mb-6 text-slate-900 dark:text-white">ต้องการลงขายแบบไหน?</h3>
                     <div className="flex flex-col gap-3">
-                        <button onClick={() => handleSelectType('single')} className="flex items-center gap-4 p-4 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 hover:border-emerald-500 transition-all group">
-                            <div className="w-12 h-12 rounded-full bg-emerald-100 dark:bg-emerald-900/50 flex items-center justify-center text-2xl group-hover:scale-110 transition-transform">🃏</div>
-                            <div className="text-left">
-                                <h4 className="font-bold text-slate-900 dark:text-white">การ์ดเดี่ยว (Single)</h4>
-                                <p className="text-xs text-slate-500 dark:text-slate-400">เลือกการ์ดจากฐานข้อมูล</p>
-                            </div>
-                        </button>
-                        <button onClick={() => handleSelectType('bulk')} className="flex items-center gap-4 p-4 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-amber-50 dark:hover:bg-amber-900/20 hover:border-amber-500 transition-all group">
-                            <div className="w-12 h-12 rounded-full bg-amber-100 dark:bg-amber-900/50 flex items-center justify-center text-2xl group-hover:scale-110 transition-transform">📦</div>
-                            <div className="text-left">
-                                <h4 className="font-bold text-slate-900 dark:text-white">ยกกล่อง / อื่นๆ</h4>
-                                <p className="text-xs text-slate-500 dark:text-slate-400">ระบุชื่อเอง + ต้องถ่ายรูป</p>
-                            </div>
-                        </button>
+                        <button onClick={() => handleSelectType('single')} className="flex items-center gap-4 p-4 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 hover:border-emerald-500 transition-all group"><div className="w-12 h-12 rounded-full bg-emerald-100 dark:bg-emerald-900/50 flex items-center justify-center text-2xl group-hover:scale-110 transition-transform">🃏</div><div className="text-left"><h4 className="font-bold text-slate-900 dark:text-white">การ์ดเดี่ยว (Single)</h4><p className="text-xs text-slate-500 dark:text-slate-400">เลือกการ์ดจากฐานข้อมูล</p></div></button>
+                        <button onClick={() => handleSelectType('bulk')} className="flex items-center gap-4 p-4 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-amber-50 dark:hover:bg-amber-900/20 hover:border-amber-500 transition-all group"><div className="w-12 h-12 rounded-full bg-amber-100 dark:bg-amber-900/50 flex items-center justify-center text-2xl group-hover:scale-110 transition-transform">📦</div><div className="text-left"><h4 className="font-bold text-slate-900 dark:text-white">ยกกล่อง / อื่นๆ</h4><p className="text-xs text-slate-500 dark:text-slate-400">ระบุชื่อเอง + ต้องถ่ายรูป</p></div></button>
                     </div>
                     <button onClick={() => setIsTypeSelectionOpen(false)} className="mt-6 w-full py-2 text-sm text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">ยกเลิก</button>
                 </div>
@@ -1281,28 +1473,34 @@ export default function AuctionMarket() {
         )
       )}
 
-      {/* 🟢 6. Modal ลงขายแบบ Bulk */}
-      <CreateBulkAuctionModal 
-        isOpen={isBulkModalOpen} 
-        onClose={() => setIsBulkModalOpen(false)} 
-        userProfile={displayUser} 
+      <CreateBulkAuctionModal isOpen={isBulkModalOpen} onClose={() => setIsBulkModalOpen(false)} userProfile={displayUser} />
+      <FeedbackModal isOpen={isFeedbackOpen} onClose={() => setIsFeedbackOpen(false)} userProfile={displayUser} showAlert={(title, msg) => alert(`${title}\n${msg}`)} />
+      {!chatAuction && (<ChatWidget userProfile={displayUser} isMobileMenuOpen={isSettingsOpen} />)}
+
+      {/* Action Modals */}
+      <ActionConfirmModal 
+        isOpen={!!actionModalData} 
+        onClose={() => setActionModalData(null)}
+        actionData={actionModalData}
+        userBalance={userReputation[userProfile?.email]?.wallet_balance || 0}
+        onConfirm={handleFinalSubmit}
+        onTopUp={() => { setActionModalData(null); setIsTopUpOpen(true); }}
       />
 
-      {/* Feedback Modal */}
-      <FeedbackModal 
-        isOpen={isFeedbackOpen} 
-        onClose={() => setIsFeedbackOpen(false)} 
-        userProfile={displayUser} 
-        showAlert={(title, msg) => alert(`${title}\n${msg}`)} 
+      <TopUpModal 
+        isOpen={isTopUpOpen}
+        onClose={() => setIsTopUpOpen(false)}
+        userProfile={displayUser}
+        onSuccess={() => fetchReputations()} 
       />
 
-      {/* Chat Widget */}
-      {!chatAuction && (
-        <ChatWidget 
-            userProfile={displayUser} 
-            isMobileMenuOpen={isSettingsOpen} 
-        />
-      )}
+      {/* ✅ เพิ่ม ShipmentModal */}
+      <ShipmentModal 
+        isOpen={!!shipmentData} 
+        onClose={() => setShipmentData(null)} 
+        auction={shipmentData} 
+        onSuccess={() => { fetchMyAuctions(); fetchAuctions(); }} 
+      />
 
     </div>
   );

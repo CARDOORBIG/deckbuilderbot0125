@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from './supabaseClient';
 import { 
     ChatBubbleIcon, TrashIcon, StoreIcon, PackageIcon, 
-    FilterIcon, SearchIcon, PlusIcon
+    FilterIcon, SearchIcon, PlusIcon, ShieldCheckIcon 
 } from './components/Icons';
 import CreateMarketListingModal from './CreateMarketListingModal';
 
@@ -46,7 +46,6 @@ export default function FleaMarket({ userProfile, onChat }) {
       if (item.images) {
           try {
               const urls = JSON.parse(item.images);
-              // แปลง URL เป็น Path สำหรับลบ
               const paths = urls.map(u => { 
                   const parts = u.split('/auction-images/'); 
                   return parts[1] ? decodeURIComponent(parts[1]) : null; 
@@ -64,7 +63,6 @@ export default function FleaMarket({ userProfile, onChat }) {
       if (error) {
           alert("ลบไม่สำเร็จ: " + error.message);
       } else {
-          // อัปเดตหน้าจอทันทีโดยไม่ต้องรอ fetch ใหม่
           setMarketItems(prev => prev.filter(i => i.id !== item.id));
       }
   };
@@ -82,7 +80,6 @@ export default function FleaMarket({ userProfile, onChat }) {
       });
   }, [marketItems, searchTerm, sortOption, filterCategory]);
 
-  // Helper สำหรับเตรียมข้อมูลส่งให้ Chat Modal
   const prepareChatData = (item) => {
     return {
         ...item,
@@ -101,10 +98,8 @@ export default function FleaMarket({ userProfile, onChat }) {
   return (
     <div className="animate-fade-in w-full md:px-8 pb-20">
         
-        {/* Header & Filter Bar */}
+        {/* Header & Filter Bar (คงเดิม) */}
         <div className="mt-4 mb-6 flex flex-col gap-2 bg-white dark:bg-slate-900/50 p-2 md:p-3 rounded-xl border border-slate-200 dark:border-emerald-500/20 shadow-sm mx-4 md:mx-0">
-            
-            {/* Row 1: Search */}
             <div className="relative w-full">
                 <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none text-slate-400">
                     <SearchIcon />
@@ -117,12 +112,8 @@ export default function FleaMarket({ userProfile, onChat }) {
                     className="w-full pl-10 pr-4 py-2.5 bg-slate-100 dark:bg-slate-800 border-none rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none text-slate-900 dark:text-white placeholder-slate-400 transition-all" 
                 />
             </div>
-
-            {/* Row 2: Filters & Button */}
             <div className="flex flex-col md:flex-row gap-2 md:items-center justify-between">
                 <div className="flex gap-2 items-center overflow-x-auto pb-1 md:pb-0 no-scrollbar shrink-0">
-                    
-                    {/* Sort Dropdown */}
                     <div className="flex items-center gap-2 bg-white dark:bg-slate-800 rounded-lg px-3 py-2 border border-slate-300 dark:border-slate-600 min-w-[140px]">
                         <span className="text-slate-500"><FilterIcon /></span>
                         <select 
@@ -135,10 +126,7 @@ export default function FleaMarket({ userProfile, onChat }) {
                             <option value="price_desc" className="text-black">ราคาสูง ➜ ต่ำ</option>
                         </select>
                     </div>
-
                     <div className="w-px h-8 bg-slate-300 dark:bg-slate-700 mx-1 shrink-0"></div>
-
-                    {/* Category Dropdown */}
                     <div className="flex items-center gap-2 bg-white dark:bg-slate-800 rounded-lg px-3 py-2 border border-slate-300 dark:border-slate-600 min-w-[160px]">
                         <span className="text-slate-500"><PackageIcon /></span>
                         <select 
@@ -155,8 +143,6 @@ export default function FleaMarket({ userProfile, onChat }) {
                         </select>
                     </div>
                 </div>
-
-                {/* ปุ่มลงขาย */}
                 <button 
                     onClick={() => setIsCreateModalOpen(true)} 
                     className="w-full md:w-auto px-5 py-2 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-bold rounded-lg shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 text-xs md:text-sm"
@@ -188,7 +174,6 @@ export default function FleaMarket({ userProfile, onChat }) {
                     if (imgs && imgs.length > 0) coverImage = imgs[0];
                 } catch {}
 
-                // 🟢 ตรวจสอบความเป็นเจ้าของ
                 const isOwner = userProfile?.email === item.seller_email;
 
                 return (
@@ -200,15 +185,22 @@ export default function FleaMarket({ userProfile, onChat }) {
                         >
                              <img src={coverImage} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
                              
+                             {/* 🟢 แสดงไอคอน Escrow (ซ้ายบน) */}
+                             {item.is_escrow && (
+                                <div className="absolute top-2 left-2 bg-blue-600 text-white p-1 rounded-full shadow-md z-20" title="ระบบ Escrow คุ้มครอง">
+                                    <ShieldCheckIcon width="16" height="16" />
+                                </div>
+                             )}
+
                              <div className="absolute top-2 right-2 bg-black/60 text-white text-[10px] px-2 py-1 rounded-full backdrop-blur-md font-bold border border-white/10 z-10">
                                 {item.condition}
                              </div>
                              
-                             {/* 🟢 ปุ่มลบ (แสดงเฉพาะเจ้าของ) */}
+                             {/* 🟢 ย้ายปุ่มลบมาไว้ ซ้ายล่าง (Bottom-Left) */}
                              {isOwner && (
                                  <button 
                                     onClick={(e) => { e.stopPropagation(); handleDelete(item); }} 
-                                    className="absolute top-2 left-2 p-1.5 bg-red-600 text-white rounded-full shadow-md opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-700 z-20"
+                                    className="absolute bottom-2 left-2 p-1.5 bg-red-600 text-white rounded-full shadow-md opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-700 z-20"
                                     title="ลบสินค้า"
                                  >
                                     <TrashIcon width="14" height="14"/>
@@ -219,13 +211,11 @@ export default function FleaMarket({ userProfile, onChat }) {
                         {/* Details */}
                         <div className="p-3 flex flex-col flex-grow gap-1">
                             <h3 className="font-bold text-sm text-slate-900 dark:text-white truncate line-clamp-1 mb-auto">{item.title}</h3>
-                            
                             <div className="flex items-center gap-2 mt-1">
                                 <span className="text-[9px] px-1.5 py-0.5 bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300 rounded border border-slate-200 dark:border-slate-600">
                                     {item.category}
                                 </span>
                             </div>
-
                             <div className="mt-auto bg-slate-50 dark:bg-slate-800/50 p-2 rounded-xl border border-slate-200 dark:border-slate-700 flex justify-between items-center">
                                 <div>
                                     <p className="text-[9px] text-slate-400 uppercase font-bold tracking-wide">ราคา</p>
