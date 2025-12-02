@@ -1,5 +1,5 @@
 import React, { useState } from 'react'; 
-import { supabase } from '../supabaseClient';
+import { supabase } from '../supabaseClient'; // ✅ Import Supabase
 import TopUpModal from './TopUpModal'; 
 import { 
     UserCogIcon, CloseIcon, CrownIcon, DeckIcon, 
@@ -20,32 +20,30 @@ const SettingsDrawer = ({
 }) => {
   const [isTopUpOpen, setIsTopUpOpen] = useState(false);
 
-  // ✅ ฟังก์ชันตรวจสอบสถานะระบบ (ฉบับแก้ไข)
+  // ✅ ฟังก์ชันตรวจสอบสถานะระบบก่อนเปิดเติมเงิน
   const handleTopUpClick = async () => {
       try {
-          // ดึงค่าจาก DB ล่าสุดเสมอ (ไม่ cache)
           const { data, error } = await supabase
               .from('system_config')
               .select('value')
               .eq('key', 'topup_status')
               .single();
 
-          if (error) {
-              console.error("Check Status Error:", error);
-              // ถ้า Error ให้เปิดไปก่อน (เผื่อ DB มีปัญหา ลูกค้าจะได้ไม่ติดขัด)
+          if (error && error.code !== 'PGRST116') {
+              console.error(error);
+              // ถ้าหาไม่เจอ (Error) ให้เปิดไปก่อน (กันระบบล่ม)
               setIsTopUpOpen(true);
               return;
           }
 
-          const status = data?.value || 'open'; 
+          const status = data?.value || 'open'; // Default open
 
-          // เช็คสถานะและแจ้งเตือน
           if (status === 'maintenance') {
-              alert("⚠️ ระบบอยู่ในระหว่างการปรับปรุงค่ะ\n\nขออภัยในความไม่สะดวก โปรดลองใหม่ภายหลัง");
+              alert("⚠️ ระบบอยู่ในระหว่างการปรับปรุงค่ะ ขออภัยในความไม่สะดวก");
           } else if (status === 'closed') {
-              alert("⛔ ระบบปิดรับเติมเงินชั่วคราวค่ะ");
+              alert("⛔ ปิดระบบเติมเงินชั่วคราว");
           } else {
-              // ถ้าเป็น 'open' ถึงจะเปิดหน้าต่าง
+              // สถานะ Open
               setIsTopUpOpen(true);
           }
 
@@ -95,7 +93,7 @@ const SettingsDrawer = ({
                       ฿{parseFloat(userStats?.wallet_balance || 0).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </p>
               </div>
-              {/* ✅ ใช้ handleTopUpClick เพื่อเช็คสถานะก่อน */}
+              {/* ✅ ใช้ handleTopUpClick แทนการเปิดตรงๆ */}
               <button 
                   onClick={handleTopUpClick} 
                   className="px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-600 text-white text-xs font-bold rounded-lg shadow hover:shadow-emerald-500/30 hover:scale-105 transition-all active:scale-95"

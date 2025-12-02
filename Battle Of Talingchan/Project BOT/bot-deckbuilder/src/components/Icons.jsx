@@ -54,6 +54,9 @@ export const UserPlusIcon = () => (
 );
 
 export const ExpandIcon = () => <Svg p={<><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" y1="3" x2="14" y2="10"></line><line x1="3" y1="21" x2="10" y2="14"></line></>} />;
+// ✅ เพิ่มไอคอน CheckIcon และ TruckIcon
+export const CheckIcon = () => <Svg strokeWidth="2.5" p={<polyline points="20 6 9 17 4 12"></polyline>} />;
+export const TruckIcon = () => <Svg p={<><rect x="1" y="3" width="15" height="13"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></>} />;
 
 // --- App Specific ---
 export const GavelIcon = ({ className }) => <Svg className={className} p={<><path d="m14 13-7.5 7.5c-.83.83-2.17.83-3 0 0 0 0 0 0 0a2.12 2.12 0 0 1 0-3L11 10"/><path d="m16 16 6-6"/><path d="m8 8 6-6"/><path d="m9 7 8-8"/><path d="m21 11-8-8"/></>} />;
