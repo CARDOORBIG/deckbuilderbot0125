@@ -72,7 +72,7 @@ const ManageBiddersModal = ({ isOpen, onClose, auction, userProfile }) => { if(!
 const BidHistoryModal = ({ isOpen, onClose, auction }) => { if(!isOpen) return null; return <div className="fixed inset-0 bg-black/80 flex items-center justify-center text-white">Bid History (Placeholder) <button onClick={onClose} className="ml-4 bg-red-500 px-2">Close</button></div>; };
 const CompletedAuctionsModal = ({ isOpen, onClose, userProfile }) => { if(!isOpen) return null; return <div className="fixed inset-0 bg-black/80 flex items-center justify-center text-white">Completed Auctions (Placeholder) <button onClick={onClose} className="ml-4 bg-red-500 px-2">Close</button></div>; };
 
-// ✅ Tracking Info Modal (สำหรับผู้ซื้อดูข้อมูลจัดส่ง)
+// ✅ Tracking Info Modal
 const TrackingModal = ({ isOpen, onClose, item }) => {
     if (!isOpen || !item) return null;
     return createPortal(
@@ -125,7 +125,7 @@ const TrackingModal = ({ isOpen, onClose, item }) => {
     );
 };
 
-// Auction Room Modal (แก้ไขลำดับ Hooks แก้ Error)
+// Auction Room Modal
 const AuctionRoomModal = ({ isOpen, onClose, auction, userProfile, onBid, onBuyNow }) => {
     // 1. Hooks ทั้งหมดต้องอยู่บนสุด ห้ามมี return คั่น
     const [messages, setMessages] = useState([]);
@@ -205,19 +205,7 @@ const AuctionRoomModal = ({ isOpen, onClose, auction, userProfile, onBid, onBuyN
     // Helper Functions (ที่ไม่ใช่ Hooks)
     const scrollToBottom = () => { setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100); };
     const handleSendMessage = async (e) => { e.preventDefault(); if (!newMessage.trim() || !userProfile) return; await supabase.from('auction_comments').insert({ auction_id: auction.id, user_email: userProfile.email, user_name: userProfile.name, user_picture: userProfile.picture, message: newMessage.trim() }); setNewMessage(""); };
-    const handleAddFriend = async () => { 
-        if (!userProfile) return alert("กรุณา Login ก่อนครับ");
-        if (userProfile.email === auction.seller_email) return;
-        const { data: existing } = await supabase.from('friendships').select('*').or(`and(requester_id.eq.${userProfile.email},receiver_id.eq.${auction.seller_email}),and(requester_id.eq.${auction.seller_email},receiver_id.eq.${userProfile.email})`);
-        if (existing && existing.length > 0) { setToastMessage("เป็นเพื่อนกันแล้ว หรือส่งคำขอไปแล้ว"); } 
-        else {
-            const { error } = await supabase.from('friendships').insert({ requester_id: userProfile.email, receiver_id: auction.seller_email });
-            if (!error) setToastMessage(`ส่งคำขอเป็นเพื่อนหา ${auction.seller_name} แล้ว!`);
-            else alert(error.message);
-        }
-        setTimeout(() => setToastMessage(null), 3000);
-    };
-
+    
     const handleNext = (e) => { e?.stopPropagation(); if(activeProofIndex < allImages.length - 1) setActiveProofIndex(prev => prev + 1); };
     const handlePrev = (e) => { e?.stopPropagation(); if(activeProofIndex > 0) setActiveProofIndex(prev => prev - 1); };
     const onTouchStart = (e) => { setIsSwiping(true); setTouchStart(e.targetTouches[0].clientX); };
@@ -261,15 +249,8 @@ const AuctionRoomModal = ({ isOpen, onClose, auction, userProfile, onBid, onBuyN
         );
     }
 
-    // 4. Render Main Content
     return createPortal(
         <div className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center z-[700] p-0 md:p-4" onClick={onClose}>
-            {toastMessage && (
-                <div className="absolute top-10 left-1/2 transform -translate-x-1/2 z-[800] bg-black/80 text-white px-6 py-3 rounded-full shadow-2xl border border-emerald-500 animate-fade-in-up flex items-center gap-2">
-                    <span className="text-xl">✅</span> {toastMessage}
-                </div>
-            )}
-
             <div className="bg-white dark:bg-slate-900 border-0 md:border border-slate-200 dark:border-emerald-500/30 rounded-none md:rounded-xl shadow-2xl w-full h-full md:h-[90vh] max-w-6xl flex flex-col md:flex-row overflow-hidden" onClick={e => e.stopPropagation()}>
                 
                 {/* ส่วนซ้าย: รูปภาพ */}
@@ -337,15 +318,6 @@ const AuctionRoomModal = ({ isOpen, onClose, auction, userProfile, onBid, onBuyN
                                     </>
                                 )}
                             </div>
-                            {allImages.length > 1 && (
-                                <div className="h-20 md:h-24 bg-black/40 flex justify-center items-center gap-2 p-2 overflow-x-auto z-50" onClick={e => e.stopPropagation()}>
-                                    {allImages.map((img, idx) => (
-                                        <button key={idx} onClick={() => goToSlide(idx)} className={`h-14 w-14 md:h-16 md:w-16 rounded-lg overflow-hidden border-2 flex-shrink-0 transition-all ${activeProofIndex === idx ? 'border-emerald-500 scale-110 opacity-100' : 'border-transparent opacity-50'}`}>
-                                            <img src={img} className="w-full h-full object-cover" />
-                                        </button>
-                                    ))}
-                                </div>
-                            )}
                         </div>
                     )}
                 </div>
@@ -434,7 +406,7 @@ const AuctionRoomModal = ({ isOpen, onClose, auction, userProfile, onBid, onBuyN
     );
 };
 
-// ✅ Confirm Transaction Modal (เพิ่มแจ้งเตือนผู้ขายเมื่อจบงาน)
+// Confirm Transaction Modal
 const ConfirmTransactionModal = ({ isOpen, onClose, auction, userProfile, fetchReputations }) => {
     const [action, setAction] = useState('good');
     const [reason, setReason] = useState('transaction_success');
@@ -446,7 +418,7 @@ const ConfirmTransactionModal = ({ isOpen, onClose, auction, userProfile, fetchR
     const isSeller = userProfile.email === auction.seller_email;
     const targetEmail = isSeller ? auction.winner_email : auction.seller_email;
     const targetName = isSeller ? auction.winner_name : auction.seller_name;
-    if (auction.end_time > new Date().toISOString()) return null;
+    if (auction.end_time > new Date().toISOString() && auction.type !== 'market') return null;
 
     const handlePreSubmit = () => {
         const score = action === 'good' ? 1 : -1;
@@ -469,10 +441,9 @@ const ConfirmTransactionModal = ({ isOpen, onClose, auction, userProfile, fetchR
         });
         if (error) { alert("Error: " + error.message); setIsSubmitting(false); }
         else { 
-            // 🟢🟢🟢 เพิ่ม: แจ้งเตือนผู้ขาย (ว่าจบงานแล้ว + ได้เงิน/เครดิต) 🟢🟢🟢
             if (targetEmail) {
                  await supabase.from('notifications').insert({
-                    user_email: targetEmail, // ส่งหาผู้ขาย
+                    user_email: targetEmail, 
                     type: 'transaction_complete',
                     title: '✅ ปิดการขายสำเร็จ!',
                     message: `ผู้ซื้อยืนยันรับสินค้า "${auction.card_name}" แล้ว\nคุณได้รับเครดิต: ${score > 0 ? '+1' : '-1'}`,
@@ -541,11 +512,11 @@ const ConfirmTransactionModal = ({ isOpen, onClose, auction, userProfile, fetchR
     );
 };
 
-// ✅ Action Confirm Modal (Popup ยืนยันการซื้อ/ประมูล แบบครบเครื่อง)
+// Action Confirm Modal
 const ActionConfirmModal = ({ isOpen, onClose, actionData, userBalance, onConfirm, onTopUp }) => {
     const [bidAmount, setBidAmount] = useState(0);
     const [isExpanded, setIsExpanded] = useState(false); 
-    const [isSuccess, setIsSuccess] = useState(false); // State สำหรับหน้า Success
+    const [isSuccess, setIsSuccess] = useState(false); 
     
     useEffect(() => { 
         if (isOpen && actionData?.type === 'bid') {
@@ -571,16 +542,11 @@ const ActionConfirmModal = ({ isOpen, onClose, actionData, userBalance, onConfir
 
     const handleSubmit = async () => { 
         if (!canProceed) return; 
-        
-        // เรียก function และรอผลลัพธ์
         const result = await onConfirm(type === 'bid' ? bidAmount : null);
-        
-        // ถ้าสำเร็จ ให้โชว์หน้า Success
         if (result && result.success) {
             setIsSuccess(true);
-            setTimeout(() => { onClose(); }, 2500); // ปิดเองใน 2.5 วิ
+            setTimeout(() => { onClose(); }, 2500); 
         } else if (type === 'bid') {
-             // กรณี Bid อาจจะ Alert มาแล้ว ให้ปิดเลยก็ได้
              onClose();
         }
     };
@@ -589,7 +555,6 @@ const ActionConfirmModal = ({ isOpen, onClose, actionData, userBalance, onConfir
         <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-[950] p-4 animate-fade-in" onClick={isSuccess ? undefined : onClose}>
             <div className="bg-white dark:bg-slate-900 border border-slate-300 dark:border-emerald-500/30 rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden transform scale-100 transition-all" onClick={e => e.stopPropagation()}>
                 
-                {/* ✅✅✅ หน้าจอสำเร็จ (Success Screen) ✅✅✅ */}
                 {isSuccess ? (
                     <div className="flex flex-col items-center justify-center h-80 p-6 text-center animate-fade-in-up">
                         <div className="mb-6 animate-bounce">
@@ -603,7 +568,6 @@ const ActionConfirmModal = ({ isOpen, onClose, actionData, userBalance, onConfir
                         </p>
                     </div>
                 ) : (
-                    // หน้าฟอร์มยืนยันปกติ
                     <>
                         <div className={`p-4 flex items-center gap-3 border-b ${type !== 'bid' ? 'bg-pink-100 dark:bg-pink-900/20 border-pink-200' : 'bg-amber-100 dark:bg-amber-900/20 border-amber-200'}`}>
                             <div className={`p-2 rounded-full ${type !== 'bid' ? 'bg-pink-500' : 'bg-amber-500'} text-white shadow-sm`}>
@@ -615,13 +579,11 @@ const ActionConfirmModal = ({ isOpen, onClose, actionData, userBalance, onConfir
                         </div>
 
                         <div className="p-6 space-y-5">
-                            {/* ข้อมูลสินค้า */}
                             <div className="text-center">
                                 <p className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide font-bold mb-1">สินค้า</p>
                                 <p className="font-bold text-slate-900 dark:text-white text-xl leading-tight">{auction.card_name}</p>
                             </div>
 
-                            {/* ยอดเงิน */}
                             {type === 'bid' ? (
                                 <div>
                                     <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">ระบุยอดเงินประมูล</label>
@@ -642,9 +604,7 @@ const ActionConfirmModal = ({ isOpen, onClose, actionData, userBalance, onConfir
                                 </div>
                             )}
 
-                            {/* 🟢 เงื่อนไข & คำเตือน (แยกตามประเภท) */}
                             {isEscrow ? (
-                                // กรณี Escrow (ระบบปลอดภัย)
                                 <div className={`rounded-xl p-4 border transition-colors ${isInsufficient ? 'bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-800' : 'bg-blue-50 border-blue-200 dark:bg-blue-900/20 dark:border-blue-800'}`}>
                                     <div className="flex justify-between items-center mb-2">
                                         <span className="text-slate-700 dark:text-slate-200 font-bold flex items-center gap-1.5 text-sm">
@@ -667,7 +627,6 @@ const ActionConfirmModal = ({ isOpen, onClose, actionData, userBalance, onConfir
                                     </div>
                                 </div>
                             ) : (
-                                // 🟡 กรณี Non-Escrow (ระบบตกลงเอง)
                                 <div className="bg-amber-50 dark:bg-amber-900/20 p-4 rounded-xl border border-amber-200 dark:border-amber-800/50 text-sm">
                                     <div className="flex items-start gap-3">
                                         <div className="mt-0.5 shrink-0"><WarningIcon /></div>
@@ -677,7 +636,6 @@ const ActionConfirmModal = ({ isOpen, onClose, actionData, userBalance, onConfir
                                                 คุณต้องติดต่อผู้ขายเพื่อชำระเงินและรับสินค้าด้วยตนเอง
                                             </p>
                                             
-                                            {/* ปุ่มอ่านเพิ่มเติม */}
                                             <button onClick={() => setIsExpanded(!isExpanded)} className="text-xs text-amber-600 dark:text-amber-300 underline mt-2 font-bold">
                                                 {isExpanded ? "ซ่อนคำเตือน" : "อ่านคำเตือนความปลอดภัย ▾"}
                                             </button>
@@ -693,7 +651,6 @@ const ActionConfirmModal = ({ isOpen, onClose, actionData, userBalance, onConfir
                                 </div>
                             )}
 
-                            {/* ปุ่มกด */}
                             <div className="flex gap-3 pt-2">
                                 {isEscrow && isInsufficient ? (
                                     <button 
@@ -775,16 +732,20 @@ export default function AuctionMarket() {
   useEffect(() => { const openFromNoti = async () => { if (location.state?.openAuctionId) { const auctionId = location.state.openAuctionId; let targetAuction = auctions.find(a => a.id === auctionId) || myAuctions.find(a => a.id === auctionId); if (!targetAuction) { const { data } = await supabase.from('auctions').select('*').eq('id', auctionId).single(); if (data) targetAuction = data; } if (targetAuction) { setChatAuction(targetAuction); window.history.replaceState({}, document.title); } } }; openFromNoti(); }, [location, auctions, myAuctions]);
   useEffect(() => { if (activeTab === 'management' && userProfile?.email) { fetchMyAuctions(); } else { fetchAuctions(); } const channel = supabase.channel('public:auctions').on('postgres_changes', { event: '*', schema: 'public', table: 'auctions' }, () => { if (activeTab === 'management') fetchMyAuctions(); else fetchAuctions(); }).subscribe(); return () => supabase.removeChannel(channel); }, [activeTab, userProfile]);
   
-  // 🟢 Fetch Data (Modified Logic)
+  // Fetch Data
   async function fetchAuctions() { const now = new Date().toISOString(); const { data } = await supabase.from('auctions').select('*').eq('status', 'active').gt('end_time', now).order('end_time', { ascending: true }); if (data) setAuctions(data); }
   
-  // 🟢 รวม Market Listings เข้ามาใน MyAuctions
+  // 🟢 แก้ไขฟังก์ชันดึงข้อมูล (เพิ่มรายละเอียดการส่ง และ Map Email)
   async function fetchMyAuctions() {
     if (!userProfile?.email) return;
     
+    // 1. Fetch Auctions
     const { data: auctionData } = await supabase.from('auctions').select('*').or(`seller_email.eq.${userProfile.email},winner_email.eq.${userProfile.email}`);
+    
+    // 2. Fetch Market Listings
     const { data: marketData } = await supabase.from('market_listings').select('*').or(`seller_email.eq.${userProfile.email},buyer_email.eq.${userProfile.email}`);
 
+    // 3. Map Market to Auction format
     const mappedMarket = (marketData || []).map(m => ({
         ...m,
         id: m.id,
@@ -795,19 +756,27 @@ export default function AuctionMarket() {
         start_price: m.price,
         buy_now_price: m.price,
         min_bid_increment: 0,
-        end_time: m.created_at, // Sort key
+        end_time: m.created_at,
         seller_email: m.seller_email,
         seller_name: m.seller_name,
-        winner_email: m.buyer_email, // Buyer
+        
+        // 🟢 Critical Mapping: buyer_email -> winner_email เพื่อให้ Management Dashboard มองเห็น
+        winner_email: m.buyer_email,
         winner_name: m.buyer_name,
-        status: m.status, // 'active', 'sold', 'completed'
+        
+        status: m.status,
         is_escrow: m.is_escrow,
+        
+        // ข้อมูลการส่ง
         is_shipped: m.is_shipped,
         tracking_number: m.tracking_number,
-        type: 'market' // Marker
+        courier_name: m.courier_name,
+        shipping_date: m.shipping_date,
+        shipping_proof: m.shipping_proof,
+        
+        type: 'market'
     }));
 
-    // 4. Merge & Sort
     const combined = [...(auctionData || []), ...mappedMarket].sort((a, b) => {
         return new Date(b.created_at) - new Date(a.created_at);
     });
@@ -818,18 +787,26 @@ export default function AuctionMarket() {
 
   async function handleBid(auction) { if (!userProfile) return alert("กรุณา Login ก่อนครับ"); if (userProfile.email === auction.seller_email) return alert("ห้ามบิดของตัวเองครับ!"); setActionModalData({ type: 'bid', auction }); }
   async function handleBuyNow(auction) { if (!userProfile) return alert("กรุณา Login ก่อนครับ"); if (userProfile.email === auction.seller_email) return alert("ซื้อของตัวเองไม่ได้ครับ"); setActionModalData({ type: 'buy', auction }); }
-  // ✅ เพิ่มฟังก์ชันซื้อของตลาดนัด
+  
+  // ✅ 🟢 แก้ไข handleBuyMarketItem (ใช้ค่าจริงจาก item)
   async function handleBuyMarketItem(item) {
       if (!userProfile) return alert("กรุณา Login ก่อนครับ");
       if (userProfile.email === item.seller_email) return alert("ซื้อของตัวเองไม่ได้ครับ");
+      
       setActionModalData({ 
           type: 'buy_market', 
-          auction: { id: item.id, card_name: item.title, buy_now_price: item.price, is_escrow: true, ...item } 
+          auction: { 
+              ...item, // เอาค่าทั้งหมดมาก่อน (รวมถึง is_escrow จาก DB)
+              id: item.id, 
+              card_name: item.title, 
+              buy_now_price: item.price, 
+              // ⚠️ สำคัญ: ใช้ค่า is_escrow ที่มีอยู่จริง
+              is_escrow: item.is_escrow 
+          } 
       });
   }
   
-  
-  // 🟢 แก้ไข handleFinalSubmit: ลบ Alert, คืนค่า success
+  // 🟢 แก้ไข handleFinalSubmit: แยก Logic Escrow/Non-Escrow
   async function handleFinalSubmit(amount) {
     if (!actionModalData) return;
     const { type, auction } = actionModalData;
@@ -853,8 +830,9 @@ export default function AuctionMarket() {
         }
     }
     else if (type === 'buy_market') {
-        let rpcName = 'buy_market_item'; 
-        if (!auction.is_escrow) rpcName = 'buy_non_escrow_item';
+        // ✅ 🟢 แยก RPC ตามประเภท (Escrow vs Non-Escrow)
+        let rpcName = 'buy_market_item'; // Default Escrow (ตัดเงิน)
+        if (!auction.is_escrow) rpcName = 'buy_non_escrow_item'; // Non-Escrow (แค่จอง)
 
         const { data, error } = await supabase.rpc(rpcName, { 
             p_item_id: auction.id, 
@@ -866,6 +844,7 @@ export default function AuctionMarket() {
         if (error) alert("Error: " + error.message); 
         else if (!data.success) alert(data.message); 
         else { 
+            // สำเร็จ -> รีโหลดข้อมูล
             fetchMyAuctions(); 
             return { success: true }; 
         }
