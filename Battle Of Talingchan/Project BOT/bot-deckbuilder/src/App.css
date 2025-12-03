@@ -1,3 +1,5 @@
+/* --- 1. ส่วนที่คุณส่งมา (จัดหน้าจอ + Logo) --- */
+
 /* สั่งให้ Root ขยายเต็มจอ ไม่มีการบีบตรงกลาง */
 #root {
   width: 100%;
@@ -7,7 +9,7 @@
   text-align: left;
 }
 
-/* โค้ด Logo เดิม (เก็บไว้ได้) */
+/* โค้ด Logo เดิม */
 .logo {
   height: 6em;
   padding: 1.5em;
@@ -38,4 +40,69 @@
 
 .read-the-docs {
   color: #888;
+}
+
+/* --- 2. ส่วนดีไซน์ปุ่มใหม่ (Glossy Button) --- */
+
+/* เอฟเฟกต์ปุ่มแวววาว (Glossy Effect) */
+.btn-glossy {
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+  z-index: 1;
+}
+
+/* แสงสะท้อนวิ่งผ่าน */
+.btn-glossy::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -150%;
+  width: 200%;
+  height: 100%;
+  background: linear-gradient(
+    to right,
+    transparent 0%,
+    rgba(255, 255, 255, 0.1) 30%, /* แสงขาวจาง */
+    rgba(255, 255, 255, 0.5) 50%, /* แสงขาวจ้าตรงกลาง */
+    rgba(255, 255, 255, 0.1) 70%,
+    transparent 100%
+  );
+  transform: skewX(-25deg); /* เอียงแสง */
+  transition: all 0.75s ease;
+  z-index: -1;
+  pointer-events: none; /* ป้องกันไม่ให้แสงบังการคลิก */
+}
+
+/* เมื่อเอาเมาส์ชี้ แสงจะวิ่งผ่าน */
+.btn-glossy:hover::after {
+  left: 150%;
+}
+
+/* เอฟเฟกต์เด้งเมื่อชี้ */
+.btn-glossy:hover {
+  transform: translateY(-2px) scale(1.02);
+  filter: brightness(1.1);
+}
+
+/* เอฟเฟกต์ยุบเมื่อกด */
+.btn-glossy:active {
+  transform: translateY(1px) scale(0.98);
+}
+
+/* --- 3. Animation เสริมอื่นๆ (ถ้ามีใช้) --- */
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.animate-fade-in {
+  animation: fade-in 0.3s ease-out forwards;
+}
+
+@keyframes fade-in-up {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in-up {
+  animation: fade-in-up 0.4s ease-out forwards;
 }

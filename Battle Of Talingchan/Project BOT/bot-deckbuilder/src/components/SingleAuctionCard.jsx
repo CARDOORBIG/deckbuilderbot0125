@@ -1,8 +1,8 @@
-// src/components/SingleAuctionCard.jsx
 import React from 'react';
-import { GavelIcon, ShieldCheckIcon } from './Icons';
+// 🟢 Import ไอคอนที่จะใช้เพิ่มเข้ามา
+import { ShieldCheckIcon, ShoppingBagIcon, GavelIcon } from './Icons';
 import TimeLeft from './TimeLeft';
-import { getAuctionThumbnail } from '../utils/auctionUtils'; // Import จากไฟล์ข้อ 1
+import { getAuctionThumbnail } from '../utils/auctionUtils';
 
 const SingleAuctionCard = ({ item, onChat, onBid, onBuyNow }) => {
     return (
@@ -19,9 +19,13 @@ const SingleAuctionCard = ({ item, onChat, onBid, onBuyNow }) => {
                     alt={item.card_name}
                 />
                 
+                {/* 🟢 Escrow Icon (แก้ไขใหม่: ใหญ่ขึ้น 1.6x, สีฟ้า-ขาว) */}
                 {item.is_escrow && (
-                    <div className="absolute top-2 right-2 bg-emerald-600 text-white p-1 rounded-full shadow-md z-10" title="Escrow">
-                        <ShieldCheckIcon width="12" height="12"/>
+                    <div 
+                        className="absolute top-2 right-2 bg-gradient-to-br from-blue-500 to-blue-700 text-white p-2 rounded-full shadow-lg shadow-blue-500/30 border border-blue-300/50 z-10 scale-110" 
+                        title="Escrow - มีระบบดูแลความปลอดภัย"
+                    >
+                        <ShieldCheckIcon width="20" height="20" className="drop-shadow-sm"/>
                     </div>
                 )}
                 
@@ -33,43 +37,52 @@ const SingleAuctionCard = ({ item, onChat, onBid, onBuyNow }) => {
             </div>
 
             {/* Title */}
-            <h3 className="text-xs md:text-sm font-bold text-slate-900 dark:text-white mb-1 line-clamp-1 leading-tight">
+            <h3 className="text-xs md:text-sm font-bold text-slate-900 dark:text-white mb-2 line-clamp-1 leading-tight">
                 {item.card_name}
             </h3>
             
             {/* Info Row: Seller & Price */}
-            <div className="flex justify-between items-end mb-3">
-                <div className="flex items-center gap-1.5 overflow-hidden max-w-[60%]">
+            <div className="flex justify-between items-end mb-4">
+                <div className="flex items-center gap-1.5 overflow-hidden max-w-[40%]">
                     {item.seller_name && (
                         <span className="text-[10px] text-slate-500 dark:text-slate-400 truncate bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded-full">
-                            โดย {item.seller_name}
+                            {item.seller_name}
                         </span>
                     )}
                 </div>
-                <div className="text-right">
-                    <p className="text-[9px] text-slate-400 uppercase font-bold leading-none">Current Bid</p>
-                    <p className="text-lg md:text-xl font-black text-emerald-500 dark:text-emerald-400 leading-none">
+                <div className="text-right flex-1 pl-2">
+                    <p className="text-[9px] text-slate-400 uppercase font-bold leading-none mb-0.5">Current Bid</p>
+                    {/* ราคาตัวใหญ่ (จากโค้ดก่อนหน้า) */}
+                    <p className="text-3xl md:text-4xl font-black text-emerald-500 dark:text-emerald-400 leading-none drop-shadow-sm tracking-tighter">
                         ฿{item.current_price.toLocaleString()}
                     </p>
                 </div>
             </div>
 
-            {/* Action Buttons */}
+            {/* Action Buttons (Glossy Style + New Icons) */}
             <div className="mt-auto flex gap-2">
                 {item.buy_now_price > 0 && (
                     <button 
                         onClick={(e) => { e.stopPropagation(); onBuyNow(item); }} 
-                        className="flex-1 px-3 py-1.5 bg-pink-100 text-pink-700 rounded-lg text-xs font-bold shadow-sm hover:bg-pink-200 transition-colors"
+                        className="btn-glossy flex-1 px-3 py-2 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white text-xs font-black shadow-lg shadow-emerald-500/30 border-t border-white/20 flex items-center justify-center gap-1.5"
                     >
-                        Buy ฿{item.buy_now_price.toLocaleString()}
+                        {/* 🟢 ใช้ ShoppingBagIcon แทนอิโมจิ */}
+                        <ShoppingBagIcon className="w-5 h-5 drop-shadow-sm" />
+                        <span>BUY ฿{item.buy_now_price.toLocaleString()}</span>
                     </button>
                 )}
                 <button 
                     onClick={(e) => { e.stopPropagation(); onBid(item); }} 
-                    className={`px-4 py-1.5 btn-fire text-white rounded-lg text-xs font-bold shadow-lg transition-transform active:scale-95 ${item.buy_now_price > 0 ? 'flex-1' : 'w-full'}`}
+                    className={`btn-glossy px-4 py-2 rounded-xl bg-gradient-to-br from-orange-500 via-red-500 to-purple-600 text-white text-xs font-black shadow-lg shadow-orange-500/30 border-t border-white/20 flex items-center justify-center gap-1.5 ${item.buy_now_price > 0 ? 'flex-1' : 'w-full'}`}
                 >
-                    <span className="flex items-center justify-center gap-1">
-                        <GavelIcon /> BID +{item.min_bid_increment.toLocaleString()}
+                    {/* 🟢 ใช้ GavelIcon แทน SVG เดิม */}
+                    <GavelIcon className="w-5 h-5 drop-shadow-sm" />
+                    <span>BID <span className="text-orange-100">+{item.min_bid_increment.toLocaleString()}</span></span>
+                    
+                    {/* Pulse Dot */}
+                    <span className="absolute top-1 right-1 flex h-2 w-2">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-red-400"></span>
                     </span>
                 </button>
             </div>

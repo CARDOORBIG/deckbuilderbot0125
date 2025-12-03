@@ -25,7 +25,7 @@ export default function ManagementDashboard({
     handleConfirmReceipt, 
     setConfirmTransaction, 
     setShipmentData,
-    handleForceEnd // 🟢 Receives the function to open the modal
+    handleForceEnd 
 }) {
     const [managementTab, setManagementTab] = useState('selling'); 
 
@@ -36,9 +36,7 @@ export default function ManagementDashboard({
         <div className="animate-fade-in w-full md:px-8">
             {/* Sub-tab Navigation */}
             <div className="flex justify-center mb-6">
-                {/* 🟢 Fix: overflow-visible ensures Red Mark is not clipped */}
                 <div className="bg-slate-200 dark:bg-slate-800 p-1 rounded-lg flex gap-2 overflow-visible relative z-10">
-                    
                     <button 
                         onClick={() => setManagementTab('selling')}
                         className={`relative px-4 py-2 rounded-md text-xs font-bold transition-all ${managementTab === 'selling' ? 'bg-white dark:bg-slate-600 shadow text-emerald-600 dark:text-emerald-400' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
@@ -90,25 +88,18 @@ export default function ManagementDashboard({
                                     className={`w-full h-full object-cover drop-shadow-2xl transition-all ${isCompleted || isCancelled ? 'grayscale' : ''}`} 
                                     onError={(e) => { if (!e.currentTarget.src.endsWith('.jpg')) e.currentTarget.src = e.currentTarget.src.replace('.png', '.jpg'); }} 
                                 />
-                                
                                 {item.is_escrow 
                                     ? (<div className="absolute top-2 left-2 bg-blue-600 text-white p-1 rounded-full shadow-md z-20" title="Escrow"><ShieldCheckIcon width="16" height="16" /></div>)
                                     : (<div className="absolute top-2 left-2 bg-amber-500 text-white px-2 py-0.5 rounded-full text-[10px] font-bold shadow-md z-20">โอนตรง</div>)
                                 }
-                                
                                 {isCompleted && (
                                     <div className="absolute inset-0 flex items-center justify-center z-30 pointer-events-none">
-                                        <div className="border-[5px] border-red-600 text-red-600 text-3xl font-black px-6 py-2 rounded-xl transform -rotate-12 uppercase tracking-widest bg-white/80 backdrop-blur-sm shadow-2xl mix-blend-normal">
-                                            SOLD
-                                        </div>
+                                        <div className="border-[5px] border-red-600 text-red-600 text-3xl font-black px-6 py-2 rounded-xl transform -rotate-12 uppercase tracking-widest bg-white/80 backdrop-blur-sm shadow-2xl mix-blend-normal">SOLD</div>
                                     </div>
                                 )}
-
                                 {isCancelled && (
                                     <div className="absolute inset-0 flex items-center justify-center z-30 pointer-events-none">
-                                        <div className="border-[5px] border-slate-600 text-slate-600 text-2xl font-black px-4 py-2 rounded-xl transform -rotate-12 uppercase tracking-widest bg-white/70 backdrop-blur-sm shadow-xl">
-                                            CANCELLED
-                                        </div>
+                                        <div className="border-[5px] border-slate-600 text-slate-600 text-2xl font-black px-4 py-2 rounded-xl transform -rotate-12 uppercase tracking-widest bg-white/70 backdrop-blur-sm shadow-xl">CANCELLED</div>
                                     </div>
                                 )}
                             </div>
@@ -118,11 +109,9 @@ export default function ManagementDashboard({
                                     <p className="text-[9px] text-slate-400 uppercase font-bold tracking-wider mb-0.5">{item.type === 'market' ? 'Price' : 'Current Bid'}</p>
                                     <span className="text-2xl md:text-3xl font-black text-slate-900 dark:text-white">฿{item.current_price.toLocaleString()}</span>
                                 </div>
-                                
                                 <div className="mt-2 space-y-2" onClick={e => e.stopPropagation()}>
                                     {item.status === 'active' && (
                                         <div className="mt-2 space-y-2">
-                                            {/* 🟢 Force End Button - Triggers Modal via Prop */}
                                             {item.type !== 'market' && item.winner_email && (
                                                 <button 
                                                     onClick={(e) => { e.stopPropagation(); handleForceEnd(item); }} 
@@ -131,11 +120,9 @@ export default function ManagementDashboard({
                                                     <GavelIcon /> จบการขายเดี๋ยวนี้
                                                 </button>
                                             )}
-
                                             <button onClick={() => handleCancel(item)} className="w-full py-1.5 bg-red-100 dark:bg-red-900/30 text-red-600 border border-red-200 rounded-lg text-xs font-bold hover:bg-red-200 flex items-center justify-center gap-1">
                                                 <BanIcon /> ยกเลิกการขาย
                                             </button>
-                                            
                                             <div className="text-[10px] text-center text-slate-400">
                                                 {item.winner_email ? `ผู้นำ: ${item.winner_name}` : 'รอผู้ซื้อกดสั่งซื้อ...'}
                                             </div>
@@ -188,10 +175,21 @@ export default function ManagementDashboard({
                                             {item.is_shipped ? <><CheckIcon /> ยืนยันรับสินค้า</> : '⏳ รอผู้ขายส่งของ'}
                                         </button> 
                                     )}
+                                    
                                     <div className="flex gap-2">
                                         <button onClick={() => setChatAuction(item)} className="flex-1 py-1.5 bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-lg text-xs font-bold hover:bg-slate-300 flex items-center justify-center gap-1"><ChatBubbleIcon/> แชท</button>
                                         {item.is_shipped && (<button onClick={() => setShipmentData(item)} className="px-3 py-1.5 bg-amber-100 text-amber-700 border border-amber-200 rounded-lg text-xs font-bold hover:bg-amber-200 flex items-center justify-center gap-1"><TruckIcon /></button>)}
                                     </div>
+
+                                    {/* 🟢 เพิ่มปุ่มลบประวัติ (แสดงเมื่อรายการจบหรือถูกยกเลิก) */}
+                                    {(isCompleted || isCancelled) && (
+                                        <button 
+                                            onClick={(e) => handleDeleteMyAuction(item, e)} 
+                                            className="w-full py-2 bg-slate-200 dark:bg-slate-800 text-slate-500 border border-slate-300 dark:border-slate-700 rounded-lg text-xs font-bold hover:bg-red-100 hover:text-red-600 hover:border-red-300 transition-all flex items-center justify-center gap-1 mt-1"
+                                        >
+                                            <TrashIcon /> ลบประวัติ
+                                        </button>
+                                    )}
                                 </div>
                             </div>
                         </div>
@@ -201,7 +199,6 @@ export default function ManagementDashboard({
                 {managementTab === 'to-ship' && myAuctions.filter(i => 
                     i.seller_email === userProfile?.email && 
                     i.winner_email && 
-                    // 🟢 Filter: แสดงเมื่ออยู่ในสถานะ "ซื้อขาย" เท่านั้น (รวมถึง ended ที่มีคนชนะแต่ยังไม่ส่ง)
                     (i.status === 'pending_ship' || i.status === 'shipped' || i.status === 'sold' || (i.status === 'ended' && i.winner_email))
                 ).map(item => {
                     const isFinished = item.status === 'completed';
