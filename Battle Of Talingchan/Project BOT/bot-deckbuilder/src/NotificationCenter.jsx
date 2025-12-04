@@ -1,148 +1,138 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { supabase } from './supabaseClient';
-import { useNavigate } from 'react-router-dom'; 
+import React, { useState, useRef, useEffect } from 'react';
 
-// === Icons ===
-const Svg = ({ p, ...r }) => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...r}>{p}</svg>;
-const BellIcon = () => <Svg p={<><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></>} />;
+// ไอคอนต่างๆ
+const BellIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"></path><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"></path></svg>;
+const TrashIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>;
+const ChevronDown = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>;
+const ChevronUp = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="18 15 12 9 6 15"></polyline></svg>;
 
 export default function NotificationCenter({ userEmail }) {
-    const [isOpen, setIsOpen] = useState(false);
-    const [notifications, setNotifications] = useState([]);
-    const [unreadCount, setUnreadCount] = useState(0);
-    const dropdownRef = useRef(null);
-    const navigate = useNavigate();
+  const [isOpen, setIsOpen] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false); // ✅ เพิ่มสถานะการขยาย
+  const dropdownRef = useRef(null);
 
-    // ปิด Dropdown เมื่อคลิกข้างนอก
-    useEffect(() => {
-        const handleClickOutside = (event) => {
-            if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-                setIsOpen(false);
-            }
-        };
-        document.addEventListener("mousedown", handleClickOutside);
-        return () => document.removeEventListener("mousedown", handleClickOutside);
-    }, []);
+  // ข้อมูลจำลอง (Mock Data)
+  const [notifications, setNotifications] = useState([
+    { id: 1, title: 'ยินดีต้อนรับ!', message: 'เข้าสู่ระบบ Deck Builder สำเร็จ ขอให้สนุกกับการจัดเด็คนะครับ', time: 'เมื่อสักครู่', type: 'info', read: false },
+    { id: 2, title: 'อัปเดตระบบ', message: 'เพิ่มฟีเจอร์ "My Decks" ใหม่แล้ว ลองใช้งานได้เลย', time: '10 นาทีที่แล้ว', type: 'system', read: false },
+    { id: 3, title: 'ตลาดประมูล', message: 'การ์ดที่คุณติดตามกำลังจะหมดเวลา', time: '1 ชม. ที่แล้ว', type: 'alert', read: true },
+    { id: 4, title: 'การชำระเงิน', message: 'ได้รับยอดเงิน 500 บาทเข้ากระเป๋าแล้ว', time: '2 ชม. ที่แล้ว', type: 'success', read: true },
+    { id: 5, title: 'แจ้งเตือนระบบ', message: 'จะมีการปิดปรับปรุงเซิร์ฟเวอร์ในคืนนี้', time: '5 ชม. ที่แล้ว', type: 'system', read: true },
+    { id: 6, title: 'กิจกรรมใหม่', message: 'เข้าร่วมกิจกรรมแจกการ์ดฟรีได้ที่หน้ากิจกรรม', time: '1 วันที่แล้ว', type: 'info', read: true },
+  ]);
 
-    // โหลดข้อมูล & Realtime
-    useEffect(() => {
-        if (!userEmail) return;
+  const unreadCount = notifications.filter(n => !n.read).length;
 
-        const fetchNotifications = async () => {
-            const { data } = await supabase
-                .from('notifications')
-                .select('*')
-                .or(`user_email.eq.${userEmail},user_email.eq.GLOBAL`)
-                .order('created_at', { ascending: false })
-                .limit(20);
-            
-            if (data) {
-                setNotifications(data);
-                const unread = data.filter(n => !n.is_read && n.user_email !== 'GLOBAL').length;
-                setUnreadCount(unread);
-            }
-        };
-        fetchNotifications();
+  // ปิด Dropdown เมื่อคลิกข้างนอก
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsOpen(false);
+        setIsExpanded(false); // ✅ รีเซ็ตขนาดเมื่อปิด
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [dropdownRef]);
 
-        const channel = supabase.channel(`noti_center:${userEmail}`)
-            .on('postgres_changes', { 
-                event: 'INSERT', 
-                schema: 'public', 
-                table: 'notifications', 
-                filter: `user_email=eq.${userEmail}` 
-            }, (payload) => {
-                setNotifications(prev => [payload.new, ...prev]);
-                setUnreadCount(prev => prev + 1);
-            })
-            .subscribe();
+  // ล้างทั้งหมด
+  const handleClearAll = () => {
+    if (confirm("คุณต้องการล้างการแจ้งเตือนทั้งหมดหรือไม่?")) {
+      setNotifications([]);
+    }
+  };
 
-        return () => supabase.removeChannel(channel);
-    }, [userEmail]);
+  // อ่านแล้ว
+  const handleRead = (id) => {
+    setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
+  };
 
-    const markAllAsRead = async () => {
-        if (notifications.length === 0) return;
-        setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
-        setUnreadCount(0);
-        await supabase.from('notifications').update({ is_read: true }).eq('user_email', userEmail);
-    };
+  return (
+    <div className="relative" ref={dropdownRef}>
+      
+      {/* ปุ่มกระดิ่ง */}
+      <button 
+        onClick={() => setIsOpen(!isOpen)} 
+        className="relative p-2 rounded-full text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+      >
+        <BellIcon />
+        {unreadCount > 0 && (
+          <span className="absolute top-1 right-1 flex h-2.5 w-2.5">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span>
+          </span>
+        )}
+      </button>
 
-    // 🟢 ฟังก์ชันหลัก: คลิกปุ๊บ ไปหน้า Chat ปั๊บ
-    const handleClickNotification = async (notification) => {
-        // 1. ทำเครื่องหมายว่าอ่านแล้วใน UI ทันที (User Experience ดีขึ้น)
-        if (!notification.is_read) {
-            setNotifications(prev => prev.map(n => n.id === notification.id ? { ...n, is_read: true } : n));
-            setUnreadCount(prev => Math.max(0, prev - 1));
-            // อัปเดตลง DB แบบเงียบๆ ไม่ต้องรอ
-            supabase.from('notifications').update({ is_read: true }).eq('id', notification.id).then();
-        }
+      {/* กล่องแจ้งเตือน */}
+      {isOpen && (
+        <div className={`absolute right-0 mt-2 w-80 sm:w-96 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-2xl z-[1000] overflow-hidden animate-in fade-in zoom-in-95 duration-200 origin-top-right flex flex-col transition-all ease-in-out ${isExpanded ? 'max-h-[80vh]' : 'max-h-[350px]'}`}>
+          
+          {/* Header (Fixed) */}
+          <div className="flex-shrink-0 flex items-center justify-between px-4 py-3 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
+            <h3 className="font-bold text-slate-800 dark:text-white text-sm">การแจ้งเตือน ({notifications.length})</h3>
+            {notifications.length > 0 && (
+              <button 
+                onClick={handleClearAll}
+                className="flex items-center gap-1 text-[10px] sm:text-xs text-slate-500 hover:text-red-500 dark:text-slate-400 dark:hover:text-red-400 transition-colors px-2 py-1 rounded hover:bg-red-50 dark:hover:bg-red-900/20"
+                title="ล้างทั้งหมด"
+              >
+                <TrashIcon /> ล้างทั้งหมด
+              </button>
+            )}
+          </div>
 
-        setIsOpen(false); // ปิด Dropdown
+          {/* รายการแจ้งเตือน (Scrollable Area) */}
+          {/* ✅ ส่วนนี้จะยืดหดตาม max-h ของ container แม่ */}
+          <div className="overflow-y-auto flex-grow scrollbar-thin scrollbar-thumb-slate-300 dark:scrollbar-thumb-slate-600">
+            {notifications.length === 0 ? (
+              <div className="py-12 text-center text-slate-500 dark:text-slate-400 text-sm flex flex-col items-center justify-center h-full">
+                <div className="text-3xl mb-2 opacity-50">🔕</div>
+                ไม่มีการแจ้งเตือนใหม่
+              </div>
+            ) : (
+              <ul className="divide-y divide-slate-100 dark:divide-slate-800">
+                {notifications.map((item) => (
+                  <li 
+                    key={item.id} 
+                    onClick={() => handleRead(item.id)}
+                    className={`px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer transition-colors ${!item.read ? 'bg-blue-50/50 dark:bg-blue-900/10' : ''}`}
+                  >
+                    <div className="flex justify-between items-start gap-3">
+                      <div className="flex-1 min-w-0">
+                        <p className={`text-sm font-semibold truncate ${!item.read ? 'text-slate-900 dark:text-white' : 'text-slate-600 dark:text-slate-400'}`}>
+                          {!item.read && <span className="inline-block w-2 h-2 bg-blue-500 rounded-full mr-2 mb-0.5"></span>}
+                          {item.title}
+                        </p>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 line-clamp-2 break-words">
+                          {item.message}
+                        </p>
+                        <p className="text-[10px] text-slate-400 mt-1">{item.time}</p>
+                      </div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
 
-        // 2. ตรวจสอบประเภท และสั่งเด้งไปหน้า Auction
-        // รองรับ type: 'bid', 'outbid', 'cancel', 'ban' หรืออื่นๆ ที่มี auction_id
-        if (notification.auction_id) {
-            navigate('/auction', { 
-                state: { 
-                    openAuctionId: notification.auction_id // ส่ง ID ไปด้วย
-                } 
-            });
-        }
-    };
-
-    if (!userEmail) return null;
-
-    return (
-        <div className="relative z-50" ref={dropdownRef}>
+          {/* Footer (Fixed Toggle Button) */}
+          <div className="flex-shrink-0 p-2 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 text-center">
+            {/* ✅ ปุ่มกดเพื่อขยาย/ย่อ */}
             <button 
-                onClick={() => setIsOpen(!isOpen)}
-                className="p-2 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-full transition-colors relative text-slate-600 dark:text-slate-300"
+                onClick={() => setIsExpanded(!isExpanded)}
+                className="w-full flex items-center justify-center gap-1 text-xs text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 py-1.5 rounded transition-colors font-medium"
             >
-                <BellIcon />
-                {unreadCount > 0 && (
-                    <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white dark:border-slate-900 animate-pulse"></span>
+                {isExpanded ? (
+                    <>ย่อลง <ChevronUp /></>
+                ) : (
+                    <>ดูทั้งหมด <ChevronDown /></>
                 )}
             </button>
+          </div>
 
-            {isOpen && (
-                <div className="absolute top-full right-0 mt-2 w-80 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-xl shadow-2xl overflow-hidden animate-fade-in">
-                    <div className="p-3 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 flex justify-between items-center">
-                        <h3 className="font-bold text-slate-800 dark:text-white text-sm">การแจ้งเตือน</h3>
-                        <div className="flex gap-2">
-                            {unreadCount > 0 && <span className="text-[10px] bg-red-500 text-white px-1.5 py-0.5 rounded-full">{unreadCount} ใหม่</span>}
-                            <button onClick={markAllAsRead} className="text-[10px] text-emerald-600 dark:text-emerald-400 hover:underline">อ่านทั้งหมด</button>
-                        </div>
-                    </div>
-                    <div className="max-h-80 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-300 dark:scrollbar-thumb-slate-600">
-                        {notifications.length === 0 ? (
-                            <div className="p-8 text-center text-slate-500 text-xs">ไม่มีการแจ้งเตือน</div>
-                        ) : (
-                            notifications.map(n => (
-                                <div 
-                                    key={n.id} 
-                                    onClick={() => handleClickNotification(n)} 
-                                    className={`p-3 border-b border-slate-100 dark:border-slate-700/50 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors cursor-pointer ${!n.is_read ? 'bg-blue-50/50 dark:bg-blue-900/20' : ''}`}
-                                >
-                                    <div className="flex items-start gap-3">
-                                        <div className={`mt-1 w-2 h-2 rounded-full flex-shrink-0 ${!n.is_read ? 'bg-red-500' : 'bg-slate-300 dark:bg-slate-600'}`}></div>
-                                        <div>
-                                            <h4 className={`text-sm font-bold ${
-                                                n.type === 'admin_announce' ? 'text-red-500 dark:text-red-400' : 
-                                                n.type === 'bid' ? 'text-emerald-600 dark:text-emerald-400' : 
-                                                n.type === 'outbid' ? 'text-amber-600 dark:text-amber-400' : 
-                                                'text-slate-800 dark:text-white'
-                                            }`}>
-                                                {n.type === 'admin_announce' ? '📢 ' : ''}{n.title}
-                                            </h4>
-                                            <p className="text-xs text-slate-600 dark:text-slate-300 mt-0.5 line-clamp-2">{n.message}</p>
-                                            <p className="text-[10px] text-slate-400 mt-1">{new Date(n.created_at).toLocaleTimeString('th-TH', {hour: '2-digit', minute:'2-digit'})}</p>
-                                        </div>
-                                    </div>
-                                </div>
-                            ))
-                        )}
-                    </div>
-                </div>
-            )}
         </div>
-    );
+      )}
+    </div>
+  );
 }

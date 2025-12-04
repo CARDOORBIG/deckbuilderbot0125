@@ -18,6 +18,7 @@ import { supabase } from './supabaseClient';
 import ChatWidget from './ChatWidget'; // 🟢 เพิ่มบรรทัดนี้
 import Header from './components/Header'; // 🟢 เพิ่มบรรทัดนี้
 
+
 // Import Components
 import CreateAuctionModal from './CreateAuctionModal';
 import NotificationCenter from './NotificationCenter';
@@ -35,6 +36,7 @@ import {
     HomeIcon, MessageIcon, NeonLightningIcon, 
     ImageIcon, ArchiveIcon 
 } from './components/Icons';
+import UserBadge from './components/UserBadge';
 
 ChartJS.register(RadialLinearScale, PointElement, LineElement, Filler, Tooltip, Legend);
 
@@ -568,6 +570,7 @@ export default function App() {
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isAdminOpen, setIsAdminOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+
   // 🟢 [UPDATED] State สำหรับ Tutorial
   const [showAuctionTutorial, setShowAuctionTutorial] = useState(false);
   const [dontShowAgain, setDontShowAgain] = useState(false); // 🆕 เก็บสถานะ Checkbox
@@ -929,12 +932,16 @@ export default function App() {
             <>
       {/* 🟢 ใช้งาน Component Header ใหม่ ตรงนี้ */}
       <Header 
-        userProfile={userProfile}
-        displayUser={displayUser}
-        userReputation={userReputation[userProfile?.email]} // ส่งเฉพาะของ User นี้
-        setIsSettingsOpen={setIsSettingsOpen}
-        setIsAdminOpen={setIsAdminOpen}
-      />
+  userProfile={userProfile}
+  displayUser={displayUser}
+  userReputation={userReputation[userProfile?.email]}
+  setIsSettingsOpen={setIsSettingsOpen}
+  
+  // ✅ แก้ตรงนี้: ส่งฟังก์ชันเปิด DeckListModal เข้าไปแทน
+  setIsMyDecksOpen={setIsDeckListModalOpen} 
+  
+  setIsAdminOpen={setIsAdminOpen}
+/>
       
               <main className="flex-1 flex flex-col md:flex-row overflow-hidden">
                 <div className={`fixed inset-0 bg-black/60 backdrop-blur-sm z-[80] transition-opacity duration-300 ease-in-out ${isSidebarOpen ? "opacity-100" : "opacity-0 pointer-events-none"} md:hidden`} onClick={() => isSidebarOpen && toggleSidebar()} />
@@ -955,7 +962,7 @@ export default function App() {
                       <div className="absolute inset-0 bg-cover bg-center opacity-10" style={{ backgroundImage: "url('https://www.tcgthailand.com/assets/img/banner.1b838965.webp')" }}></div>
                       <div className="relative z-10 flex flex-col items-center justify-center">
                         <img src="/cards/LOGOBOT.png" alt="Battle Of Talingchan Logo" className="w-24 h-24 md:w-28 md:h-28 mb-2 object-contain drop-shadow-lg" onError={(e) => { e.currentTarget.style.display = "none"; }} />
-                        <h1 className="text-3xl md:text-5xl font-extrabold tracking-tight text-slate-900 dark:text-white drop-shadow-md">Battle Of Talingchan</h1>
+                        <h1 className="text-3xl md:text-5xl font-extrabold tracking-tight text-slate-900 dark:text-white drop-shadow-md">จัดเด็คของคุณ</h1>
                       </div>
                     </div>
                     {cardDb.length === 0 ? (
@@ -1071,7 +1078,7 @@ export default function App() {
                         </div>
                     </div>
                 </div>
-
+                
                 {/* 🟢 [ใหม่] Checkbox: ไม่ต้องแสดงหน้านี้อีก */}
                 <div className="mt-8 flex items-center justify-center gap-2" onClick={e => e.stopPropagation()}>
                     <input 

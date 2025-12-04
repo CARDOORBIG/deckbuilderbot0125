@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { supabase } from './supabaseClient';
-import { useNavigate, useLocation } from 'react-router-dom'; 
+import { Link, useNavigate, useLocation } from 'react-router-dom'; 
 import { createPortal } from "react-dom";
 import { googleLogout } from '@react-oauth/google';
 import { db } from './firebase';
@@ -19,7 +19,7 @@ import ShipmentModal from './components/ShipmentModal';
 import ConfirmForceEndModal from './components/ConfirmForceEndModal'
 import SingleAuctionCard from './components/SingleAuctionCard';
 
-// ✅ New Imported Components (แยกออกมาแล้ว)
+// Imported Components
 import TrackingModal from './components/TrackingModal';
 import AuctionRoomModal from './components/AuctionRoomModal';
 import ConfirmTransactionModal from './components/ConfirmTransactionModal';
@@ -34,7 +34,11 @@ import {
     GavelIcon, ShoppingBagIcon, PackageIcon, HistoryIcon, 
 } from './components/Icons';
 
-// Placeholder Modals (ถ้ายังไม่ได้แยกไฟล์ ให้คงไว้แบบนี้ หรือแยกไปไฟล์ PlaceholderModals.jsx ก็ได้)
+// Local Icons for View Toggle
+const LayoutGridIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>;
+const LayoutFeedIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="3" y1="15" x2="21" y2="15"></line></svg>;
+
+// Placeholder Modals
 const ManageBiddersModal = ({ isOpen, onClose }) => (!isOpen ? null : <div className="fixed inset-0 bg-black/80 flex items-center justify-center text-white"><div className="bg-slate-900 p-4 rounded">Manage Bidders (Placeholder)<button onClick={onClose} className="ml-4 bg-red-500 px-2 rounded">Close</button></div></div>);
 const BidHistoryModal = ({ isOpen, onClose }) => (!isOpen ? null : <div className="fixed inset-0 bg-black/80 flex items-center justify-center text-white"><div className="bg-slate-900 p-4 rounded">Bid History (Placeholder)<button onClick={onClose} className="ml-4 bg-red-500 px-2 rounded">Close</button></div></div>);
 const CompletedAuctionsModal = ({ isOpen, onClose }) => (!isOpen ? null : <div className="fixed inset-0 bg-black/80 flex items-center justify-center text-white"><div className="bg-slate-900 p-4 rounded">Completed Auctions (Placeholder)<button onClick={onClose} className="ml-4 bg-red-500 px-2 rounded">Close</button></div></div>);
@@ -46,7 +50,8 @@ export default function AuctionMarket() {
   const navigate = useNavigate();
   const location = useLocation();
   const [activeTab, setActiveTab] = useLocalStorage('bot-market-active-tab', 'auction');
-  
+  const [viewMode, setViewMode] = useLocalStorage('bot-view-mode', 'grid');
+
   const [auctions, setAuctions] = useState([]);
   const [myAuctions, setMyAuctions] = useState([]);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -61,14 +66,13 @@ export default function AuctionMarket() {
   const [sortOption, setSortOption] = useState("ending_soon");
   const [filterStatus, setFilterStatus] = useState("all");
   const [isDeckListModalOpen, setIsDeckListModalOpen] = useState(false);
-  const [isTypeSelectionOpen, setIsTypeSelectionOpen] = useState(false); 
+  
+  // 🟢 ลบ state isTypeSelectionOpen ออก เพราะเราจะเปิด Modal ลงขายเลย
   const [isBulkModalOpen, setIsBulkModalOpen] = useState(false); 
   const [actionModalData, setActionModalData] = useState(null); 
   const [isTopUpOpen, setIsTopUpOpen] = useState(false); 
   const [shipmentData, setShipmentData] = useState(null); 
-  // eslint-disable-next-line no-unused-vars
   const [isCreateAuctionModalOpen, setIsCreateAuctionModalOpen] = useState(false); 
-  // eslint-disable-next-line no-unused-vars
   const [auctionTargetCard, setAuctionTargetCard] = useState(null);
   const [forceEndItem, setForceEndItem] = useState(null);
 
@@ -90,7 +94,7 @@ export default function AuctionMarket() {
   const displayUser = useMemo(() => { if (!userProfile) return null; if (!customProfile) return userProfile; return { ...userProfile, name: customProfile.displayName || userProfile.name, picture: customProfile.avatarUrl || userProfile.picture }; }, [userProfile, customProfile]);
   useEffect(() => { if (userProfile?.email) { const fetchProfile = async () => { try { const docSnap = await getDoc(doc(db, "users", userProfile.email)); if (docSnap.exists()) setCustomProfile(docSnap.data()); } catch (e) { console.error("Profile fetch error", e); } }; fetchProfile(); } }, [userProfile]);
   const fetchReputations = async () => { const { data } = await supabase.from('user_stats').select('user_email, total_score, penalty_level, wallet_balance'); const map = {}; data?.forEach(u => map[u.user_email] = u); setUserReputation(map); };
-  useEffect(() => { const channel = supabase.channel('market_balance_update').on('postgres_changes', { event: '*', schema: 'public', table: 'user_stats' }, () => { fetchReputations(); }).subscribe(); return () => { supabase.removeChannel(channel); }; }, []);
+  useEffect(() => { const channel = supabase.channel('market_balance_update').on('postgres_changes', { event: '*', schema: 'public', table: 'user_stats' }, (payload) => { fetchReputations(); }).subscribe(); return () => { supabase.removeChannel(channel); }; }, []);
   useEffect(() => { fetchReputations(); }, []);
   useEffect(() => { const openFromNoti = async () => { if (location.state?.openAuctionId) { const auctionId = location.state.openAuctionId; let targetAuction = auctions.find(a => a.id === auctionId) || myAuctions.find(a => a.id === auctionId); if (!targetAuction) { const { data } = await supabase.from('auctions').select('*').eq('id', auctionId).single(); if (data) targetAuction = data; } if (targetAuction) { setChatAuction(targetAuction); window.history.replaceState({}, document.title); } } }; openFromNoti(); }, [location, auctions, myAuctions]);
   useEffect(() => { if (activeTab === 'management' && userProfile?.email) { fetchMyAuctions(); } else { fetchAuctions(); } const channel = supabase.channel('public:auctions').on('postgres_changes', { event: '*', schema: 'public', table: 'auctions' }, () => { if (activeTab === 'management') fetchMyAuctions(); else fetchAuctions(); }).subscribe(); return () => supabase.removeChannel(channel); }, [activeTab, userProfile]);
@@ -126,7 +130,21 @@ export default function AuctionMarket() {
       return toShip + toReceive;
   }, [myAuctions, userProfile]);
 
-  const filteredAuctions = useMemo(() => { return auctions.filter(item => { const matchName = item.card_name.toLowerCase().includes(searchTerm.toLowerCase()); let matchStatus = true; if (filterStatus === 'active_bid') matchStatus = item.current_price > item.start_price; else if (filterStatus === 'no_bid') matchStatus = item.current_price === item.start_price; return matchName && matchStatus; }).sort((a, b) => { if (sortOption === 'price_asc') return a.current_price - b.current_price; if (sortOption === 'price_desc') return b.current_price - a.current_price; return new Date(a.end_time) - new Date(b.end_time); }); }, [auctions, searchTerm, sortOption, filterStatus]);
+  const filteredAuctions = useMemo(() => { 
+      return auctions.filter(item => { 
+          const matchName = item.card_name.toLowerCase().includes(searchTerm.toLowerCase()); 
+          let matchStatus = true; 
+          
+          if (filterStatus === 'escrow') matchStatus = item.is_escrow === true;
+          else if (filterStatus === 'direct') matchStatus = item.is_escrow === false;
+
+          return matchName && matchStatus; 
+      }).sort((a, b) => { 
+          if (sortOption === 'price_asc') return a.current_price - b.current_price; 
+          if (sortOption === 'price_desc') return b.current_price - a.current_price; 
+          return new Date(a.end_time) - new Date(b.end_time); 
+      }); 
+  }, [auctions, searchTerm, sortOption, filterStatus]);
   
   async function handleBid(auction) { if (!userProfile) return alert("กรุณา Login ก่อนครับ"); if (userProfile.email === auction.seller_email) return alert("ห้ามบิดของตัวเองครับ!"); setActionModalData({ type: 'bid', auction }); }
   async function handleBuyNow(auction) { if (!userProfile) return alert("กรุณา Login ก่อนครับ"); if (userProfile.email === auction.seller_email) return alert("ซื้อของตัวเองไม่ได้ครับ"); setActionModalData({ type: 'buy', auction }); }
@@ -161,7 +179,12 @@ export default function AuctionMarket() {
   
   const handleLogout = () => { googleLogout(); localStorage.removeItem("bot-userProfile-v1"); setUserProfile(null); navigate('/'); };
   const handleSaveProfile = async (data) => { if (!userProfile) return; try { await setDoc(doc(db, "users", userProfile.email), { displayName: data.displayName, avatarUrl: data.avatarUrl, isSetup: true, updatedAt: serverTimestamp() }, { merge: true }); setCustomProfile(p => ({ ...p, ...data })); setIsProfileModalOpen(false); alert("บันทึกข้อมูลเรียบร้อย!"); } catch (e) { console.error(e); alert("บันทึกไม่สำเร็จ"); } };
-  const handleStartAuctionClick = () => { setIsTypeSelectionOpen(true); };
+  
+  // 🟢 แก้ไข: เปิดหน้า Bulk (General) เลย ไม่ต้องเลือก Type
+  const handleStartAuctionClick = () => { 
+      setIsBulkModalOpen(true); 
+  };
+  
   const handleSelectType = (type) => { setIsTypeSelectionOpen(false); if (type === 'single') { navigate('/', { state: { showAuctionTutorial: true } }); } else { setIsBulkModalOpen(true); } };
   const handleConfirmReceipt = (item) => { if (!item.is_shipped) { return alert("ผู้ขายยังไม่ได้กดส่งสินค้าครับ กรุณารอผู้ขายจัดส่งก่อน"); } setConfirmTransaction({ auction: item }); };
   const handleTopUpClick = async () => { try { const { data, error } = await supabase.from('system_config').select('value').eq('key', 'topup_status').single(); if (error) { setIsTopUpOpen(true); return; } const status = data?.value || 'open'; if (status === 'maintenance') alert("⚠️ ระบบอยู่ในระหว่างการปรับปรุงค่ะ"); else if (status === 'closed') alert("⛔ ปิดระบบเติมเงินชั่วคราว"); else setIsTopUpOpen(true); } catch (e) { setIsTopUpOpen(true); } };
@@ -210,14 +233,62 @@ export default function AuctionMarket() {
         
         {activeTab === 'auction' && (
             <div className="animate-fade-in w-full md:px-8">
-                <div className="mt-4 mb-6 flex flex-col gap-2 bg-white dark:bg-slate-900/50 p-2 md:p-3 rounded-xl border border-slate-200 dark:border-emerald-500/20 shadow-sm mx-4 md:mx-0">
-                    <div className="relative flex-grow w-full"><div className="absolute inset-y-0 left-3 flex items-center pointer-events-none"><svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg></div><input type="text" placeholder="ค้นหาชื่อการ์ด..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-9 pr-4 py-1.5 md:py-2 bg-slate-100 dark:bg-slate-800 border-none rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none text-slate-900 dark:text-white placeholder-slate-400 transition-all" /></div>
-                    <div className="flex flex-col md:flex-row gap-2 md:items-center shrink-0">
-                        <div className="flex gap-2 items-center overflow-x-auto pb-1 md:pb-0 no-scrollbar shrink-0"><select value={sortOption} onChange={(e) => setSortOption(e.target.value)} className="px-2 py-1.5 md:py-2 bg-slate-100 dark:bg-slate-800 rounded-lg text-xs font-bold text-slate-700 dark:text-slate-300 border-none outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer shrink-0"><option value="ending_soon">เวลา</option><option value="price_asc">ถูก➜แพง</option><option value="price_desc">แพง➜ถูก</option></select><div className="flex bg-slate-100 dark:bg-slate-800 rounded-lg p-1 gap-1 shrink-0"><button onClick={() => setFilterStatus('all')} className={`px-2 py-1 rounded text-[10px] md:text-xs font-bold transition-all shrink-0 ${filterStatus === 'all' ? 'bg-white dark:bg-slate-600 shadow text-emerald-600 dark:text-emerald-400' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}>รวม</button><button onClick={() => setFilterStatus('active_bid')} className={`px-2 py-1 rounded text-[10px] md:text-xs font-bold transition-all shrink-0 ${filterStatus === 'active_bid' ? 'bg-white dark:bg-slate-600 shadow text-red-500' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}>เดือด</button><button onClick={() => setFilterStatus('no_bid')} className={`px-2 py-1 rounded text-[10px] md:text-xs font-bold transition-all shrink-0 ${filterStatus === 'no_bid' ? 'bg-white dark:bg-slate-600 shadow text-blue-500' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}>ใหม่</button></div><div className="w-px h-6 bg-slate-300 dark:bg-slate-700 mx-1 shrink-0"></div><button onClick={() => setIsCompletedModalOpen(true)} className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 border border-transparent hover:border-slate-300 dark:hover:border-slate-600 rounded-lg text-xs font-bold text-slate-600 dark:text-slate-400 transition-all whitespace-nowrap shrink-0" title="ดูประวัติการประมูลที่จบแล้ว"><HistoryIcon /> <span className="hidden sm:inline">ประวัติ</span></button></div>
-                        <button onClick={handleStartAuctionClick} className="w-full md:w-auto flex items-center gap-1 px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-xs font-bold shadow-md hover:shadow-emerald-500/30 transition-all active:scale-95 whitespace-nowrap justify-center shrink-0"><span className="text-lg leading-none mb-0.5">+</span> ลงประมูล</button>
+                
+                <div className="sticky top-0 z-20 mb-6 mx-4 md:mx-0 mt-4">
+                    <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border border-slate-200 dark:border-slate-800 p-3 rounded-2xl shadow-sm flex flex-col gap-3">
+                        
+                        {/* Row 1: Search + History + Create (Desktop) */}
+                        <div className="flex gap-2 items-center w-full">
+                            <div className="relative flex-grow">
+                                <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
+                                    <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                                </div>
+                                <input type="text" placeholder="ค้นหาการ์ด..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-9 pr-4 py-2 bg-slate-100 dark:bg-slate-800 border-none rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 outline-none text-slate-900 dark:text-white placeholder-slate-400 transition-all" />
+                            </div>
+                            
+                            <button onClick={() => setIsCompletedModalOpen(true)} className="p-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 hover:text-emerald-500 rounded-xl transition-colors shrink-0" title="ประวัติการประมูล">
+                                <HistoryIcon width="20" height="20" />
+                            </button>
+
+                            <button onClick={handleStartAuctionClick} className="hidden md:flex items-center gap-1 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-xs font-bold shadow-lg shadow-emerald-500/20 transition-all active:scale-95 whitespace-nowrap shrink-0">
+                                <span className="text-base leading-none">+</span> ลงขาย
+                            </button>
+                        </div>
+
+                        {/* Row 2: Sort + Filters (Escrow/Direct) + View Toggle */}
+                        <div className="flex items-center justify-between gap-2 overflow-x-auto no-scrollbar">
+                            
+                            <div className="flex items-center gap-2 shrink-0">
+                                <div className="relative shrink-0">
+                                    <select value={sortOption} onChange={(e) => setSortOption(e.target.value)} className="appearance-none pl-3 pr-6 py-2 bg-slate-100 dark:bg-slate-800 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-300 border-none outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer">
+                                        <option value="ending_soon">เวลา</option>
+                                        <option value="price_asc">ถูก➜แพง</option>
+                                        <option value="price_desc">แพง➜ถูก</option>
+                                    </select>
+                                    <div className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400 text-[8px]">▼</div>
+                                </div>
+
+                                <div className="flex bg-slate-100 dark:bg-slate-800 rounded-xl p-1 gap-1 shrink-0">
+                                    <button onClick={() => setFilterStatus('all')} className={`px-2 py-1.5 rounded-lg text-[10px] md:text-xs font-bold transition-all ${filterStatus === 'all' ? 'bg-white dark:bg-slate-600 shadow text-emerald-600 dark:text-emerald-400' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}>รวม</button>
+                                    <button onClick={() => setFilterStatus('escrow')} className={`px-2 py-1.5 rounded-lg text-[10px] md:text-xs font-bold transition-all ${filterStatus === 'escrow' ? 'bg-white dark:bg-slate-600 shadow text-blue-500' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}>ผ่านกลาง</button>
+                                    <button onClick={() => setFilterStatus('direct')} className={`px-2 py-1.5 rounded-lg text-[10px] md:text-xs font-bold transition-all ${filterStatus === 'direct' ? 'bg-white dark:bg-slate-600 shadow text-amber-500' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}>โอนตรง</button>
+                                </div>
+                            </div>
+
+                            <div className="flex items-center gap-2 shrink-0">
+                                <div className="flex bg-slate-100 dark:bg-slate-800 rounded-xl p-1 gap-1">
+                                    <button onClick={() => setViewMode('feed')} className={`p-1.5 rounded-lg transition-all ${viewMode === 'feed' ? 'bg-white dark:bg-slate-600 shadow text-emerald-500' : 'text-slate-400 hover:text-slate-600'}`} title="Feed View"><LayoutFeedIcon /></button>
+                                    <button onClick={() => setViewMode('grid')} className={`p-1.5 rounded-lg transition-all ${viewMode === 'grid' ? 'bg-white dark:bg-slate-600 shadow text-emerald-500' : 'text-slate-400 hover:text-slate-600'}`} title="Grid View"><LayoutGridIcon /></button>
+                                </div>
+                            </div>
+
+                        </div>
                     </div>
+                    {/* Mobile Only: Create Button */}
+                    <button onClick={handleStartAuctionClick} className="md:hidden w-full flex items-center justify-center gap-2 px-4 py-3 bg-emerald-500 text-white rounded-xl text-sm font-bold shadow-lg mt-2"><span className="text-lg leading-none">+</span> ลงประมูลสินค้า</button>
                 </div>
-                <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 md:gap-6">
+
+                <div className={viewMode === 'feed' ? "flex flex-col gap-6 max-w-xl mx-auto" : "grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 md:gap-6"}>
                     {filteredAuctions.map(item => (
                         <SingleAuctionCard 
                             key={item.id}
@@ -231,7 +302,8 @@ export default function AuctionMarket() {
             </div>
         )}
 
-        {activeTab === 'market' && <FleaMarket userProfile={displayUser} onChat={(item) => setChatAuction(item)} onBuy={handleBuyMarketItem} />}
+        {/* ส่ง viewMode ไปให้ FleaMarket ด้วย */}
+        {activeTab === 'market' && <FleaMarket userProfile={displayUser} onChat={(item) => setChatAuction(item)} onBuy={handleBuyMarketItem} viewMode={viewMode} setViewMode={setViewMode} onCreate={handleStartAuctionClick} />}
 
         {activeTab === 'management' && (
             <ManagementDashboard 
@@ -269,7 +341,7 @@ export default function AuctionMarket() {
       <TopUpModal isOpen={isTopUpOpen} onClose={() => setIsTopUpOpen(false)} userProfile={displayUser} onSuccess={() => fetchReputations()} />
       <ShipmentModal isOpen={!!shipmentData} onClose={() => setShipmentData(null)} auction={shipmentData} onSuccess={() => { fetchMyAuctions(); fetchAuctions(); }} />
       
-      {isTypeSelectionOpen && (createPortal(<div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[900] p-4 animate-fade-in" onClick={() => setIsTypeSelectionOpen(false)}><div className="bg-white dark:bg-slate-900 p-6 rounded-2xl w-full max-w-sm shadow-2xl border border-slate-200 dark:border-slate-700 transform scale-100 transition-transform" onClick={e => e.stopPropagation()}><h3 className="text-xl font-bold text-center mb-6 text-slate-900 dark:text-white">ต้องการลงขายแบบไหน?</h3><div className="flex flex-col gap-3"><button onClick={() => handleSelectType('single')} className="flex items-center gap-4 p-4 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 hover:border-emerald-500 transition-all group"><div className="w-12 h-12 rounded-full bg-emerald-100 dark:bg-emerald-900/50 flex items-center justify-center text-2xl group-hover:scale-110 transition-transform">🃏</div><div className="text-left"><h4 className="font-bold text-slate-900 dark:text-white">การ์ดเดี่ยว (Single)</h4><p className="text-xs text-slate-500 dark:text-slate-400">เลือกการ์ดจากฐานข้อมูล</p></div></button><button onClick={() => handleSelectType('bulk')} className="flex items-center gap-4 p-4 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-amber-50 dark:hover:bg-amber-900/20 hover:border-amber-500 transition-all group"><div className="w-12 h-12 rounded-full bg-amber-100 dark:bg-amber-900/50 flex items-center justify-center text-2xl group-hover:scale-110 transition-transform">📦</div><div className="text-left"><h4 className="font-bold text-slate-900 dark:text-white">ยกกล่อง / อื่นๆ</h4><p className="text-xs text-slate-500 dark:text-slate-400">ระบุชื่อเอง + ต้องถ่ายรูป</p></div></button></div><button onClick={() => setIsTypeSelectionOpen(false)} className="mt-6 w-full py-2 text-sm text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">ยกเลิก</button></div></div>, document.body))}
+      {/* 🟢 Removed Type Selection Portal here */}
       <ConfirmForceEndModal 
         isOpen={!!forceEndItem}
         onClose={() => setForceEndItem(null)}

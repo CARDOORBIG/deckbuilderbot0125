@@ -43,13 +43,15 @@ const SingleAuctionCard = ({ item, onChat, onBid, onBuyNow }) => {
             
             {/* Info Row: Seller & Price */}
             <div className="flex justify-between items-end mb-4">
-                <div className="flex items-center gap-1.5 overflow-hidden max-w-[40%]">
-                    {item.seller_name && (
-                        <span className="text-[10px] text-slate-500 dark:text-slate-400 truncate bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded-full">
-                            {item.seller_name}
-                        </span>
-                    )}
-                </div>
+                <div className="flex items-center gap-1.5 overflow-hidden max-w-[60%]">
+    {item.seller_name && (
+        <span className="text-[10px] text-slate-500 dark:text-slate-400 truncate bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded-full">
+            {item.seller_name}
+        </span>
+    )}
+    {/* 🟢 แทรกตรงนี้ (ส่งคะแนน seller_score เข้าไป ถ้ามี) */}
+    {item.seller_score !== undefined && <RatingBadge score={item.seller_score} />}
+</div>
                 <div className="text-right flex-1 pl-2">
                     <p className="text-[9px] text-slate-400 uppercase font-bold leading-none mb-0.5">Current Bid</p>
                     {/* ราคาตัวใหญ่ (จากโค้ดก่อนหน้า) */}

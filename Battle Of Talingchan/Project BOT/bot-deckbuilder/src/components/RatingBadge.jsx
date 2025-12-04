@@ -1,14 +1,11 @@
 import React from 'react';
+import { getRankFromScore, getNextRankProgress } from '../utils/rankSystem';
 
-const RatingBadge = ({ score }) => {
-    const s = parseInt(score || 0);
-    
-    const formatScore = (num) => {
-        if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
-        if (num >= 1000) return (num / 1000).toFixed(1) + 'k';
-        return num;
-    };
+const RatingBadge = ({ score, showProgress = false }) => {
+    const rank = getRankFromScore(score);
+    const progress = getNextRankProgress(score);
 
+    // 🟢 รวมไอคอน SVG ของคุณไว้ที่นี่
     const Icons = {
         Cross: <svg viewBox="0 0 24 24" fill="currentColor" className="w-3 h-3 md:w-4 md:h-4"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>,
         Warning: <svg viewBox="0 0 24 24" fill="currentColor" className="w-3 h-3 md:w-4 md:h-4"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>,
@@ -20,48 +17,69 @@ const RatingBadge = ({ score }) => {
         Sultan: <svg viewBox="0 0 24 24" fill="currentColor" className="w-3 h-3 md:w-4 md:h-4"><path d="M12 2L1 21h22L12 2zm0 3.5L18.5 19H5.5L12 5.5zM12 11a2 2 0 1 0 0 4 2 2 0 0 0 0-4z"/></svg>
     };
 
+    // 🟢 Map Rank ID จาก rankSystem เข้ากับ Style และ Icon ของคุณ
     let theme = {};
 
-    // 1. ❌ พวกป่วน (ติดลบ)
-    if (s < 0) {
-        theme = { icon: Icons.Cross, label: 'เครดิตเสีย', style: 'text-red-600 border-red-600 bg-red-950/40 shadow-[0_0_10px_rgba(220,38,38,0.8)]' };
-    } 
-    // 2. ⚪ หน้าใหม่ (0 - 999) --> 🟢 ปรับ Scale ให้เล็กลง (scale-90)
-    else if (s < 1000) {
-        theme = { 
-            icon: Icons.New, 
-            label: 'หน้าใหม่', 
-            style: 'text-slate-300 border-slate-500 bg-slate-800/40 shadow-[0_0_5px_rgba(148,163,184,0.3)] scale-90 opacity-80' 
-        };
-    } 
-    // 3. 🟢 นักประมูลฝึกหัด (1,000 - 9,999)
-    else if (s < 10000) {
-        theme = { icon: Icons.Leaf, label: 'ฝึกหัด', style: 'text-emerald-400 border-emerald-500 bg-emerald-900/20 shadow-[0_0_8px_rgba(52,211,153,0.6)]' };
-    } 
-    // 4. 🔵 นักประมูลขาประจำ (10,000 - 29,999)
-    else if (s < 30000) {
-        theme = { icon: Icons.Shield, label: 'ขาประจำ', style: 'text-cyan-400 border-cyan-500 bg-cyan-900/20 shadow-[0_0_10px_rgba(34,211,238,0.7)]' };
-    } 
-    // 5. 🟣 นักประมูลทุนหนา (30,000 - 49,999)
-    else if (s < 50000) {
-        theme = { icon: Icons.Diamond, label: 'ทุนหนา', style: 'text-fuchsia-300 border-fuchsia-400 bg-fuchsia-900/40 shadow-[0_0_15px_2px_rgba(217,70,239,0.7)] drop-shadow-[0_0_5px_rgba(217,70,239,1)] font-bold' };
-    } 
-    // 6. 🔴 สุลต่าน (50,000+)
-    else {
-        theme = { icon: Icons.Sultan, label: 'สุลต่าน', style: 'text-rose-100 border-rose-500 bg-rose-900/60 shadow-[0_0_20px_4px_rgba(244,63,94,0.9)] drop-shadow-[0_0_10px_rgba(244,63,94,1)] font-black animate-pulse border-2' };
+    switch (rank.id) {
+        case 'BAD':
+            theme = { icon: Icons.Cross, style: 'text-red-600 border-red-600 bg-red-950/40 shadow-[0_0_10px_rgba(220,38,38,0.8)]' };
+            break;
+        case 'NEW':
+            theme = { icon: Icons.New, style: 'text-slate-500 border-slate-400 bg-slate-100 dark:bg-slate-800/40 dark:text-slate-300 dark:border-slate-500 shadow-sm' };
+            break;
+        case 'ROOKIE':
+            theme = { icon: Icons.Leaf, style: 'text-emerald-600 border-emerald-500 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-900/20 shadow-[0_0_8px_rgba(52,211,153,0.4)]' };
+            break;
+        case 'REGULAR':
+            theme = { icon: Icons.Shield, style: 'text-cyan-600 border-cyan-500 bg-cyan-50 dark:text-cyan-400 dark:bg-cyan-900/20 shadow-[0_0_10px_rgba(34,211,238,0.5)]' };
+            break;
+        case 'PRO':
+            theme = { icon: Icons.Diamond, style: 'text-fuchsia-600 border-fuchsia-500 bg-fuchsia-50 dark:text-fuchsia-300 dark:border-fuchsia-400 dark:bg-fuchsia-900/40 shadow-[0_0_15px_2px_rgba(217,70,239,0.5)] font-bold' };
+            break;
+        case 'TYCOON':
+            theme = { icon: Icons.Crown, style: 'text-purple-600 border-purple-500 bg-purple-50 dark:text-purple-300 dark:border-purple-400 dark:bg-purple-900/40 shadow-[0_0_15px_2px_rgba(168,85,247,0.5)] font-bold' };
+            break;
+        case 'LEGEND':
+            theme = { icon: Icons.Sultan, style: 'text-rose-600 border-rose-500 bg-rose-50 dark:text-rose-100 dark:border-rose-500 dark:bg-rose-900/60 shadow-[0_0_20px_4px_rgba(244,63,94,0.9)] font-black animate-pulse border-2' };
+            break;
+        default:
+            theme = { icon: Icons.New, style: 'text-slate-400 border-slate-400' };
     }
-    
+
     return (
-        <div className={`
-            inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border 
-            text-[10px] md:text-xs transition-all duration-300
-            backdrop-blur-md cursor-help
-            ${theme.style}
-        `}
-        title={`ระดับ: ${theme.label}`}
-        >
-            <span className="filter drop-shadow-md">{theme.icon}</span>
-            <span className="uppercase tracking-wider font-bold">{theme.label}</span>
+        <div className="flex flex-col items-start gap-1">
+            {/* Badge หลัก */}
+            <div className={`
+                inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border 
+                text-[10px] md:text-xs transition-all duration-300
+                backdrop-blur-md cursor-help select-none
+                ${theme.style}
+            `}
+            title={`Credit Score: ${score}`}
+            >
+                <span className="filter drop-shadow-md">{theme.icon}</span>
+                <span className="uppercase tracking-wider font-bold">{rank.name}</span>
+            </div>
+
+            {/* (Option) หลอด EXP อัปยศ (แสดงเฉพาะเมื่อมี props showProgress) */}
+            {showProgress && progress.nextScore && score >= 0 && (
+                <div className="w-full pl-1 pr-1 mt-1 group relative">
+                    <div className="h-1.5 w-full bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                        <div 
+                            className={`h-full transition-all duration-500 rounded-full`} 
+                            style={{ 
+                                width: `${progress.percent}%`,
+                                backgroundColor: 'currentColor', // ใช้สีเดียวกับ text แม่
+                                color: 'inherit' // สืบทอดสี
+                            }}
+                        />
+                    </div>
+                    {/* Tooltip บอกแต้มที่ขาด */}
+                    <div className="absolute top-3 left-0 text-[9px] text-slate-500 dark:text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap bg-white dark:bg-slate-800 px-1 rounded shadow border border-slate-200 dark:border-slate-700 z-10">
+                        อีก {progress.nextScore - score} แต้ม จะเป็น "{progress.nextName}"
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

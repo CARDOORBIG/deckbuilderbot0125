@@ -920,7 +920,7 @@ useEffect(() => {
       />
 
       <main className="flex-1 overflow-y-auto p-4 md:p-8 lg:p-12">
-        <h2 className="text-3xl font-bold text-slate-900 dark:text-white mb-6">Public Shared Decks</h2>
+        <h2 className="text-3xl font-bold text-slate-900 dark:text-white mb-6">แชร์เด็คสาธารณะ</h2>
         <div className="mb-8 p-4 bg-white dark:bg-slate-900/70 rounded-xl border border-slate-200 dark:border-emerald-500/20">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4"><input type="search" placeholder="Search decks..." className="w-full px-4 py-2 border border-slate-300 dark:border-emerald-500/30 rounded-lg bg-white dark:bg-slate-700/50 text-slate-900 dark:text-white" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} /></div>
           {/* 🔽 Sort Dropdown */}

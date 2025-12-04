@@ -1,245 +1,201 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from './supabaseClient';
-import { 
-    ChatBubbleIcon, TrashIcon, StoreIcon, PackageIcon, 
-    FilterIcon, SearchIcon, PlusIcon, 
-    ShoppingBagIcon, ShieldCheckIcon 
-} from './components/Icons';
-import CreateMarketListingModal from './CreateMarketListingModal';
+import { ShoppingBagIcon, ChatBubbleIcon, ShieldCheckIcon, HistoryIcon } from './components/Icons';
 
-// Helper
-const encodePath = (p) => p ? p.split('/').map(encodeURIComponent).join('/') : '';
+// 🟢 Local Icons (เพื่อให้เหมือนหน้าประมูล)
+const LayoutGridIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>;
+const LayoutFeedIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="3" y1="15" x2="21" y2="15"></line></svg>;
 
-// ฟังก์ชันเตรียมข้อมูลสำหรับ Chat
-const prepareChatData = (item) => ({
-    id: item.id,
-    card_name: item.title,
-    seller_email: item.seller_email,
-    seller_name: item.seller_name,
-    current_price: item.price,
-    end_time: new Date().toISOString(),
-    status: item.status,
-    card_image_path: 'CUSTOM_ITEM',
-    proof_image: item.images
-});
+export default function FleaMarket({ userProfile, onChat, onBuy, viewMode = 'grid', setViewMode, onCreate }) {
+    const [items, setItems] = useState([]);
+    const [searchTerm, setSearchTerm] = useState("");
+    const [sortOption, setSortOption] = useState("newest");
+    const [filterStatus, setFilterStatus] = useState("all");
 
-export default function FleaMarket({ userProfile, onChat, onBuy }) {
-  const [marketItems, setMarketItems] = useState([]);
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [loading, setLoading] = useState(true);
+    // Fetch Market Items
+    useEffect(() => {
+        const fetchItems = async () => {
+            const { data, error } = await supabase
+                .from('market_listings')
+                .select('*')
+                .eq('status', 'active') // แสดงเฉพาะที่ยังขายอยู่
+                .order('created_at', { ascending: false });
+            
+            if (!error && data) setItems(data);
+        };
 
-  // Filter States
-  const [searchTerm, setSearchTerm] = useState("");
-  const [sortOption, setSortOption] = useState("newest");
-  const [filterCategory, setFilterCategory] = useState("All");
+        fetchItems();
 
-  // Fetch Data
-  const fetchMarketItems = async () => {
-    setLoading(true);
-    const { data, error } = await supabase
-        .from('market_listings')
-        .select('*')
-        .eq('status', 'active')
-        .order('created_at', { ascending: false });
+        // Real-time Subscription
+        const channel = supabase.channel('market_realtime')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'market_listings' }, () => {
+                fetchItems();
+            })
+            .subscribe();
 
-    if (error) console.error("Error fetching market:", error);
-    else setMarketItems(data || []);
-    setLoading(false);
-  };
+        return () => supabase.removeChannel(channel);
+    }, []);
 
-  useEffect(() => {
-    fetchMarketItems();
-    const channel = supabase.channel('public:market_listings')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'market_listings' }, () => fetchMarketItems())
-        .subscribe();
-    return () => supabase.removeChannel(channel);
-  }, []);
+    // Filter & Sort Logic
+    const filteredItems = useMemo(() => {
+        return items.filter(item => {
+            const matchName = (item.title || '').toLowerCase().includes(searchTerm.toLowerCase());
+            let matchStatus = true;
+            if (filterStatus === 'escrow') matchStatus = item.is_escrow === true;
+            if (filterStatus === 'direct') matchStatus = item.is_escrow === false;
+            return matchName && matchStatus;
+        }).sort((a, b) => {
+            if (sortOption === 'price_asc') return a.price - b.price;
+            if (sortOption === 'price_desc') return b.price - a.price;
+            return new Date(b.created_at) - new Date(a.created_at); // newest
+        });
+    }, [items, searchTerm, sortOption, filterStatus]);
 
-  // 🟢 ฟังก์ชันลบสินค้า (สำหรับเจ้าของ)
-  const handleDelete = async (item) => {
-      if (!confirm(`ยืนยันการลบประกาศ "${item.title}" ใช่หรือไม่?`)) return;
-      
-      if (item.images) {
-          try {
-              const urls = JSON.parse(item.images);
-              const paths = urls.map(u => { 
-                  const parts = u.split('/auction-images/'); 
-                  return parts[1] ? decodeURIComponent(parts[1]) : null; 
-              }).filter(Boolean);
-              
-              if (paths.length > 0) {
-                  await supabase.storage.from('auction-images').remove(paths);
-              }
-          } catch(e) { console.error("Error deleting images:", e); }
-      }
-      
-      const { error } = await supabase.from('market_listings').delete().eq('id', item.id);
-      if (error) alert("ลบไม่สำเร็จ: " + error.message);
-      else setMarketItems(prev => prev.filter(i => i.id !== item.id));
-  };
+    const getThumbnail = (item) => {
+        try {
+            const images = JSON.parse(item.images);
+            return images[0] || 'https://placehold.co/300x420/1e293b/ffffff?text=No+Image';
+        } catch {
+            return 'https://placehold.co/300x420/1e293b/ffffff?text=Error';
+        }
+    };
 
-  const filteredItems = useMemo(() => {
-    return marketItems.filter(item => {
-        const matchesSearch = item.title.toLowerCase().includes(searchTerm.toLowerCase()) || item.description?.toLowerCase().includes(searchTerm.toLowerCase());
-        const matchesCategory = filterCategory === "All" || item.category === filterCategory;
-        return matchesSearch && matchesCategory;
-    }).sort((a, b) => {
-        if (sortOption === 'price_asc') return a.price - b.price;
-        if (sortOption === 'price_desc') return b.price - a.price;
-        return new Date(b.created_at) - new Date(a.created_at);
-    });
-  }, [marketItems, searchTerm, sortOption, filterCategory]);
+    return (
+        <div className="animate-fade-in w-full md:px-8">
+            
+            {/* 🟢 NEW HEADER DESIGN (เหมือนหน้า Auction) */}
+            <div className="sticky top-0 z-20 mb-6 mx-4 md:mx-0 mt-4">
+                <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border border-slate-200 dark:border-slate-800 p-3 rounded-2xl shadow-sm flex flex-col gap-3">
+                    
+                    {/* Row 1: Search + History + Create (Desktop) */}
+                    <div className="flex gap-2 items-center w-full">
+                        <div className="relative flex-grow">
+                            <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
+                                <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                            </div>
+                            <input 
+                                type="text" 
+                                placeholder="ค้นหาสินค้า..." 
+                                value={searchTerm} 
+                                onChange={(e) => setSearchTerm(e.target.value)} 
+                                className="w-full pl-9 pr-4 py-2 bg-slate-100 dark:bg-slate-800 border-none rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 outline-none text-slate-900 dark:text-white placeholder-slate-400 transition-all" 
+                            />
+                        </div>
+                        
+                        {/* History Button (Placeholder action) */}
+                        <button className="p-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 hover:text-emerald-500 rounded-xl transition-colors shrink-0" title="ประวัติการซื้อขาย">
+                            <HistoryIcon width="20" height="20" />
+                        </button>
 
-  const getThumbnail = (item) => {
-      try {
-          const images = JSON.parse(item.images);
-          return images[0] || 'https://placehold.co/300x420/1e293b/ffffff?text=No+Image';
-      } catch { return 'https://placehold.co/300x420/1e293b/ffffff?text=Error'; }
-  };
+                        {/* Create Button (Desktop) */}
+                        {onCreate && (
+                            <button onClick={onCreate} className="hidden md:flex items-center gap-1 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-xs font-bold shadow-lg shadow-emerald-500/20 transition-all active:scale-95 whitespace-nowrap shrink-0">
+                                <span className="text-base leading-none">+</span> ลงขาย
+                            </button>
+                        )}
+                    </div>
 
-  return (
-    <div className="w-full md:px-8 pb-20 animate-fade-in">
-        
-        {/* Filter Bar */}
-        <div className="mt-4 mb-6 flex flex-col gap-2 bg-white dark:bg-slate-900/50 p-2 md:p-3 rounded-xl border border-slate-200 dark:border-emerald-500/20 shadow-sm mx-4 md:mx-0">
-            <div className="relative w-full">
-                <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none text-slate-400"><SearchIcon /></div>
-                <input type="text" placeholder="ค้นหาสินค้า..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full pl-9 pr-4 py-1.5 md:py-2 bg-slate-100 dark:bg-slate-800 border-none rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none text-slate-900 dark:text-white placeholder-slate-400 transition-all" />
-            </div>
-            <div className="flex flex-col md:flex-row gap-2 md:items-center justify-between">
-                <div className="flex gap-2 items-center overflow-x-auto pb-1 md:pb-0 no-scrollbar shrink-0">
-                    <select value={sortOption} onChange={e => setSortOption(e.target.value)} className="px-2 py-1.5 md:py-2 bg-slate-100 dark:bg-slate-800 rounded-lg text-xs font-bold text-slate-700 dark:text-slate-300 border-none outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer shrink-0"><option value="newest">ล่าสุด</option><option value="price_asc">ราคา: ต่ำ-สูง</option><option value="price_desc">ราคา: สูง-ต่ำ</option></select>
-                    <select value={filterCategory} onChange={e => setFilterCategory(e.target.value)} className="px-2 py-1.5 md:py-2 bg-slate-100 dark:bg-slate-800 rounded-lg text-xs font-bold text-slate-700 dark:text-slate-300 border-none outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer shrink-0"><option value="All">หมวดหมู่: ทั้งหมด</option><option value="General">ทั่วไป</option><option value="Single">การ์ดเดี่ยว</option><option value="Bulk">ยกกอง / Box</option><option value="Deck">เด็ค</option><option value="Accessories">อุปกรณ์เสริม</option></select>
+                    {/* Row 2: Sort + Filters + View Toggle */}
+                    <div className="flex items-center justify-between gap-2 overflow-x-auto no-scrollbar">
+                        
+                        {/* Sort & Filters */}
+                        <div className="flex items-center gap-2 shrink-0">
+                            <div className="relative shrink-0">
+                                <select value={sortOption} onChange={(e) => setSortOption(e.target.value)} className="appearance-none pl-3 pr-6 py-2 bg-slate-100 dark:bg-slate-800 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-300 border-none outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer">
+                                    <option value="newest">ล่าสุด</option>
+                                    <option value="price_asc">ถูก➜แพง</option>
+                                    <option value="price_desc">แพง➜ถูก</option>
+                                </select>
+                                <div className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400 text-[8px]">▼</div>
+                            </div>
+
+                            <div className="flex bg-slate-100 dark:bg-slate-800 rounded-xl p-1 gap-1 shrink-0">
+                                <button onClick={() => setFilterStatus('all')} className={`px-2 py-1.5 rounded-lg text-[10px] md:text-xs font-bold transition-all ${filterStatus === 'all' ? 'bg-white dark:bg-slate-600 shadow text-emerald-600 dark:text-emerald-400' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}>รวม</button>
+                                <button onClick={() => setFilterStatus('escrow')} className={`px-2 py-1.5 rounded-lg text-[10px] md:text-xs font-bold transition-all ${filterStatus === 'escrow' ? 'bg-white dark:bg-slate-600 shadow text-blue-500' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}>ผ่านกลาง</button>
+                                <button onClick={() => setFilterStatus('direct')} className={`px-2 py-1.5 rounded-lg text-[10px] md:text-xs font-bold transition-all ${filterStatus === 'direct' ? 'bg-white dark:bg-slate-600 shadow text-amber-500' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}>โอนตรง</button>
+                            </div>
+                        </div>
+
+                        {/* View Toggle */}
+                        {setViewMode && (
+                            <div className="flex items-center gap-2 shrink-0">
+                                <div className="flex bg-slate-100 dark:bg-slate-800 rounded-xl p-1 gap-1">
+                                    <button onClick={() => setViewMode('feed')} className={`p-1.5 rounded-lg transition-all ${viewMode === 'feed' ? 'bg-white dark:bg-slate-600 shadow text-emerald-500' : 'text-slate-400 hover:text-slate-600'}`} title="Feed View"><LayoutFeedIcon /></button>
+                                    <button onClick={() => setViewMode('grid')} className={`p-1.5 rounded-lg transition-all ${viewMode === 'grid' ? 'bg-white dark:bg-slate-600 shadow text-emerald-500' : 'text-slate-400 hover:text-slate-600'}`} title="Grid View"><LayoutGridIcon /></button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
                 </div>
-                <button onClick={() => { if(!userProfile) return alert("กรุณา Login ก่อนลงขาย"); setIsCreateModalOpen(true); }} className="w-full md:w-auto flex items-center gap-1 px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-xs font-bold shadow-md hover:shadow-emerald-500/30 transition-all active:scale-95 whitespace-nowrap justify-center shrink-0"><PlusIcon /> ลงขายสินค้า</button>
+                {/* Mobile Create Button */}
+                {onCreate && (
+                    <button onClick={onCreate} className="md:hidden w-full flex items-center justify-center gap-2 px-4 py-3 bg-emerald-500 text-white rounded-xl text-sm font-bold shadow-lg mt-2"><span className="text-lg leading-none">+</span> ลงขายสินค้า</button>
+                )}
             </div>
-        </div>
 
-        {loading && <div className="text-center py-20 text-slate-500 animate-pulse">กำลังโหลดตลาด...</div>}
-        {!loading && filteredItems.length === 0 && <div className="text-center py-20 text-slate-500">ไม่พบสินค้าตามเงื่อนไข</div>}
-
-        {/* 🟢 Grid Items (ปรับสไตล์ให้เหมือน AuctionMarket หน้าจัดการ) */}
-        <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 md:gap-6">
-            {filteredItems.map(item => {
-                const isOwner = userProfile?.email === item.seller_email;
-                return (
+            {/* 🟢 LISTINGS DISPLAY (Grid/Feed Switch) */}
+            <div className={viewMode === 'feed' ? "flex flex-col gap-6 max-w-xl mx-auto" : "grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 md:gap-6"}>
+                {filteredItems.map(item => (
                     <div 
                         key={item.id} 
-                        className="bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-emerald-500/20 rounded-2xl shadow-md hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group cursor-pointer relative overflow-hidden flex flex-col" 
-                        onClick={() => onChat(prepareChatData(item))}
+                        className="relative group cursor-pointer bg-white dark:bg-slate-900/70 backdrop-blur-sm p-2 md:p-3 rounded-xl border border-slate-200 dark:border-emerald-500/20 shadow-lg transition-all hover:border-amber-400/50 hover:shadow-amber-500/10 flex flex-col h-full"
+                        onClick={() => onChat(item)}
                     >
-                        {/* Image Section (Aspect 4:5 like Auctions) */}
-                        <div className="aspect-[4/5] bg-slate-100 dark:bg-slate-800/50 relative p-1 md:p-6 flex items-center justify-center overflow-hidden">
+                        {/* Image Section */}
+                        <div className="aspect-[5/7] w-full rounded mb-2 overflow-hidden bg-slate-200 dark:bg-slate-800 relative shadow-inner">
                             <img 
                                 src={getThumbnail(item)} 
-                                className="w-full h-full object-cover drop-shadow-2xl transition-transform duration-500 group-hover:scale-110" 
+                                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" 
                                 loading="lazy" 
+                                alt={item.title}
                             />
                             
-                            {/* Condition Tag */}
-                            <div className="absolute top-2 right-2 bg-black/60 text-white text-[10px] px-2 py-1 rounded-full backdrop-blur-md font-bold border border-white/10 z-10">
-                                {item.condition}
-                            </div>
-
-                            {/* Escrow Tag */}
+                            {/* Escrow Badge */}
                             {item.is_escrow && (
-                                <div className="absolute top-2 left-2 bg-blue-600 text-white p-1 rounded-full shadow-md z-20" title="ระบบ Escrow คุ้มครอง">
-                                    <ShieldCheckIcon width="16" height="16" />
+                                <div className="absolute top-2 right-2 bg-gradient-to-br from-blue-500 to-blue-700 text-white p-2 rounded-full shadow-lg shadow-blue-500/40 border-[1.5px] border-white/50 z-10 transform scale-125" title="Escrow Protected">
+                                    <ShieldCheckIcon width="20" height="20" className="drop-shadow-md" />
                                 </div>
                             )}
+                        </div>
 
-                            {/* ปุ่มลบ (แสดงเฉพาะเจ้าของ) */}
-                            {isOwner && (
+                        {/* Title */}
+                        <h3 className="text-xs md:text-sm font-bold text-slate-900 dark:text-white mb-2 line-clamp-1 leading-tight">{item.title}</h3>
+                        
+                        {/* Seller & Price */}
+                        <div className="flex justify-between items-end mb-4">
+                            <div className="flex items-center gap-1.5 overflow-hidden max-w-[40%]">
+                                <span className="text-[10px] text-slate-500 dark:text-slate-400 truncate bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded-full">{item.seller_name}</span>
+                            </div>
+                            <div className="text-right flex-1 pl-2">
+                                <p className="text-[9px] text-slate-400 uppercase font-bold leading-none mb-0.5">Price</p>
+                                <p className="text-3xl md:text-4xl font-black text-emerald-500 dark:text-emerald-400 leading-none drop-shadow-sm tracking-tighter">฿{item.price.toLocaleString()}</p>
+                            </div>
+                        </div>
+
+                        {/* Buttons (Glossy Style) */}
+                        <div className="mt-auto flex gap-2">
+                            {userProfile?.email !== item.seller_email && (
                                 <button 
-                                    onClick={(e) => { e.stopPropagation(); handleDelete(item); }} 
-                                    className="absolute bottom-2 left-2 p-1.5 bg-red-600 text-white rounded-full shadow-md opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-700 z-20 scale-90"
-                                    title="ลบสินค้า"
+                                    onClick={(e) => { e.stopPropagation(); onBuy(item); }} 
+                                    className="btn-glossy flex-1 px-3 py-2 rounded-xl bg-gradient-to-br from-pink-500 to-rose-600 text-white text-xs font-black shadow-lg shadow-pink-500/30 border-t border-white/20 flex items-center justify-center gap-1.5"
                                 >
-                                    <TrashIcon width="14" height="14"/>
+                                    <ShoppingBagIcon className="w-4 h-4 md:w-5 md:h-5 drop-shadow-sm" />
+                                    <span>BUY NOW</span>
                                 </button>
                             )}
-                        </div>
-                        
-                        {/* Details Section */}
-                        <div className="p-2 md:p-3 flex flex-col flex-grow gap-1">
-                            <h3 className="font-bold text-xs md:text-sm text-slate-900 dark:text-white truncate line-clamp-1 mb-auto">
-                                {item.title}
-                            </h3>
-                            
-                            {/* Categories Tags */}
-                            <div className="flex flex-wrap items-center gap-1 mt-1">
-                                <span className="text-[9px] px-1.5 py-0.5 bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300 rounded border border-slate-200 dark:border-slate-600 whitespace-nowrap">
-                                    {item.category}
-                                </span>
-                                {item.is_escrow && (
-                                    <span className="text-[9px] px-1.5 py-0.5 bg-blue-50 text-blue-600 border border-blue-200 rounded flex items-center gap-0.5 font-bold whitespace-nowrap">
-                                        <ShieldCheckIcon width="10" height="10" /> Escrow
-                                    </span>
-                                )}
-                            </div>
-
-                            {/* Price & Actions Box */}
-                            <div className="mt-2 bg-slate-50 dark:bg-slate-800/50 p-2 rounded-lg border border-slate-200 dark:border-slate-700 flex flex-col gap-2">
-                                <div>
-                                    <p className="text-[9px] text-slate-400 uppercase font-bold tracking-wide leading-none">ราคา</p>
-                                    <p className="text-base md:text-lg font-black text-emerald-600 dark:text-emerald-400 truncate leading-tight">
-                                        ฿{item.price.toLocaleString()}
-                                    </p>
-                                </div>
-                                
-                                <div className="flex gap-1.5 h-8">
-                                    {/* ✅ ปุ่มซื้อ (แสดงทั้ง Escrow และ Non-Escrow) */}
-                                    {item.status === 'active' && (
-                                        <button 
-                                            onClick={(e) => { 
-                                                e.stopPropagation(); 
-                                                if(!userProfile) return alert("กรุณา Login ก่อนซื้อ");
-                                                if(userProfile.email === item.seller_email) return alert("ซื้อของตัวเองไม่ได้");
-                                                onBuy(item); 
-                                            }}
-                                            className={`flex-1 px-2 rounded-md shadow-sm font-bold text-[10px] md:text-xs transition-all active:scale-95 flex items-center justify-center gap-1 ${
-                                                item.is_escrow 
-                                                ? 'bg-emerald-600 text-white hover:bg-emerald-500' // สีเขียว (Escrow)
-                                                : 'bg-amber-500 text-white hover:bg-amber-400'     // สีส้ม (Non-Escrow)
-                                            }`}
-                                            title={item.is_escrow ? "ซื้อผ่านระบบ Escrow" : "สนใจซื้อ (ตกลงกับผู้ขาย)"}
-                                        >
-                                            <ShoppingBagIcon width="14" height="14"/> 
-                                            <span className="truncate">{item.is_escrow ? "ซื้อเลย" : "สนใจซื้อ"}</span>
-                                        </button>
-                                    )}
-
-                                    {/* ปุ่มแชท */}
-                                    <button 
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            if (!userProfile) return alert("กรุณา Login ก่อนทักแชท");
-                                            onChat(prepareChatData(item)); 
-                                        }}
-                                        className={`px-3 bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400 rounded-md hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors border border-blue-100 dark:border-blue-800 flex items-center justify-center ${item.status !== 'active' ? 'w-full' : ''}`}
-                                        title="ทักแชท"
-                                    >
-                                        <ChatBubbleIcon width="16" height="16" />
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        {/* Seller Name (Footer) */}
-                        <div className="px-3 pb-2 flex items-center gap-1.5 justify-center opacity-60 border-t border-slate-100 dark:border-slate-800/50 pt-1">
-                             {item.seller_avatar ? <img src={item.seller_avatar} className="w-4 h-4 rounded-full object-cover border border-slate-200 dark:border-slate-600" /> : <div className="w-4 h-4 rounded-full bg-slate-300"></div>}
-                             <span className="text-[9px] text-slate-500 truncate">{item.seller_name}</span>
+                            <button onClick={(e) => { e.stopPropagation(); onChat(item); }} className="p-2 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
+                                <ChatBubbleIcon />
+                            </button>
                         </div>
                     </div>
-                );
-            })}
+                ))}
+            </div>
+            
+            {filteredItems.length === 0 && (
+                <div className="text-center py-20 text-slate-400">
+                    <p>ยังไม่มีสินค้าวางขาย</p>
+                </div>
+            )}
         </div>
-
-        <CreateMarketListingModal 
-            isOpen={isCreateModalOpen}
-            onClose={() => setIsCreateModalOpen(false)}
-            userProfile={userProfile}
-        />
-    </div>
-  );
+    );
 }
