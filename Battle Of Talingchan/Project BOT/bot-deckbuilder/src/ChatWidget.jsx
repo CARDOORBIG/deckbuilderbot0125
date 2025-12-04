@@ -30,9 +30,14 @@ export default function ChatWidget({ userProfile, isMobileMenuOpen }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [isFetchingUsers, setIsFetchingUsers] = useState(false);
   
+  // 🟢 State สำหรับนับจำนวนข้อความ (รวม และ แยกรายคน)
+  const [totalUnreadCount, setTotalUnreadCount] = useState(0); 
+  const [unreadPerUser, setUnreadPerUser] = useState({}); // { 'email1': 5, 'email2': 1 }
+  const [isAnimating, setIsAnimating] = useState(false);
+
   const messagesEndRef = useRef(null);
 
-  // 1. Fetch Data
+  // 1. Fetch Data (Friends & Requests)
   const fetchFriendsAndRequests = async () => {
     if (!userProfile) return;
     const { data: fData } = await supabase.from('friendships').select('*').or(`requester_id.eq.${userProfile.email},receiver_id.eq.${userProfile.email}`);
@@ -64,33 +69,111 @@ export default function ChatWidget({ userProfile, isMobileMenuOpen }) {
     } catch (error) { console.error("Error", error); } finally { setIsFetchingUsers(false); }
   };
 
+  // 🟢 2. Fetch Unread Messages (ดึงข้อมูลแล้วมานับแยกรายคน)
+  const fetchUnreadStats = async () => {
+      if (!userProfile) return;
+      
+      // ดึงข้อความทั้งหมดที่ส่งถึงเรา และยังไม่อ่าน
+      const { data } = await supabase
+          .from('messages')
+          .select('sender_id') // เอาแค่ sender_id มานับ
+          .eq('receiver_id', userProfile.email)
+          .eq('is_read', false);
+      
+      if (data) {
+          // คำนวณผลรวม
+          setTotalUnreadCount(data.length);
+
+          // คำนวณแยกรายคน
+          const counts = {};
+          data.forEach(msg => {
+              counts[msg.sender_id] = (counts[msg.sender_id] || 0) + 1;
+          });
+          setUnreadPerUser(counts);
+      }
+  };
+
   useEffect(() => {
     if (isOpen) {
         fetchFriendsAndRequests();
         if (view === 'add') fetchAllSystemUsers();
     }
-    const channel = supabase.channel('friends_update_v2').on('postgres_changes', { event: '*', schema: 'public', table: 'friendships' }, () => { fetchFriendsAndRequests(); }).subscribe();
-    return () => supabase.removeChannel(channel);
+    // โหลดครั้งแรก
+    fetchUnreadStats(); 
+    fetchFriendsAndRequests(); // โหลด requests ตั้งแต่แรกเพื่อให้ปุ่มแดงโชว์
+
+    // Listener 1: Friends update (เช่น มีคนแอดมา)
+    const friendChannel = supabase.channel('friends_update_v3')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'friendships' }, () => { 
+            fetchFriendsAndRequests(); // อัปเดตตัวเลข request สีแดงทันที
+        })
+        .subscribe();
+    
+    // Listener 2: Messages update (มีคนทักมา)
+    const msgChannel = supabase.channel('global_messages_v3')
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `receiver_id=eq.${userProfile.email}` }, (payload) => {
+            // เมื่อมีข้อความใหม่ส่งถึงเรา
+            const sender = payload.new.sender_id;
+            
+            // อัปเดต state ทันทีโดยไม่ต้อง fetch ใหม่
+            setTotalUnreadCount(prev => prev + 1);
+            setUnreadPerUser(prev => ({
+                ...prev,
+                [sender]: (prev[sender] || 0) + 1
+            }));
+
+            setIsAnimating(true);
+            setTimeout(() => setIsAnimating(false), 1000); 
+        })
+        .subscribe();
+
+    return () => {
+        supabase.removeChannel(friendChannel);
+        supabase.removeChannel(msgChannel);
+    };
   }, [isOpen, userProfile, view]);
 
-  // 2. Chat Logic
+  // 3. Chat Logic (Active Chat Room)
   useEffect(() => {
     if (!activeFriend || !userProfile) return;
+    
     const loadMessages = async () => {
         const { data } = await supabase.from('messages').select('*').or(`and(sender_id.eq.${userProfile.email},receiver_id.eq.${activeFriend.email}),and(sender_id.eq.${activeFriend.email},receiver_id.eq.${userProfile.email})`).order('created_at', { ascending: true });
         setMessages(data || []);
         scrollToBottom();
+
+        // 🟢 เมื่อเข้าห้องแชท -> เคลียร์ unread ของเพื่อนคนนี้ใน DB
+        await supabase.from('messages')
+            .update({ is_read: true })
+            .eq('sender_id', activeFriend.email)
+            .eq('receiver_id', userProfile.email)
+            .eq('is_read', false);
+        
+        // 🟢 เคลียร์ state หน้าจอด้วย
+        setUnreadPerUser(prev => {
+            const newCounts = { ...prev };
+            const countToSubtract = newCounts[activeFriend.email] || 0;
+            delete newCounts[activeFriend.email]; // ลบkeyนี้ออก
+            setTotalUnreadCount(prevTotal => Math.max(0, prevTotal - countToSubtract)); // ลดยอดรวม
+            return newCounts;
+        });
     };
     loadMessages();
+
     const chatChannel = supabase.channel(`chat:${activeFriend.email}`).on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `receiver_id=eq.${userProfile.email}` }, (payload) => {
-        if (payload.new.sender_id === activeFriend.email) { setMessages(prev => [...prev, payload.new]); scrollToBottom(); }
+        if (payload.new.sender_id === activeFriend.email) { 
+            setMessages(prev => [...prev, payload.new]); 
+            scrollToBottom(); 
+            // ถ้าเปิดหน้าจอแชทกับคนนี้อยู่ ให้ mark read ทันที และไม่เพิ่ม count
+            supabase.from('messages').update({ is_read: true }).eq('id', payload.new.id);
+        }
     }).subscribe();
     return () => supabase.removeChannel(chatChannel);
   }, [activeFriend, userProfile]);
 
   const scrollToBottom = () => { setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100); };
 
-  // 3. Actions
+  // 4. Actions
   const handleSendMessage = async () => {
     if (!inputText.trim()) return;
     const text = inputText.trim();
@@ -124,6 +207,9 @@ export default function ChatWidget({ userProfile, isMobileMenuOpen }) {
 
   if (!userProfile) return null;
 
+  // 🟢 คำนวณยอดแจ้งเตือนรวม (ข้อความ + คำขอเพื่อน)
+  const totalNotifications = requests.length + totalUnreadCount;
+
   return createPortal(
     <div className={`fixed bottom-4 right-4 z-[9999] flex-col items-end font-sans pointer-events-auto ${isMobileMenuOpen ? 'hidden md:flex' : 'flex'}`}>
       
@@ -146,7 +232,7 @@ export default function ChatWidget({ userProfile, isMobileMenuOpen }) {
                 <div className="flex items-center gap-2">
                     {view === 'chat' && <button onClick={() => handleRemoveFriend(activeFriend.id, activeFriend.profile.displayName || activeFriend.email)} className="p-1.5 hover:bg-white/20 rounded text-red-100 hover:text-red-300 transition-colors"><TrashIcon /></button>}
                     {view === 'list' && requests.length > 0 && (
-                        <div className="relative animate-pulse"><BellIcon /><span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[9px] font-bold w-4 h-4 rounded-full flex items-center justify-center border border-white dark:border-slate-900">{requests.length}</span></div>
+                        <div className="relative animate-pulse" title="คำขอเป็นเพื่อน"><BellIcon /><span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[9px] font-bold w-4 h-4 rounded-full flex items-center justify-center border border-white dark:border-slate-900">{requests.length}</span></div>
                     )}
                     {view === 'list' && <button onClick={() => setView('add')} className="hover:bg-white/20 p-1 rounded"><UserPlusIcon /></button>}
                     <button onClick={() => setIsOpen(false)} className="hover:bg-white/20 p-1 rounded"><CloseIcon /></button>
@@ -172,7 +258,7 @@ export default function ChatWidget({ userProfile, isMobileMenuOpen }) {
                             <div className="text-center py-10 text-slate-400"><p>ยังไม่มีเพื่อน</p><button onClick={() => setView('add')} className="text-emerald-500 text-sm font-bold mt-2 hover:underline">ค้นหาเพื่อนใหม่</button></div>
                         ) : (
                             friends.map(f => (
-                                <div key={f.email} className="group flex items-center gap-3 p-3 bg-white dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700 hover:shadow-md cursor-pointer transition-all active:scale-95" onClick={() => { setActiveFriend(f); setView('chat'); }}>
+                                <div key={f.email} className="group flex items-center gap-3 p-3 bg-white dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700 hover:shadow-md cursor-pointer transition-all active:scale-95 relative" onClick={() => { setActiveFriend(f); setView('chat'); }}>
                                     <div className="w-10 h-10 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden flex items-center justify-center shrink-0">
                                         {f.profile.avatarUrl ? (
                                             <img src={f.profile.avatarUrl} className="w-full h-full object-cover" />
@@ -181,6 +267,14 @@ export default function ChatWidget({ userProfile, isMobileMenuOpen }) {
                                         )}
                                     </div>
                                     <div className="flex-grow min-w-0"><p className="font-bold text-sm text-slate-800 dark:text-white truncate">{f.profile.displayName || f.email}</p><p className="text-xs text-slate-400 truncate">แตะเพื่อแชท</p></div>
+                                    
+                                    {/* 🟢 แสดงจำนวนข้อความที่ยังไม่ได้อ่านของเพื่อนคนนี้ (ถ้ามี) */}
+                                    {unreadPerUser[f.email] > 0 && (
+                                        <div className="bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-md animate-pulse">
+                                            {unreadPerUser[f.email] > 9 ? '9+' : unreadPerUser[f.email]}
+                                        </div>
+                                    )}
+
                                     <button onClick={(e) => { e.stopPropagation(); handleRemoveFriend(f.id, f.profile.displayName || f.email); }} className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-full opacity-0 group-hover:opacity-100 transition-all"><TrashIcon /></button>
                                 </div>
                             ))
@@ -226,7 +320,6 @@ export default function ChatWidget({ userProfile, isMobileMenuOpen }) {
                                 <div className={`max-w-[80%] px-3 py-2 rounded-2xl text-sm break-words shadow-sm ${
                                     m.sender_id === userProfile.email 
                                     ? 'bg-emerald-500 text-white rounded-tr-none' 
-                                    // 🟢 แก้ไขสีตัวอักษร (Light Mode = สีดำ, Dark Mode = สีขาว)
                                     : 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 rounded-tl-none border border-slate-200 dark:border-slate-600'
                                 }`}>
                                     {m.content}
@@ -244,7 +337,6 @@ export default function ChatWidget({ userProfile, isMobileMenuOpen }) {
                     <form onSubmit={(e) => { e.preventDefault(); handleSendMessage(); }} className="flex gap-2 items-center">
                         <input 
                             className="flex-grow bg-slate-100 dark:bg-slate-800 rounded-full px-4 py-2 text-sm outline-none focus:ring-1 focus:ring-emerald-500 text-slate-900 dark:text-white" 
-                            // 🟢 แก้ไขสีตัวอักษร (Light Mode = สีดำ)
                             placeholder="พิมพ์ข้อความ..." 
                             value={inputText} 
                             onChange={e => setInputText(e.target.value)} 
@@ -257,9 +349,15 @@ export default function ChatWidget({ userProfile, isMobileMenuOpen }) {
       )}
 
       {/* --- Toggle Button --- */}
-      <button onClick={() => setIsOpen(!isOpen)} className="w-14 h-14 bg-emerald-600 hover:bg-emerald-500 text-white rounded-full shadow-[0_4px_14px_rgba(16,185,129,0.4)] flex items-center justify-center transition-all hover:scale-110 active:scale-95 relative">
+      <button onClick={() => setIsOpen(!isOpen)} className={`w-14 h-14 bg-emerald-600 hover:bg-emerald-500 text-white rounded-full shadow-[0_4px_14px_rgba(16,185,129,0.4)] flex items-center justify-center transition-all hover:scale-110 active:scale-95 relative ${isAnimating ? 'animate-bounce' : ''}`}>
         {isOpen ? <CloseIcon /> : <ChatIcon />}
-        {requests.length > 0 && !isOpen && <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center border-2 border-white dark:border-black animate-bounce">{requests.length}</span>}
+        
+        {/* 🟢 Red Mark Real-time รวม (ข้อความ + คำขอ) */}
+        {totalNotifications > 0 && !isOpen && (
+            <span className="absolute -top-1 -right-1 w-6 h-6 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center border-2 border-white dark:border-black animate-pulse shadow-md">
+                {totalNotifications > 9 ? '9+' : totalNotifications}
+            </span>
+        )}
       </button>
 
     </div>,

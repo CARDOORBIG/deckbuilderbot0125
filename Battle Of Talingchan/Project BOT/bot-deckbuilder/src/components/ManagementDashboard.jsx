@@ -4,6 +4,7 @@ import {
     ChatBubbleIcon, TruckIcon, GavelIcon
 } from './Icons';
 
+// ... (getAuctionThumbnail function คงเดิม) ...
 const getAuctionThumbnail = (item) => {
     if (item.card_image_path === 'CUSTOM_ITEM') {
         try { const images = JSON.parse(item.proof_image); return images[0] || 'https://placehold.co/300x420/1e293b/ffffff?text=No+Image'; } catch { return 'https://placehold.co/300x420/1e293b/ffffff?text=Error'; }
@@ -35,7 +36,8 @@ export default function ManagementDashboard({
     return (
         <div className="animate-fade-in w-full md:px-8">
             {/* Sub-tab Navigation */}
-            <div className="flex justify-center mb-6">
+            {/* 🟢 แก้ไขตรงนี้: เพิ่ม mt-6 (หรือ mt-8) เพื่อเว้นระยะห่างจาก Tab หลักด้านบน */}
+            <div className="flex justify-center mb-6 mt-6">
                 <div className="bg-slate-200 dark:bg-slate-800 p-1 rounded-lg flex gap-2 overflow-visible relative z-10">
                     <button 
                         onClick={() => setManagementTab('selling')}
@@ -181,7 +183,6 @@ export default function ManagementDashboard({
                                         {item.is_shipped && (<button onClick={() => setShipmentData(item)} className="px-3 py-1.5 bg-amber-100 text-amber-700 border border-amber-200 rounded-lg text-xs font-bold hover:bg-amber-200 flex items-center justify-center gap-1"><TruckIcon /></button>)}
                                     </div>
 
-                                    {/* 🟢 เพิ่มปุ่มลบประวัติ (แสดงเมื่อรายการจบหรือถูกยกเลิก) */}
                                     {(isCompleted || isCancelled) && (
                                         <button 
                                             onClick={(e) => handleDeleteMyAuction(item, e)} 
