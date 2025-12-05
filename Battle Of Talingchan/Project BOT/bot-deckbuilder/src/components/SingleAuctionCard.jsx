@@ -1,10 +1,22 @@
 import React from 'react';
-// 🟢 Import ไอคอนที่จะใช้เพิ่มเข้ามา
-import { ShieldCheckIcon, ShoppingBagIcon, GavelIcon } from './Icons';
+// 🟢 เพิ่ม ShareIcon
+import { ShieldCheckIcon, ShoppingBagIcon, GavelIcon, ShareIcon } from './Icons';
 import TimeLeft from './TimeLeft';
 import { getAuctionThumbnail } from '../utils/auctionUtils';
 
 const SingleAuctionCard = ({ item, onChat, onBid, onBuyNow }) => {
+    
+    // 🟢 ฟังก์ชันแชร์
+    const handleShare = (e) => {
+        e.stopPropagation();
+        const url = `${window.location.origin}/auction?id=${item.id}&type=${item.type || 'auction'}`;
+        navigator.clipboard.writeText(url).then(() => {
+            alert("✅ คัดลอกลิงก์เรียบร้อย!");
+        }).catch(() => {
+            alert("❌ คัดลอกไม่สำเร็จ");
+        });
+    };
+
     return (
         <div 
             className="relative group cursor-pointer bg-white dark:bg-slate-900/70 backdrop-blur-sm p-2 md:p-3 rounded-xl border border-slate-200 dark:border-emerald-500/20 shadow-lg transition-all hover:border-amber-400/50 hover:shadow-amber-500/10 flex flex-col h-full"
@@ -19,7 +31,16 @@ const SingleAuctionCard = ({ item, onChat, onBid, onBuyNow }) => {
                     alt={item.card_name}
                 />
                 
-                {/* 🟢 Escrow Icon (แก้ไขใหม่: ใหญ่ขึ้น 1.6x, สีฟ้า-ขาว) */}
+                {/* 🟢 Share Button (Top-Left) */}
+                <button 
+                    onClick={handleShare}
+                    className="absolute top-2 left-2 p-1.5 bg-black/50 text-white rounded-full backdrop-blur-md hover:bg-emerald-500 transition-colors z-20"
+                    title="แชร์ลิงก์"
+                >
+                    <ShareIcon />
+                </button>
+
+                {/* Escrow Icon */}
                 {item.is_escrow && (
                     <div 
                         className="absolute top-2 right-2 bg-gradient-to-br from-blue-500 to-blue-700 text-white p-2 rounded-full shadow-lg shadow-blue-500/30 border border-blue-300/50 z-10 scale-110" 
@@ -41,34 +62,30 @@ const SingleAuctionCard = ({ item, onChat, onBid, onBuyNow }) => {
                 {item.card_name}
             </h3>
             
-            {/* Info Row: Seller & Price */}
+            {/* Info Row */}
             <div className="flex justify-between items-end mb-4">
                 <div className="flex items-center gap-1.5 overflow-hidden max-w-[60%]">
-    {item.seller_name && (
-        <span className="text-[10px] text-slate-500 dark:text-slate-400 truncate bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded-full">
-            {item.seller_name}
-        </span>
-    )}
-    {/* 🟢 แทรกตรงนี้ (ส่งคะแนน seller_score เข้าไป ถ้ามี) */}
-    {item.seller_score !== undefined && <RatingBadge score={item.seller_score} />}
-</div>
+                    {item.seller_name && (
+                        <span className="text-[10px] text-slate-500 dark:text-slate-400 truncate bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded-full">
+                            {item.seller_name}
+                        </span>
+                    )}
+                </div>
                 <div className="text-right flex-1 pl-2">
                     <p className="text-[9px] text-slate-400 uppercase font-bold leading-none mb-0.5">Current Bid</p>
-                    {/* ราคาตัวใหญ่ (จากโค้ดก่อนหน้า) */}
                     <p className="text-3xl md:text-4xl font-black text-emerald-500 dark:text-emerald-400 leading-none drop-shadow-sm tracking-tighter">
                         ฿{item.current_price.toLocaleString()}
                     </p>
                 </div>
             </div>
 
-            {/* Action Buttons (Glossy Style + New Icons) */}
+            {/* Action Buttons */}
             <div className="mt-auto flex gap-2">
                 {item.buy_now_price > 0 && (
                     <button 
                         onClick={(e) => { e.stopPropagation(); onBuyNow(item); }} 
                         className="btn-glossy flex-1 px-3 py-2 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white text-xs font-black shadow-lg shadow-emerald-500/30 border-t border-white/20 flex items-center justify-center gap-1.5"
                     >
-                        {/* 🟢 ใช้ ShoppingBagIcon แทนอิโมจิ */}
                         <ShoppingBagIcon className="w-5 h-5 drop-shadow-sm" />
                         <span>BUY ฿{item.buy_now_price.toLocaleString()}</span>
                     </button>
@@ -77,11 +94,8 @@ const SingleAuctionCard = ({ item, onChat, onBid, onBuyNow }) => {
                     onClick={(e) => { e.stopPropagation(); onBid(item); }} 
                     className={`btn-glossy px-4 py-2 rounded-xl bg-gradient-to-br from-orange-500 via-red-500 to-purple-600 text-white text-xs font-black shadow-lg shadow-orange-500/30 border-t border-white/20 flex items-center justify-center gap-1.5 ${item.buy_now_price > 0 ? 'flex-1' : 'w-full'}`}
                 >
-                    {/* 🟢 ใช้ GavelIcon แทน SVG เดิม */}
                     <GavelIcon className="w-5 h-5 drop-shadow-sm" />
                     <span>BID <span className="text-orange-100">+{item.min_bid_increment.toLocaleString()}</span></span>
-                    
-                    {/* Pulse Dot */}
                     <span className="absolute top-1 right-1 flex h-2 w-2">
                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
                         <span className="relative inline-flex rounded-full h-2 w-2 bg-red-400"></span>

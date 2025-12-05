@@ -14,6 +14,7 @@ import ReportModal from './ReportModal';
 import ChatWidget from './ChatWidget';
 import FeedbackModal from './components/FeedbackModal';
 import CreateBulkAuctionModal from './CreateBulkAuctionModal'; 
+import CreateMarketListingModal from './CreateMarketListingModal'; 
 import TopUpModal from './components/TopUpModal'; 
 import ShipmentModal from './components/ShipmentModal';
 import ConfirmForceEndModal from './components/ConfirmForceEndModal'
@@ -67,8 +68,9 @@ export default function AuctionMarket() {
   const [filterStatus, setFilterStatus] = useState("all");
   const [isDeckListModalOpen, setIsDeckListModalOpen] = useState(false);
   
-  // 🟢 ลบ state isTypeSelectionOpen ออก เพราะเราจะเปิด Modal ลงขายเลย
   const [isBulkModalOpen, setIsBulkModalOpen] = useState(false); 
+  const [isMarketModalOpen, setIsMarketModalOpen] = useState(false);
+
   const [actionModalData, setActionModalData] = useState(null); 
   const [isTopUpOpen, setIsTopUpOpen] = useState(false); 
   const [shipmentData, setShipmentData] = useState(null); 
@@ -87,7 +89,48 @@ export default function AuctionMarket() {
   const [userProfile, setUserProfile] = useState(() => { try { return JSON.parse(localStorage.getItem("bot-userProfile-v1")); } catch { return null; } });
   const [theme, setThemeState] = useState(() => { try { return JSON.parse(localStorage.getItem("bot-theme")) || 'dark'; } catch { return 'dark'; } });
 
-  // Effects
+  // 🟢 Deep Link Handler: เปิดสินค้าทันทีถ้ามี ?id=xxx&type=xxx ใน URL
+  useEffect(() => {
+      const params = new URLSearchParams(location.search);
+      const shareId = params.get('id');
+      const shareType = params.get('type'); // 'auction' or 'market'
+
+      if (shareId) {
+          const fetchSharedItem = async () => {
+              const table = shareType === 'market' ? 'market_listings' : 'auctions';
+              const { data, error } = await supabase
+                  .from(table)
+                  .select('*')
+                  .eq('id', shareId)
+                  .single();
+              
+              if (data) {
+                  let item = data;
+                  // ปรับโครงสร้างข้อมูล Market ให้เข้ากับ AuctionRoomModal
+                  if (shareType === 'market') {
+                       item = { 
+                          ...data, 
+                          card_name: data.title, 
+                          current_price: data.price, 
+                          start_price: data.price, 
+                          buy_now_price: data.price, 
+                          min_bid_increment: 0,
+                          proof_image: data.images, 
+                          seller_email: data.seller_email, 
+                          seller_name: data.seller_name, 
+                          status: data.status,
+                          type: 'market'
+                      };
+                  } else {
+                      item = { ...data, type: 'auction' };
+                  }
+                  setChatAuction(item);
+              }
+          };
+          fetchSharedItem();
+      }
+  }, [location.search]);
+
   useEffect(() => { const ua = navigator.userAgent || navigator.vendor || window.opera; const isInApp = /(Line|FBAN|FBAV|Instagram|Messenger)/i.test(ua); if (isInApp) { navigate(`/open-browser?redirect=${encodeURIComponent(location.pathname + location.search)}`, { replace: true }); } }, [location, navigate]);
   useEffect(() => { const root = document.documentElement; if (theme === 'dark') root.classList.add('dark'); else root.classList.remove('dark'); }, [theme]);
   const setTheme = (newTheme) => { setThemeState(newTheme); localStorage.setItem("bot-theme", JSON.stringify(newTheme)); };
@@ -180,84 +223,68 @@ export default function AuctionMarket() {
   const handleLogout = () => { googleLogout(); localStorage.removeItem("bot-userProfile-v1"); setUserProfile(null); navigate('/'); };
   const handleSaveProfile = async (data) => { if (!userProfile) return; try { await setDoc(doc(db, "users", userProfile.email), { displayName: data.displayName, avatarUrl: data.avatarUrl, isSetup: true, updatedAt: serverTimestamp() }, { merge: true }); setCustomProfile(p => ({ ...p, ...data })); setIsProfileModalOpen(false); alert("บันทึกข้อมูลเรียบร้อย!"); } catch (e) { console.error(e); alert("บันทึกไม่สำเร็จ"); } };
   
-  // 🟢 แก้ไข: เปิดหน้า Bulk (General) เลย ไม่ต้องเลือก Type
-  const handleStartAuctionClick = () => { 
-      setIsBulkModalOpen(true); 
-  };
-  
+  const handleStartAuctionClick = () => { setIsBulkModalOpen(true); };
+  const handleStartMarketListingClick = () => { setIsMarketModalOpen(true); }
   const handleSelectType = (type) => { setIsTypeSelectionOpen(false); if (type === 'single') { navigate('/', { state: { showAuctionTutorial: true } }); } else { setIsBulkModalOpen(true); } };
   const handleConfirmReceipt = (item) => { if (!item.is_shipped) { return alert("ผู้ขายยังไม่ได้กดส่งสินค้าครับ กรุณารอผู้ขายจัดส่งก่อน"); } setConfirmTransaction({ auction: item }); };
   const handleTopUpClick = async () => { try { const { data, error } = await supabase.from('system_config').select('value').eq('key', 'topup_status').single(); if (error) { setIsTopUpOpen(true); return; } const status = data?.value || 'open'; if (status === 'maintenance') alert("⚠️ ระบบอยู่ในระหว่างการปรับปรุงค่ะ"); else if (status === 'closed') alert("⛔ ปิดระบบเติมเงินชั่วคราว"); else setIsTopUpOpen(true); } catch (e) { setIsTopUpOpen(true); } };
   
-  const handleOpenForceEndModal = (item) => {
-      if (!item.winner_email) {
-          return alert("⚠️ ยังไม่มีผู้ร่วมประมูล ไม่สามารถกดจบการขายได้");
-      }
-      setForceEndItem(item); 
-  };
-
-  const handleConfirmForceEnd = async (item) => {
-      setForceEndItem(null); 
-      const { data, error } = await supabase.rpc('force_end_auction', { 
-          p_auction_id: item.id, 
-          p_seller_email: userProfile.email 
-      });
-      if (error) {
-          alert("Error: " + error.message);
-      } else if (!data.success) {
-          alert("แจ้งเตือน: " + data.message);
-      } else {
-          fetchMyAuctions(); 
-      }
-  };
+  const handleOpenForceEndModal = (item) => { if (!item.winner_email) { return alert("⚠️ ยังไม่มีผู้ร่วมประมูล ไม่สามารถกดจบการขายได้"); } setForceEndItem(item); };
+  const handleConfirmForceEnd = async (item) => { setForceEndItem(null); const { data, error } = await supabase.rpc('force_end_auction', { p_auction_id: item.id, p_seller_email: userProfile.email }); if (error) { alert("Error: " + error.message); } else if (!data.success) { alert("แจ้งเตือน: " + data.message); } else { fetchMyAuctions(); } };
 
   return (
-    <div className="h-full overflow-y-auto bg-slate-100 dark:bg-black text-slate-900 dark:text-white flex flex-col transition-colors duration-300">
-      <Header userProfile={userProfile} displayUser={displayUser} userReputation={userReputation[userProfile?.email]} setIsSettingsOpen={setIsSettingsOpen} setIsAdminOpen={setIsAdminOpen} />
-      <div className="flex justify-center mt-4 px-2 md:px-4 shrink-0">
-        <div className="flex w-full md:w-auto bg-slate-200 dark:bg-slate-800 rounded-full p-1 shadow-inner overflow-visible relative z-10">
-            <button onClick={() => setActiveTab('auction')} className={`flex-1 md:flex-none flex items-center justify-center gap-1 md:gap-2 px-4 py-2 rounded-full font-bold text-xs md:text-sm transition-all whitespace-nowrap ${activeTab === 'auction' ? 'bg-white dark:bg-slate-700 text-amber-600 dark:text-amber-400 shadow-md' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}><GavelIcon /> ลานประมูล</button>
-            <button onClick={() => setActiveTab('market')} className={`flex-1 md:flex-none flex items-center justify-center gap-1 md:gap-2 px-4 py-2 rounded-full font-bold text-xs md:text-sm transition-all whitespace-nowrap ${activeTab === 'market' ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-md' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}><ShoppingBagIcon /> ตลาดซื้อขาย</button>
-            <button onClick={() => setActiveTab('management')} className={`relative flex-1 md:flex-none flex items-center justify-center gap-1 md:gap-2 px-4 py-2 rounded-full font-bold text-xs md:text-sm transition-all whitespace-nowrap ${activeTab === 'management' ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-md' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}>
-                <PackageIcon /> การจัดการ
-                {managementNotiCount > 0 && (
-                    <span className="absolute -top-2 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] text-white ring-2 ring-white dark:ring-slate-900 shadow-md z-50 animate-bounce">
-                        {managementNotiCount}
-                    </span>
-                )}
-            </button>
-        </div>
+    <div className="h-screen flex flex-col bg-slate-100 dark:bg-black text-slate-900 dark:text-white transition-colors duration-300 overflow-hidden">
+      
+      <div className="flex-none z-50 bg-slate-100 dark:bg-black border-b border-slate-200 dark:border-slate-800 shadow-sm relative">
+          <Header 
+            userProfile={userProfile} 
+            displayUser={displayUser} 
+            userReputation={userReputation[userProfile?.email]} 
+            setIsSettingsOpen={setIsSettingsOpen} 
+            setIsAdminOpen={setIsAdminOpen}
+            setIsMyDecksOpen={setIsDeckListModalOpen}
+          />
+          
+          <div className="flex justify-center py-2 px-2 md:px-4">
+            <div className="flex w-full md:w-auto bg-slate-200 dark:bg-slate-800 rounded-full p-1 shadow-inner relative">
+                <button onClick={() => setActiveTab('auction')} className={`flex-1 md:flex-none flex items-center justify-center gap-1 md:gap-2 px-4 py-2 rounded-full font-bold text-xs md:text-sm transition-all whitespace-nowrap ${activeTab === 'auction' ? 'bg-white dark:bg-slate-700 text-amber-600 dark:text-amber-400 shadow-md' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}><GavelIcon /> ลานประมูล</button>
+                <button onClick={() => setActiveTab('market')} className={`flex-1 md:flex-none flex items-center justify-center gap-1 md:gap-2 px-4 py-2 rounded-full font-bold text-xs md:text-sm transition-all whitespace-nowrap ${activeTab === 'market' ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-md' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}><ShoppingBagIcon /> ตลาดซื้อขาย</button>
+                <button onClick={() => setActiveTab('management')} className={`relative flex-1 md:flex-none flex items-center justify-center gap-1 md:gap-2 px-4 py-2 rounded-full font-bold text-xs md:text-sm transition-all whitespace-nowrap ${activeTab === 'management' ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-md' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}>
+                    <PackageIcon /> การจัดการ
+                    {managementNotiCount > 0 && (
+                        <span className="absolute -top-2 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] text-white ring-2 ring-white dark:ring-slate-900 shadow-md z-50 animate-bounce">
+                            {managementNotiCount}
+                        </span>
+                    )}
+                </button>
+            </div>
+          </div>
       </div>
 
-      <main className="flex-grow p-0 md:p-8 w-full pb-40 min-h-[120vh]">
+      <main className="flex-grow overflow-y-auto p-0 md:p-8 w-full pb-40 relative">
         
         {activeTab === 'auction' && (
             <div className="animate-fade-in w-full md:px-8">
-                
-                <div className="sticky top-0 z-20 mb-6 mx-4 md:mx-0 mt-4">
-                    <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border border-slate-200 dark:border-slate-800 p-3 rounded-2xl shadow-sm flex flex-col gap-3">
-                        
-                        {/* Row 1: Search + History + Create (Desktop) */}
+                <div className="mb-6 mx-4 md:mx-0 mt-4">
+                    <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border border-slate-200 dark:border-slate-800 p-3 rounded-2xl shadow-sm flex flex-col gap-3">
                         <div className="flex gap-2 items-center w-full">
                             <div className="relative flex-grow">
                                 <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
                                     <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
                                 </div>
-                                <input type="text" placeholder="ค้นหาการ์ด..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-9 pr-4 py-2 bg-slate-100 dark:bg-slate-800 border-none rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 outline-none text-slate-900 dark:text-white placeholder-slate-400 transition-all" />
+                                <input 
+                                    type="text" 
+                                    placeholder="ค้นหาการ์ด..." 
+                                    value={searchTerm} 
+                                    onChange={(e) => setSearchTerm(e.target.value)} 
+                                    className="w-full pl-9 pr-4 py-2 bg-slate-100 dark:bg-slate-800 border-none rounded-xl text-base md:text-sm focus:ring-2 focus:ring-emerald-500 outline-none text-slate-900 dark:text-white placeholder-slate-400 transition-all" 
+                                />
                             </div>
-                            
-                            <button onClick={() => setIsCompletedModalOpen(true)} className="p-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 hover:text-emerald-500 rounded-xl transition-colors shrink-0" title="ประวัติการประมูล">
-                                <HistoryIcon width="20" height="20" />
-                            </button>
-
-                            <button onClick={handleStartAuctionClick} className="hidden md:flex items-center gap-1 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-xs font-bold shadow-lg shadow-emerald-500/20 transition-all active:scale-95 whitespace-nowrap shrink-0">
-                                <span className="text-base leading-none">+</span> ลงขาย
-                            </button>
+                            <button onClick={() => setIsCompletedModalOpen(true)} className="p-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 hover:text-emerald-500 rounded-xl transition-colors shrink-0" title="ประวัติการประมูล"><HistoryIcon width="20" height="20" /></button>
+                            <button onClick={handleStartAuctionClick} className="hidden md:flex items-center gap-1 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-xs font-bold shadow-lg shadow-emerald-500/20 transition-all active:scale-95 whitespace-nowrap shrink-0"><span className="text-base leading-none">+</span> ลงขาย</button>
                         </div>
 
-                        {/* Row 2: Sort + Filters (Escrow/Direct) + View Toggle */}
                         <div className="flex items-center justify-between gap-2 overflow-x-auto no-scrollbar">
-                            
                             <div className="flex items-center gap-2 shrink-0">
                                 <div className="relative shrink-0">
                                     <select value={sortOption} onChange={(e) => setSortOption(e.target.value)} className="appearance-none pl-3 pr-6 py-2 bg-slate-100 dark:bg-slate-800 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-300 border-none outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer">
@@ -267,60 +294,40 @@ export default function AuctionMarket() {
                                     </select>
                                     <div className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400 text-[8px]">▼</div>
                                 </div>
-
                                 <div className="flex bg-slate-100 dark:bg-slate-800 rounded-xl p-1 gap-1 shrink-0">
                                     <button onClick={() => setFilterStatus('all')} className={`px-2 py-1.5 rounded-lg text-[10px] md:text-xs font-bold transition-all ${filterStatus === 'all' ? 'bg-white dark:bg-slate-600 shadow text-emerald-600 dark:text-emerald-400' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}>รวม</button>
                                     <button onClick={() => setFilterStatus('escrow')} className={`px-2 py-1.5 rounded-lg text-[10px] md:text-xs font-bold transition-all ${filterStatus === 'escrow' ? 'bg-white dark:bg-slate-600 shadow text-blue-500' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}>ผ่านกลาง</button>
                                     <button onClick={() => setFilterStatus('direct')} className={`px-2 py-1.5 rounded-lg text-[10px] md:text-xs font-bold transition-all ${filterStatus === 'direct' ? 'bg-white dark:bg-slate-600 shadow text-amber-500' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}>โอนตรง</button>
                                 </div>
                             </div>
-
                             <div className="flex items-center gap-2 shrink-0">
                                 <div className="flex bg-slate-100 dark:bg-slate-800 rounded-xl p-1 gap-1">
                                     <button onClick={() => setViewMode('feed')} className={`p-1.5 rounded-lg transition-all ${viewMode === 'feed' ? 'bg-white dark:bg-slate-600 shadow text-emerald-500' : 'text-slate-400 hover:text-slate-600'}`} title="Feed View"><LayoutFeedIcon /></button>
                                     <button onClick={() => setViewMode('grid')} className={`p-1.5 rounded-lg transition-all ${viewMode === 'grid' ? 'bg-white dark:bg-slate-600 shadow text-emerald-500' : 'text-slate-400 hover:text-slate-600'}`} title="Grid View"><LayoutGridIcon /></button>
                                 </div>
                             </div>
-
                         </div>
                     </div>
-                    {/* Mobile Only: Create Button */}
-                    <button onClick={handleStartAuctionClick} className="md:hidden w-full flex items-center justify-center gap-2 px-4 py-3 bg-emerald-500 text-white rounded-xl text-sm font-bold shadow-lg mt-2"><span className="text-lg leading-none">+</span> ลงประมูลสินค้า</button>
+                    <button onClick={handleStartAuctionClick} className="md:hidden w-full flex items-center justify-center gap-2 px-4 py-3 bg-emerald-500 text-white rounded-xl text-sm font-bold shadow-lg mt-2 shadow-emerald-500/30"><span className="text-lg leading-none">+</span> ลงประมูลสินค้า</button>
                 </div>
 
-                <div className={viewMode === 'feed' ? "flex flex-col gap-6 max-w-xl mx-auto" : "grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 md:gap-6"}>
-                    {filteredAuctions.map(item => (
-                        <SingleAuctionCard 
-                            key={item.id}
-                            item={item}
-                            onChat={setChatAuction} 
-                            onBid={handleBid}       
-                            onBuyNow={handleBuyNow} 
-                        />
-                    ))}
+                <div className="mt-4">
+                    <div className={viewMode === 'feed' ? "flex flex-col gap-6 max-w-xl mx-auto" : "grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 md:gap-6"}>
+                        {filteredAuctions.map(item => (
+                            <SingleAuctionCard key={item.id} item={item} onChat={setChatAuction} onBid={handleBid} onBuyNow={handleBuyNow} />
+                        ))}
+                    </div>
                 </div>
             </div>
         )}
 
-        {/* ส่ง viewMode ไปให้ FleaMarket ด้วย */}
-        {activeTab === 'market' && <FleaMarket userProfile={displayUser} onChat={(item) => setChatAuction(item)} onBuy={handleBuyMarketItem} viewMode={viewMode} setViewMode={setViewMode} onCreate={handleStartAuctionClick} />}
-
-        {activeTab === 'management' && (
-            <ManagementDashboard 
-                myAuctions={myAuctions}
-                userProfile={userProfile}
-                setChatAuction={setChatAuction}
-                handleCancel={handleCancel}
-                handlePenaltyCancel={handlePenaltyCancel}
-                setManageAuction={setManageAuction}
-                handleDeleteMyAuction={handleDeleteMyAuction}
-                handleConfirmReceipt={handleConfirmReceipt}
-                setConfirmTransaction={setConfirmTransaction}
-                setShipmentData={setShipmentData}
-                handleForceEnd={handleOpenForceEndModal} 
-            />
+        {activeTab === 'market' && (
+            <FleaMarket userProfile={displayUser} onChat={(item) => setChatAuction(item)} onBuy={handleBuyMarketItem} viewMode={viewMode} setViewMode={setViewMode} onCreate={handleStartMarketListingClick} />
         )}
 
+        {activeTab === 'management' && (
+            <ManagementDashboard myAuctions={myAuctions} userProfile={userProfile} setChatAuction={setChatAuction} handleCancel={handleCancel} handlePenaltyCancel={handlePenaltyCancel} setManageAuction={setManageAuction} handleDeleteMyAuction={handleDeleteMyAuction} handleConfirmReceipt={handleConfirmReceipt} setConfirmTransaction={setConfirmTransaction} setShipmentData={setShipmentData} handleForceEnd={handleOpenForceEndModal} />
+        )}
       </main>
 
       <SettingsDrawer isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} userProfile={displayUser} onEditProfile={() => setIsProfileModalOpen(true)} onLogout={handleLogout} theme={theme} setTheme={setTheme} onOpenAdmin={() => setIsAdminOpen(true)} userStats={userReputation[userProfile?.email]} onOpenMyDecks={() => setIsDeckListModalOpen(true)} onOpenFeedback={() => setIsFeedbackOpen(true)} />
@@ -333,22 +340,16 @@ export default function AuctionMarket() {
       <AuctionRoomModal isOpen={!!chatAuction} onClose={() => setChatAuction(null)} auction={chatAuction} userProfile={displayUser} onBid={handleBid} onBuyNow={handleBuyNow} />
       <ConfirmTransactionModal isOpen={!!confirmTransaction} onClose={() => setConfirmTransaction(null)} auction={confirmTransaction?.auction} userProfile={userProfile} fetchReputations={fetchReputations} onBuyNow={handleBuyNow} />
       <DeckListModal isOpen={isDeckListModalOpen} onClose={() => setIsDeckListModalOpen(false)} userProfile={displayUser} userDecks={userDecks} setUserDecks={setUserDecks} mainDeck={mainDeck} lifeDeck={lifeDeck} setMainDeck={setMainDeck} setLifeDeck={setLifeDeck} cardDb={cardDb} />
+      
       <CreateBulkAuctionModal isOpen={isBulkModalOpen} onClose={() => setIsBulkModalOpen(false)} userProfile={displayUser} />
+      <CreateMarketListingModal isOpen={isMarketModalOpen} onClose={() => setIsMarketModalOpen(false)} userProfile={displayUser} />
+
       <FeedbackModal isOpen={isFeedbackOpen} onClose={() => setIsFeedbackOpen(false)} userProfile={displayUser} showAlert={(title, msg) => alert(`${title}\n${msg}`)} />
       {!chatAuction && (<ChatWidget userProfile={displayUser} isMobileMenuOpen={isSettingsOpen} />)}
-      
       <ActionConfirmModal isOpen={!!actionModalData} onClose={() => setActionModalData(null)} actionData={actionModalData} userBalance={userReputation[userProfile?.email]?.wallet_balance || 0} onConfirm={handleFinalSubmit} onTopUp={() => { setActionModalData(null); handleTopUpClick(); }} />
       <TopUpModal isOpen={isTopUpOpen} onClose={() => setIsTopUpOpen(false)} userProfile={displayUser} onSuccess={() => fetchReputations()} />
       <ShipmentModal isOpen={!!shipmentData} onClose={() => setShipmentData(null)} auction={shipmentData} onSuccess={() => { fetchMyAuctions(); fetchAuctions(); }} />
-      
-      {/* 🟢 Removed Type Selection Portal here */}
-      <ConfirmForceEndModal 
-        isOpen={!!forceEndItem}
-        onClose={() => setForceEndItem(null)}
-        onConfirm={handleConfirmForceEnd}
-        item={forceEndItem}
-      />
-
+      <ConfirmForceEndModal isOpen={!!forceEndItem} onClose={() => setForceEndItem(null)} onConfirm={handleConfirmForceEnd} item={forceEndItem} />
     </div>
   );
 }

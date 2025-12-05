@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { supabase } from './supabaseClient';
 
 // ไอคอนต่างๆ
 const BellIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"></path><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"></path></svg>;
@@ -8,27 +9,55 @@ const ChevronUp = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" heigh
 
 export default function NotificationCenter({ userEmail }) {
   const [isOpen, setIsOpen] = useState(false);
-  const [isExpanded, setIsExpanded] = useState(false); // ✅ เพิ่มสถานะการขยาย
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [notifications, setNotifications] = useState([]);
   const dropdownRef = useRef(null);
 
-  // ข้อมูลจำลอง (Mock Data)
-  const [notifications, setNotifications] = useState([
-    { id: 1, title: 'ยินดีต้อนรับ!', message: 'เข้าสู่ระบบ Deck Builder สำเร็จ ขอให้สนุกกับการจัดเด็คนะครับ', time: 'เมื่อสักครู่', type: 'info', read: false },
-    { id: 2, title: 'อัปเดตระบบ', message: 'เพิ่มฟีเจอร์ "My Decks" ใหม่แล้ว ลองใช้งานได้เลย', time: '10 นาทีที่แล้ว', type: 'system', read: false },
-    { id: 3, title: 'ตลาดประมูล', message: 'การ์ดที่คุณติดตามกำลังจะหมดเวลา', time: '1 ชม. ที่แล้ว', type: 'alert', read: true },
-    { id: 4, title: 'การชำระเงิน', message: 'ได้รับยอดเงิน 500 บาทเข้ากระเป๋าแล้ว', time: '2 ชม. ที่แล้ว', type: 'success', read: true },
-    { id: 5, title: 'แจ้งเตือนระบบ', message: 'จะมีการปิดปรับปรุงเซิร์ฟเวอร์ในคืนนี้', time: '5 ชม. ที่แล้ว', type: 'system', read: true },
-    { id: 6, title: 'กิจกรรมใหม่', message: 'เข้าร่วมกิจกรรมแจกการ์ดฟรีได้ที่หน้ากิจกรรม', time: '1 วันที่แล้ว', type: 'info', read: true },
-  ]);
+  // 1. ดึงข้อมูลเริ่มต้น + Realtime
+  useEffect(() => {
+    if (!userEmail) return;
 
-  const unreadCount = notifications.filter(n => !n.read).length;
+    const fetchNotis = async () => {
+      const { data } = await supabase
+        .from('notifications')
+        .select('*')
+        .eq('user_email', userEmail)
+        .order('created_at', { ascending: false })
+        .limit(20);
+      
+      if (data) setNotifications(data);
+    };
+    fetchNotis();
+
+    // Subscribe Realtime
+    const channel = supabase
+      .channel(`noti:${userEmail}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'notifications',
+          filter: `user_email=eq.${userEmail}`
+        },
+        (payload) => {
+          // เมื่อมีแจ้งเตือนใหม่เข้ามา
+          setNotifications(prev => [payload.new, ...prev]);
+        }
+      )
+      .subscribe();
+
+    return () => supabase.removeChannel(channel);
+  }, [userEmail]);
+
+  const unreadCount = notifications.filter(n => !n.is_read).length;
 
   // ปิด Dropdown เมื่อคลิกข้างนอก
   useEffect(() => {
     function handleClickOutside(event) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
         setIsOpen(false);
-        setIsExpanded(false); // ✅ รีเซ็ตขนาดเมื่อปิด
+        setIsExpanded(false);
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
@@ -36,15 +65,32 @@ export default function NotificationCenter({ userEmail }) {
   }, [dropdownRef]);
 
   // ล้างทั้งหมด
-  const handleClearAll = () => {
+  const handleClearAll = async () => {
     if (confirm("คุณต้องการล้างการแจ้งเตือนทั้งหมดหรือไม่?")) {
+      // ลบใน DB (หรือจะแค่ mark read ก็ได้)
+      await supabase.from('notifications').delete().eq('user_email', userEmail);
       setNotifications([]);
     }
   };
 
   // อ่านแล้ว
-  const handleRead = (id) => {
-    setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
+  const handleRead = async (id) => {
+    // อัปเดต UI ทันที
+    setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n));
+    // อัปเดต DB
+    await supabase.from('notifications').update({ is_read: true }).eq('id', id);
+  };
+
+  // Helper: แปลงเวลา
+  const formatTime = (dateString) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diff = Math.floor((now - date) / 1000); // วินาที
+
+    if (diff < 60) return 'เมื่อสักครู่';
+    if (diff < 3600) return `${Math.floor(diff / 60)} นาทีที่แล้ว`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)} ชม. ที่แล้ว`;
+    return date.toLocaleDateString('th-TH');
   };
 
   return (
@@ -68,7 +114,7 @@ export default function NotificationCenter({ userEmail }) {
       {isOpen && (
         <div className={`absolute right-0 mt-2 w-80 sm:w-96 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-2xl z-[1000] overflow-hidden animate-in fade-in zoom-in-95 duration-200 origin-top-right flex flex-col transition-all ease-in-out ${isExpanded ? 'max-h-[80vh]' : 'max-h-[350px]'}`}>
           
-          {/* Header (Fixed) */}
+          {/* Header */}
           <div className="flex-shrink-0 flex items-center justify-between px-4 py-3 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
             <h3 className="font-bold text-slate-800 dark:text-white text-sm">การแจ้งเตือน ({notifications.length})</h3>
             {notifications.length > 0 && (
@@ -82,8 +128,7 @@ export default function NotificationCenter({ userEmail }) {
             )}
           </div>
 
-          {/* รายการแจ้งเตือน (Scrollable Area) */}
-          {/* ✅ ส่วนนี้จะยืดหดตาม max-h ของ container แม่ */}
+          {/* รายการแจ้งเตือน */}
           <div className="overflow-y-auto flex-grow scrollbar-thin scrollbar-thumb-slate-300 dark:scrollbar-thumb-slate-600">
             {notifications.length === 0 ? (
               <div className="py-12 text-center text-slate-500 dark:text-slate-400 text-sm flex flex-col items-center justify-center h-full">
@@ -96,18 +141,18 @@ export default function NotificationCenter({ userEmail }) {
                   <li 
                     key={item.id} 
                     onClick={() => handleRead(item.id)}
-                    className={`px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer transition-colors ${!item.read ? 'bg-blue-50/50 dark:bg-blue-900/10' : ''}`}
+                    className={`px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer transition-colors ${!item.is_read ? 'bg-blue-50/50 dark:bg-blue-900/10' : ''}`}
                   >
                     <div className="flex justify-between items-start gap-3">
                       <div className="flex-1 min-w-0">
-                        <p className={`text-sm font-semibold truncate ${!item.read ? 'text-slate-900 dark:text-white' : 'text-slate-600 dark:text-slate-400'}`}>
-                          {!item.read && <span className="inline-block w-2 h-2 bg-blue-500 rounded-full mr-2 mb-0.5"></span>}
+                        <p className={`text-sm font-semibold truncate ${!item.is_read ? 'text-slate-900 dark:text-white' : 'text-slate-600 dark:text-slate-400'}`}>
+                          {!item.is_read && <span className="inline-block w-2 h-2 bg-blue-500 rounded-full mr-2 mb-0.5"></span>}
                           {item.title}
                         </p>
                         <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 line-clamp-2 break-words">
                           {item.message}
                         </p>
-                        <p className="text-[10px] text-slate-400 mt-1">{item.time}</p>
+                        <p className="text-[10px] text-slate-400 mt-1">{formatTime(item.created_at)}</p>
                       </div>
                     </div>
                   </li>
@@ -116,18 +161,13 @@ export default function NotificationCenter({ userEmail }) {
             )}
           </div>
 
-          {/* Footer (Fixed Toggle Button) */}
+          {/* Footer */}
           <div className="flex-shrink-0 p-2 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 text-center">
-            {/* ✅ ปุ่มกดเพื่อขยาย/ย่อ */}
             <button 
                 onClick={() => setIsExpanded(!isExpanded)}
                 className="w-full flex items-center justify-center gap-1 text-xs text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 py-1.5 rounded transition-colors font-medium"
             >
-                {isExpanded ? (
-                    <>ย่อลง <ChevronUp /></>
-                ) : (
-                    <>ดูทั้งหมด <ChevronDown /></>
-                )}
+                {isExpanded ? <><ChevronUp /> ย่อลง</> : <><ChevronDown /> ดูทั้งหมด</>}
             </button>
           </div>
 
