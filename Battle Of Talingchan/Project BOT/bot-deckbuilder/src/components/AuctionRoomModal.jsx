@@ -9,7 +9,7 @@ import RatingBadge from './RatingBadge';
 import { 
     ChevronLeftIcon, ChevronRightIcon, ExpandIcon, 
     ChatBubbleIcon, CloseIcon, SendIcon, GavelIcon, ShoppingBagIcon,
-    CoinIcon // ✅ ใช้ไอคอนเหรียญ
+    CoinIcon 
 } from './Icons';
 
 export default function AuctionRoomModal({ isOpen, onClose, auction, userProfile, onBid, onBuyNow }) {
@@ -26,7 +26,6 @@ export default function AuctionRoomModal({ isOpen, onClose, auction, userProfile
     const [isSwiping, setIsSwiping] = useState(false);
     const minSwipeDistance = 50;
 
-    // 🟢 State สำหรับรายการคนบิด
     const [bidders, setBidders] = useState([]);
     const [showBidders, setShowBidders] = useState(false);
 
@@ -63,23 +62,19 @@ export default function AuctionRoomModal({ isOpen, onClose, auction, userProfile
         }
     }, [isOpen, auction]);
 
-    // 🟢 Fetch Bidders List (รวม Amount & Time)
     useEffect(() => {
         if (isOpen && auction && auction.type !== 'market') {
             const fetchBidders = async () => {
                 const { data } = await supabase
                     .from('bids')
-                    .select('bidder_email, bidder_name, amount, created_at') // ✅ ดึงยอดเงินและเวลา
+                    .select('bidder_email, bidder_name, amount, created_at')
                     .eq('auction_id', auction.id)
-                    .order('amount', { ascending: false }); // เรียงจากมากไปน้อย
+                    .order('amount', { ascending: false });
                 
-                if (data) {
-                    setBidders(data);
-                }
+                if (data) setBidders(data);
             };
             fetchBidders();
 
-            // Realtime Update
             const bidChannel = supabase.channel(`bids_list:${auction.id}`)
                 .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'bids', filter: `auction_id=eq.${auction.id}` }, () => {
                     fetchBidders();
@@ -132,11 +127,16 @@ export default function AuctionRoomModal({ isOpen, onClose, auction, userProfile
 
     if (!isOpen || !auction) return null;
     
-    const isEnded = auction.status !== 'active' || new Date(auction.end_time) < new Date();
+    const isEnded = auction.status !== 'active' || (auction.end_time && new Date(auction.end_time) < new Date());
     const isCompleted = auction.status === 'completed'; 
     const isChatDisabled = isCompleted || !userProfile;
     const isOwner = userProfile?.email === auction.seller_email;
     const isRestricted = (auction.status === 'sold' || auction.status === 'completed') && !(isOwner || userProfile?.email === auction.winner_email);
+
+    // ✅ ป้องกัน Crash: ใช้ตัวแปรนี้แทนการเรียก auction.xxx โดยตรงใน JSX
+    const currentPrice = auction.current_price || auction.price || 0;
+    const buyNowPrice = auction.buy_now_price || auction.price || 0;
+    const minBid = auction.min_bid_increment || 0;
 
     if (isRestricted) {
         return (
@@ -159,10 +159,16 @@ export default function AuctionRoomModal({ isOpen, onClose, auction, userProfile
                 <div className="w-full md:w-2/3 h-[40vh] md:h-full flex flex-col bg-slate-100 dark:bg-slate-950 relative group shrink-0">
                     <button onClick={onClose} className="absolute top-4 left-4 z-20 bg-black/50 text-white p-2 rounded-full md:hidden hover:bg-red-500 transition-colors"><ChevronLeftIcon /></button>
                     <div className="flex-grow relative overflow-hidden bg-black/5 touch-pan-y" onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}>
-                        <div style={getTrackStyle()}>{allImages.map((img, index) => (<div key={index} className="h-full flex items-center justify-center relative shrink-0" style={{ width: `${100 / allImages.length}%` }}><img src={img} className="max-h-full max-w-full object-contain drop-shadow-2xl select-none pointer-events-none" onClick={(e) => { e.stopPropagation(); setShowFullGallery(true); }} /></div>))}</div>
+                        {allImages.length > 0 ? (
+                            <div style={getTrackStyle()}>{allImages.map((img, index) => (<div key={index} className="h-full flex items-center justify-center relative shrink-0" style={{ width: `${100 / allImages.length}%` }}><img src={img} className="max-h-full max-w-full object-contain drop-shadow-2xl select-none pointer-events-none" onClick={(e) => { e.stopPropagation(); setShowFullGallery(true); }} /></div>))}</div>
+                        ) : (
+                             <div className="h-full flex items-center justify-center text-slate-400">ไม่มีรูปภาพ</div>
+                        )}
+                        
                         {allImages.length > 1 && (<><button onClick={handlePrev} className={`absolute left-2 top-1/2 -translate-y-1/2 z-30 p-2 bg-black/30 hover:bg-black/60 text-white rounded-full transition-all hidden md:block ${activeProofIndex === 0 ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}><ChevronLeftIcon width="24" height="24" /></button><button onClick={handleNext} className={`absolute right-2 top-1/2 -translate-y-1/2 z-30 p-2 bg-black/30 hover:bg-black/60 text-white rounded-full transition-all hidden md:block ${activeProofIndex === allImages.length - 1 ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}><ChevronRightIcon width="24" height="24" /></button></>)}
                         <div className="absolute bottom-4 right-4 bg-black/50 text-white p-1.5 rounded-full pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity"><ExpandIcon /></div>
-                        <div className="absolute top-4 right-4 z-10 flex items-center gap-2">{allImages.length > 1 && (<div className="bg-black/60 text-white text-xs px-2 py-1 rounded-full backdrop-blur-md font-mono border border-white/10">{activeProofIndex + 1} / {allImages.length}</div>)}{(auction.min_bid_increment > 0 && !isEnded) && <TimeLeft endTime={auction.end_time} />}</div>
+                        {/* ✅ ใช้ minBid ที่ประกาศไว้ด้านบน */}
+                        <div className="absolute top-4 right-4 z-10 flex items-center gap-2">{allImages.length > 1 && (<div className="bg-black/60 text-white text-xs px-2 py-1 rounded-full backdrop-blur-md font-mono border border-white/10">{activeProofIndex + 1} / {allImages.length}</div>)}{(minBid > 0 && !isEnded && auction.end_time) && <TimeLeft endTime={auction.end_time} />}</div>
                         {auction.description && (<div className="absolute bottom-4 left-4 z-20"><button onClick={(e) => { e.stopPropagation(); setShowDesc(true); }} className="bg-black/60 hover:bg-black/80 text-white px-3 py-1.5 rounded-full text-xs backdrop-blur-md flex items-center gap-1 transition-all border border-white/20"><span className="text-lg">📝</span> อ่านรายละเอียด</button></div>)}
                     </div>
                     {showDesc && (<div className="absolute inset-0 z-30 bg-black/80 backdrop-blur-sm flex items-center justify-center p-8 animate-fade-in" onClick={(e) => { e.stopPropagation(); setShowDesc(false); }}><div className="bg-white dark:bg-slate-900 p-6 rounded-xl max-w-md w-full max-h-[80vh] overflow-y-auto border border-slate-700 shadow-2xl relative" onClick={e => e.stopPropagation()}><h3 className="font-bold text-lg mb-4 dark:text-white border-b border-slate-200 dark:border-slate-700 pb-2">รายละเอียดสินค้า</h3><p className="text-slate-700 dark:text-slate-300 whitespace-pre-wrap leading-relaxed text-sm">{auction.description}</p><button onClick={() => setShowDesc(false)} className="absolute top-4 right-4 text-slate-400 hover:text-red-500"><CloseIcon/></button></div></div>)}
@@ -172,13 +178,12 @@ export default function AuctionRoomModal({ isOpen, onClose, auction, userProfile
                 {/* Right Side: Chat & Actions */}
                 <div className="w-full md:w-1/3 flex flex-col border-l border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 h-full max-h-[60vh] md:max-h-full">
                     
-                    {/* 🟢 Header: เพิ่มปุ่มสลับดูคนบิด */}
+                    {/* Header */}
                     <div className="p-3 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 flex justify-between items-center shrink-0">
                         <div className="flex items-center gap-2">
                             <h3 className="font-bold text-slate-700 dark:text-slate-200 flex items-center gap-2">
                                 <ChatBubbleIcon /> {auction.status === 'sold' ? 'Private Chat' : 'Live Chat'}
                             </h3>
-                            {/* Toggle Button for Bidders */}
                             {auction.type !== 'market' && (
                                 <button 
                                     onClick={() => setShowBidders(!showBidders)} 
@@ -192,46 +197,29 @@ export default function AuctionRoomModal({ isOpen, onClose, auction, userProfile
                         <button onClick={onClose} className="hidden md:block text-slate-400 hover:text-red-500"><CloseIcon /></button>
                     </div>
 
-                    {/* Seller Info Row */}
+                    {/* Seller Info */}
                     <div className="p-3 bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800 shrink-0"><div className="flex items-start gap-3"><img src={sellerAvatar || `https://ui-avatars.com/api/?name=${auction.seller_name}`} className="w-10 h-10 rounded-full border-2 border-slate-200 dark:border-slate-700 object-cover"/><div className="flex-grow min-w-0"><div className="flex items-center justify-between"><span className="font-bold text-sm text-slate-900 dark:text-white truncate max-w-[120px]">{auction.seller_name}</span>{sellerStats && <RatingBadge score={sellerStats.total_score} />}</div><p className="text-[10px] text-slate-400 mt-0.5">สถานะ: {auction.status === 'sold' ? '🔴 ขายแล้ว' : '🟢 กำลังขาย'}</p></div></div></div>
                     
-                    {/* 🟢 Content Area: สลับระหว่าง Chat กับ Bidders List */}
+                    {/* Content Area */}
                     {showBidders ? (
-                        // 💰 หน้ารายการประวัติการบิด (ตาราง)
                         <div className="flex-grow overflow-y-auto p-4 scrollbar-thin scrollbar-thumb-slate-300 dark:scrollbar-thumb-slate-700 min-h-0 bg-slate-50 dark:bg-black/20">
                             <h4 className="text-xs font-bold text-slate-500 uppercase mb-3 sticky top-0 bg-slate-50 dark:bg-slate-900/95 py-2 z-10 backdrop-blur-sm border-b border-slate-200 dark:border-slate-800 flex justify-between px-2">
-                                <span>ผู้บิด</span>
-                                <span>ยอดบิด / (ก่อนหน้า)</span>
+                                <span>ผู้บิด</span><span>ยอดบิด / (ก่อนหน้า)</span>
                             </h4>
                             {bidders.length === 0 ? (
-                                <div className="flex flex-col items-center justify-center h-40 text-slate-400 text-sm gap-2">
-                                    <span className="text-3xl opacity-30">📭</span>
-                                    <p>ยังไม่มีใครบิด</p>
-                                </div>
+                                <div className="flex flex-col items-center justify-center h-40 text-slate-400 text-sm gap-2"><span className="text-3xl opacity-30">📭</span><p>ยังไม่มีใครบิด</p></div>
                             ) : (
                                 <div className="space-y-2">
                                     {bidders.map((b, i) => {
-                                        const prevBid = bidders[i + 1] ? bidders[i + 1].amount : auction.start_price; // ยอดก่อนหน้า (หรือราคาเริ่ม)
+                                        const prevBid = bidders[i + 1] ? bidders[i + 1].amount : auction.start_price;
                                         const isTop = i === 0;
                                         return (
                                             <div key={i} className={`flex items-center justify-between p-3 rounded-lg border ${isTop ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-300 dark:border-amber-700 shadow-sm' : 'bg-white dark:bg-slate-800/50 border-slate-100 dark:border-slate-700/50'}`}>
                                                 <div className="flex items-center gap-3">
-                                                    <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs shadow-sm text-white ${isTop ? 'bg-gradient-to-br from-amber-400 to-orange-500' : 'bg-slate-400'}`}>
-                                                        {isTop ? '1st' : i + 1}
-                                                    </div>
-                                                    <div className="flex flex-col">
-                                                        <span className={`text-xs font-bold truncate max-w-[100px] ${isTop ? 'text-amber-700 dark:text-amber-400' : 'text-slate-700 dark:text-slate-300'}`}>{b.bidder_name}</span>
-                                                        <span className="text-[9px] text-slate-400">{new Date(b.created_at).toLocaleTimeString('th-TH', {hour: '2-digit', minute:'2-digit'})}</span>
-                                                    </div>
+                                                    <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs shadow-sm text-white ${isTop ? 'bg-gradient-to-br from-amber-400 to-orange-500' : 'bg-slate-400'}`}>{isTop ? '1st' : i + 1}</div>
+                                                    <div className="flex flex-col"><span className={`text-xs font-bold truncate max-w-[100px] ${isTop ? 'text-amber-700 dark:text-amber-400' : 'text-slate-700 dark:text-slate-300'}`}>{b.bidder_name}</span><span className="text-[9px] text-slate-400">{new Date(b.created_at).toLocaleTimeString('th-TH', {hour: '2-digit', minute:'2-digit'})}</span></div>
                                                 </div>
-                                                <div className="text-right">
-                                                    <div className={`font-bold font-mono ${isTop ? 'text-lg text-emerald-600 dark:text-emerald-400' : 'text-sm text-slate-600 dark:text-slate-400'}`}>
-                                                        ฿{b.amount.toLocaleString()}
-                                                    </div>
-                                                    <div className="text-[9px] text-slate-400">
-                                                        (ก่อนหน้า: {prevBid.toLocaleString()})
-                                                    </div>
-                                                </div>
+                                                <div className="text-right"><div className={`font-bold font-mono ${isTop ? 'text-lg text-emerald-600 dark:text-emerald-400' : 'text-sm text-slate-600 dark:text-slate-400'}`}>฿{b.amount.toLocaleString()}</div><div className="text-[9px] text-slate-400">(ก่อนหน้า: {prevBid.toLocaleString()})</div></div>
                                             </div>
                                         );
                                     })}
@@ -239,62 +227,40 @@ export default function AuctionRoomModal({ isOpen, onClose, auction, userProfile
                             )}
                         </div>
                     ) : (
-                        // 💬 หน้าแชทปกติ
                         <div className="flex-grow overflow-y-auto p-4 space-y-3 scrollbar-thin scrollbar-thumb-slate-300 dark:scrollbar-thumb-slate-700 min-h-0">
-                            {messages.length === 0 ? (
-                                <div className="flex flex-col items-center justify-center h-full text-slate-400 text-sm gap-2"><span className="text-4xl opacity-20">💬</span><p>เริ่มการสนทนาได้เลย...</p></div>
-                            ) : messages.map((msg) => (
+                            {messages.length === 0 ? (<div className="flex flex-col items-center justify-center h-full text-slate-400 text-sm gap-2"><span className="text-4xl opacity-20">💬</span><p>เริ่มการสนทนาได้เลย...</p></div>) : messages.map((msg) => (
                                 <div key={msg.id} className={`flex gap-2 ${msg.user_email === userProfile?.email ? 'flex-row-reverse' : ''}`}>
                                     <img src={msg.user_picture} className="w-8 h-8 rounded-full bg-slate-700 object-cover shrink-0" />
-                                    <div className={`max-w-[85%] px-3 py-2 rounded-xl text-sm ${msg.user_email === userProfile?.email ? 'bg-emerald-600 text-white rounded-tr-none' : 'bg-slate-200 dark:bg-slate-800 text-slate-900 dark:text-slate-200 rounded-tl-none'}`}>
-                                        <p className="text-[10px] opacity-70 mb-0.5">{msg.user_name}</p><p>{msg.message}</p>
-                                    </div>
+                                    <div className={`max-w-[85%] px-3 py-2 rounded-xl text-sm ${msg.user_email === userProfile?.email ? 'bg-emerald-600 text-white rounded-tr-none' : 'bg-slate-200 dark:bg-slate-800 text-slate-900 dark:text-slate-200 rounded-tl-none'}`}><p className="text-[10px] opacity-70 mb-0.5">{msg.user_name}</p><p>{msg.message}</p></div>
                                 </div>
                             ))}
                             <div ref={chatEndRef} />
                         </div>
                     )}
 
-                    {/* 🔥 Action Bar */}
+                    {/* Action Bar */}
                     <div className="p-3 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-emerald-500/20 shrink-0 pb-safe">
                          <div className="flex items-center justify-between mb-3">
-                            <div><span className="text-[10px] text-slate-500 uppercase">{auction.type === 'market' ? 'Price' : 'Current Bid'}</span><div className="text-xl font-black text-slate-900 dark:text-white">฿{auction.current_price.toLocaleString()}</div></div>
+                            <div><span className="text-[10px] text-slate-500 uppercase">{auction.type === 'market' ? 'Price' : 'Current Bid'}</span><div className="text-xl font-black text-slate-900 dark:text-white">฿{currentPrice.toLocaleString()}</div></div>
                             
-                            {/* Buttons */}
                             {userProfile?.email !== auction.seller_email && !isEnded && (
                                 <div className="flex gap-2">
-                                    {auction.buy_now_price > 0 && (
-                                        <button 
-                                            onClick={() => onBuyNow(auction)} 
-                                            className="btn-glossy px-3 py-1.5 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white text-xs font-black shadow-lg shadow-emerald-500/30 border-t border-white/20 flex items-center justify-center gap-1.5"
-                                        >
-                                            <ShoppingBagIcon className="w-5 h-5 drop-shadow-sm" />
-                                            <span>Buy ฿{auction.buy_now_price.toLocaleString()}</span>
+                                    {buyNowPrice > 0 && (
+                                        <button onClick={() => onBuyNow(auction)} className="btn-glossy px-3 py-1.5 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white text-xs font-black shadow-lg shadow-emerald-500/30 border-t border-white/20 flex items-center justify-center gap-1.5">
+                                            <ShoppingBagIcon className="w-5 h-5 drop-shadow-sm" /><span>Buy ฿{buyNowPrice.toLocaleString()}</span>
                                         </button>
                                     )}
-                                    {(auction.min_bid_increment > 0) && (
-                                        <button 
-                                            onClick={() => onBid(auction)} 
-                                            className="btn-glossy px-4 py-1.5 rounded-xl bg-gradient-to-br from-orange-500 via-red-500 to-purple-600 text-white text-xs font-black shadow-lg shadow-orange-500/30 border-t border-white/20 flex items-center justify-center gap-1.5"
-                                        >
-                                            <GavelIcon className="w-5 h-5 drop-shadow-sm" />
-                                            <span>Bid +{auction.min_bid_increment.toLocaleString()}</span>
-                                            <span className="absolute top-1 right-1 flex h-2 w-2"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span><span className="relative inline-flex rounded-full h-2 w-2 bg-red-400"></span></span>
+                                    {/* ✅ ใช้ minBid ที่ป้องกันแล้ว */}
+                                    {(minBid > 0) && (
+                                        <button onClick={() => onBid(auction)} className="btn-glossy px-4 py-1.5 rounded-xl bg-gradient-to-br from-orange-500 via-red-500 to-purple-600 text-white text-xs font-black shadow-lg shadow-orange-500/30 border-t border-white/20 flex items-center justify-center gap-1.5">
+                                            <GavelIcon className="w-5 h-5 drop-shadow-sm" /><span>Bid +{minBid.toLocaleString()}</span><span className="absolute top-1 right-1 flex h-2 w-2"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span><span className="relative inline-flex rounded-full h-2 w-2 bg-red-400"></span></span>
                                         </button>
                                     )}
                                 </div>
                             )}
                          </div>
                          <form onSubmit={handleSendMessage} className="flex gap-2">
-                             {/* ✅ Fix iOS Zoom: text-base on mobile */}
-                             <input 
-                                type="text" 
-                                value={newMessage} 
-                                onChange={e => setNewMessage(e.target.value)} 
-                                placeholder={isChatDisabled ? "🔒 การสนทนาถูกปิด" : "พิมพ์ข้อความ..."} 
-                                disabled={isChatDisabled} 
-                                className={`flex-grow bg-slate-100 dark:bg-slate-800 border-none rounded-full px-4 py-2 text-base md:text-sm text-black dark:text-white outline-none focus:ring-1 focus:ring-emerald-500 ${isChatDisabled ? 'opacity-50 cursor-not-allowed' : ''}`} 
-                             />
+                             <input type="text" value={newMessage} onChange={e => setNewMessage(e.target.value)} placeholder={isChatDisabled ? "🔒 การสนทนาถูกปิด" : "พิมพ์ข้อความ..."} disabled={isChatDisabled} className={`flex-grow bg-slate-100 dark:bg-slate-800 border-none rounded-full px-4 py-2 text-base md:text-sm text-black dark:text-white outline-none focus:ring-1 focus:ring-emerald-500 ${isChatDisabled ? 'opacity-50 cursor-not-allowed' : ''}`} />
                              <button type="submit" disabled={!newMessage.trim() || isChatDisabled} className={`p-2 bg-emerald-600 text-white rounded-full hover:bg-emerald-500 transition-colors ${isChatDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}><SendIcon /></button>
                          </form>
                     </div>
