@@ -12,12 +12,11 @@ import { auth } from './firebase';
 import { signInWithPopup, FacebookAuthProvider } from "firebase/auth";
 import { 
   collection, doc, writeBatch, serverTimestamp, getDoc, setDoc,
-  query, where, getDocs, addDoc 
+  query, where, getDocs, addDoc, onSnapshot, updateDoc, deleteField // 🟢 เพิ่ม onSnapshot, updateDoc, deleteField
 } from 'firebase/firestore';
 import { supabase } from './supabaseClient';
-import ChatWidget from './ChatWidget'; // 🟢 เพิ่มบรรทัดนี้
-import Header from './components/Header'; // 🟢 เพิ่มบรรทัดนี้
-
+import ChatWidget from './ChatWidget'; 
+import Header from './components/Header'; 
 
 // Import Components
 import CreateAuctionModal from './CreateAuctionModal';
@@ -37,9 +36,11 @@ import {
     ImageIcon, ArchiveIcon 
 } from './components/Icons';
 import UserBadge from './components/UserBadge';
+import WarningPopup from './components/WarningPopup'; // 🟢 Import WarningPopup
 
 ChartJS.register(RadialLinearScale, PointElement, LineElement, Filler, Tooltip, Legend);
 
+// ... (ส่วน Local Icons, Helper functions, Components เดิม ยังคงเหมือนเดิม ไม่เปลี่ยนแปลง) ...
 // === Local Icons (Only used in App.jsx) ===
 const Svg = ({ p, ...r }) => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...r}>{p}</svg>;
 const ImportIcon = () => <Svg p={<><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></>} />;
@@ -232,7 +233,6 @@ function DeckViewModal({ isOpen, onClose, deck, rules, onAddCard, onRemoveCard, 
   );
 }
 
-// ✅ แก้ไข DeckAnalysisModal: เพิ่มปุ่ม Save และ Share ใน Sidebar
 function DeckAnalysisModal({ isOpen, onClose, mainDeck, lifeDeck, showAlert, theme, showChart, onSave, onShare }) { 
     const analysis = useMemo(() => {
         if (!mainDeck || mainDeck.length === 0) return null;
@@ -490,6 +490,9 @@ export default function App() {
   const navigate = useNavigate();
   const location = useLocation();
 
+  // 🟢 State สำหรับ Warning Popup
+  const [warningMessage, setWarningMessage] = useState(null);
+
   useEffect(() => {
     const ua = navigator.userAgent || navigator.vendor || window.opera;
     const isInApp = /(Line|FBAN|FBAV|Instagram|Messenger)/i.test(ua);
@@ -575,6 +578,36 @@ export default function App() {
   const [showAuctionTutorial, setShowAuctionTutorial] = useState(false);
   const [dontShowAgain, setDontShowAgain] = useState(false); // 🆕 เก็บสถานะ Checkbox
 
+  // 🟢 Realtime Listener สำหรับ Warning Message
+  useEffect(() => {
+    if (!userProfile?.email) return;
+    const unsub = onSnapshot(doc(db, "users", userProfile.email), (docSnap) => {
+        if (docSnap.exists()) {
+            const data = docSnap.data();
+            // เช็คว่ามี Warning message ไหม
+            if (data.warningMessage) {
+                setWarningMessage(data.warningMessage);
+            } else {
+                setWarningMessage(null);
+            }
+        }
+    });
+    return () => unsub();
+  }, [userProfile]);
+
+  // 🟢 ฟังก์ชันเคลียร์ Warning Message เมื่อกดตกลง
+  const handleClearWarning = async () => {
+      if (!userProfile?.email) return;
+      try {
+          await updateDoc(doc(db, "users", userProfile.email), {
+              warningMessage: deleteField()
+          });
+          setWarningMessage(null);
+      } catch (error) {
+          console.error("Error clearing warning:", error);
+      }
+  };
+
   // 🟢 [UPDATED] เช็คว่าต้องแสดง Tutorial หรือไม่ (เช็ค localStorage ด้วย)
   useEffect(() => {
     const isHidden = localStorage.getItem("bot-hide-auction-tutorial"); // ดูว่าเคยปิดถาวรไหม
@@ -593,13 +626,6 @@ export default function App() {
       }
       setShowAuctionTutorial(false);
   };
-  useEffect(() => {
-    if (location.state?.showAuctionTutorial) {
-        setShowAuctionTutorial(true);
-        // เคลียร์ state ทิ้ง เพื่อไม่ให้แสดงซ้ำตอน refresh
-        window.history.replaceState({}, document.title);
-    }
-  }, [location]);
   
   const displayUser = useMemo(() => {
     if (!userProfile) return null;
@@ -634,16 +660,14 @@ export default function App() {
       const result = await signInWithPopup(auth, provider);
       const user = result.user;
 
-      // จัดรูปแบบข้อมูลให้เหมือนกับ Google Login
       const profileData = { 
         name: user.displayName, 
         email: user.email, 
-        picture: user.photoURL + "?height=500" // ขอรูปชัดๆ
+        picture: user.photoURL + "?height=500" 
       };
 
       setUserProfile(profileData);
       
-      // สร้าง Slot เด็คถ้ายังไม่มี (Logic เดิม)
       if (!userDecks[profileData.email]) {
         setUserDecks(prev => ({
           ...prev,
@@ -653,12 +677,10 @@ export default function App() {
         }));
       }
       
-      // ดึงข้อมูลโปรไฟล์เพิ่มเติมจาก Firestore
       fetchUserProfile(profileData.email);
 
     } catch (error) {
       console.error("Facebook Login Error:", error);
-      // กรณีอีเมลซ้ำกับ Google จะต้องจัดการ Account Linking (แต่เบื้องต้นแจ้งเตือนก่อน)
       if (error.code === 'auth/account-exists-with-different-credential') {
         showAlert("Login Failed", "อีเมลนี้ลงทะเบียนด้วยวิธีอื่นไปแล้ว (เช่น Google)");
       } else {
@@ -752,7 +774,7 @@ export default function App() {
       const fetchStats = async () => {
         const { data, error } = await supabase
           .from('user_stats')
-          .select('user_email, total_score, wallet_balance') // ✅ ต้องมีตรงนี้ ถึงจะโชว์ยอดเงิน
+          .select('user_email, total_score, wallet_balance') 
           .eq('user_email', userProfile.email)
           .single();
         
@@ -769,11 +791,11 @@ export default function App() {
         .channel('realtime_balance')
         .on(
           'postgres_changes',
-          { event: '*', schema: 'public', table: 'user_stats' }, // ✅ ต้องฟัง user_stats
+          { event: '*', schema: 'public', table: 'user_stats' }, 
           (payload) => {
             if (payload.new && payload.new.user_email === userProfile.email) {
                 console.log("🔔 ยอดเงินเปลี่ยน!", payload.new.wallet_balance);
-                fetchStats(); // โหลดใหม่ทันที
+                fetchStats(); 
             }
           }
         )
@@ -785,7 +807,6 @@ export default function App() {
     }
   }, [userProfile]);
 
-  // ✅ ฟังก์ชันแชร์เด็คปัจจุบัน (ทำงานเหมือน DeckListModal แต่ใช้ข้อมูลปัจจุบัน)
   const handleShareCurrentDeck = async () => {
     if (!userProfile) return showAlert("Login", "กรุณาเข้าสู่ระบบก่อนแชร์เด็คครับ");
     
@@ -793,20 +814,18 @@ export default function App() {
     if (!only1) return showAlert("Error", "เด็คต้องมี 'Only #1' Card (การ์ดหลัก) ก่อนจึงจะแชร์ได้ครับ");
 
     try {
-      // เช็คโควต้า 2 เด็ค
       const q = query(collection(db, "publicDecks"), where("user.email", "==", userProfile.email));
       const snap = await getDocs(q);
       const existing = snap.docs.map(d => ({ id: d.id, ...d.data() }));
 
       const performShare = async (targetId = null) => {
-        closeModal(); // ปิด Modal ยืนยัน
+        closeModal(); 
         try {
             const batch = writeBatch(db);
             const ref = targetId ? doc(db, "publicDecks", targetId) : doc(collection(db, "publicDecks"));
             const allCards = [...mainDeck, ...lifeDeck];
             const factions = [...new Set(allCards.map(c => c.faction).filter(Boolean))];
             
-            // ตั้งชื่อเด็ค (ใช้ชื่อ Only #1 หรือตั้ง Default)
             const deckName = `Deck: ${only1.name}`;
 
             batch.set(ref, {
@@ -930,18 +949,14 @@ export default function App() {
             </div>
           ) : (
             <>
-      {/* 🟢 ใช้งาน Component Header ใหม่ ตรงนี้ */}
       <Header 
-  userProfile={userProfile}
-  displayUser={displayUser}
-  userReputation={userReputation[userProfile?.email]}
-  setIsSettingsOpen={setIsSettingsOpen}
-  
-  // ✅ แก้ตรงนี้: ส่งฟังก์ชันเปิด DeckListModal เข้าไปแทน
-  setIsMyDecksOpen={setIsDeckListModalOpen} 
-  
-  setIsAdminOpen={setIsAdminOpen}
-/>
+        userProfile={userProfile}
+        displayUser={displayUser}
+        userReputation={userReputation[userProfile?.email]}
+        setIsSettingsOpen={setIsSettingsOpen}
+        setIsMyDecksOpen={setIsDeckListModalOpen} 
+        setIsAdminOpen={setIsAdminOpen}
+      />
       
               <main className="flex-1 flex flex-col md:flex-row overflow-hidden">
                 <div className={`fixed inset-0 bg-black/60 backdrop-blur-sm z-[80] transition-opacity duration-300 ease-in-out ${isSidebarOpen ? "opacity-100" : "opacity-0 pointer-events-none"} md:hidden`} onClick={() => isSidebarOpen && toggleSidebar()} />
@@ -1002,10 +1017,7 @@ export default function App() {
           showChart={analysisDeck.showChart} 
           showAlert={showAlert} 
           theme={theme} 
-
-          // ✅✅✅ เพิ่มบรรทัดนี้ครับ: สั่งให้เปิดหน้าเลือก Slot เมื่อกดปุ่ม Save ✅✅✅
           onSave={() => setIsDeckListModalOpen(true)} 
-
           onShare={handleShareCurrentDeck}
       /><DeckViewModal isOpen={viewingDeck !== null} onClose={() => setViewingDeck(null)} deck={viewingDeck === "main" ? mainDeck : lifeDeck} rules={viewingDeck === "main" ? RULES.main : RULES.life} onAddCard={viewingDeck === "main" ? addToMain : addToLife} onRemoveCard={viewingDeck === "main" ? removeFromMain : removeFromLife} title={viewingDeck === "main" ? "Main Deck" : "Life Deck"} />
               <CardDetailModal card={zoomedCard} onClose={() => setZoomedCard(null)} onSell={(card) => { setAuctionTargetCard(card); setIsAuctionModalOpen(true); setZoomedCard(null); }} />
@@ -1013,28 +1025,33 @@ export default function App() {
               <DeckListModal isOpen={isDeckListModalOpen} onClose={() => setIsDeckListModalOpen(false)} userProfile={displayUser} userDecks={userDecks} setUserDecks={setUserDecks} mainDeck={mainDeck} lifeDeck={lifeDeck} setMainDeck={setMainDeck} setLifeDeck={setLifeDeck} showAlert={showAlert} setModal={setModal} closeModal={closeModal} encodeDeckCode={encodeDeckCode} decodeDeckCode={decodeDeckCode} allCards={cardDb} onShowCards={(deck) => setAnalysisDeck({ deck: deck, showChart: false })} key={userProfile?.email || "guest"} />
               <ProfileSetupModal isOpen={isProfileModalOpen} onClose={() => setIsProfileModalOpen(false)} userProfile={userProfile} onSave={handleSaveProfile} />
               <SettingsDrawer
-    isOpen={isSettingsOpen}
-    onClose={() => setIsSettingsOpen(false)}
-    userProfile={displayUser}
-    onEditProfile={() => setIsProfileModalOpen(true)}
-    onLogout={handleLogout}
-    theme={theme}
-    setTheme={setTheme}
-    onOpenFeedback={() => setIsFeedbackOpen(true)}
-    onOpenMyDecks={() => setIsDeckListModalOpen(true)}
-    // 🟢 [เติมบรรทัดนี้] ส่งคะแนนเข้าไปแสดงผล
-    userStats={userReputation[userProfile?.email]} 
-    onOpenAdmin={() => setIsAdminOpen(true)}
-/><FeedbackModal isOpen={isFeedbackOpen} onClose={() => setIsFeedbackOpen(false)} userProfile={displayUser} showAlert={showAlert} />
-  <AdminDashboardModal 
-        isOpen={isAdminOpen} 
-        onClose={() => setIsAdminOpen(false)} 
-        adminEmail={userProfile?.email} 
-      />
-      <ChatWidget 
-          userProfile={displayUser} 
-          isMobileMenuOpen={isSidebarOpen} 
-      />
+                isOpen={isSettingsOpen}
+                onClose={() => setIsSettingsOpen(false)}
+                userProfile={displayUser}
+                onEditProfile={() => setIsProfileModalOpen(true)}
+                onLogout={handleLogout}
+                theme={theme}
+                setTheme={setTheme}
+                onOpenFeedback={() => setIsFeedbackOpen(true)}
+                onOpenMyDecks={() => setIsDeckListModalOpen(true)}
+                userStats={userReputation[userProfile?.email]} 
+                onOpenAdmin={() => setIsAdminOpen(true)}
+            />
+            <FeedbackModal isOpen={isFeedbackOpen} onClose={() => setIsFeedbackOpen(false)} userProfile={displayUser} showAlert={showAlert} />
+            <AdminDashboardModal 
+                    isOpen={isAdminOpen} 
+                    onClose={() => setIsAdminOpen(false)} 
+                    adminEmail={userProfile?.email} 
+            />
+            <ChatWidget 
+                userProfile={displayUser} 
+                isMobileMenuOpen={isSidebarOpen} 
+            />
+            {/* 🟢 Render WarningPopup ถ้ามีข้อความ */}
+            <WarningPopup 
+                message={warningMessage} 
+                onConfirm={handleClearWarning} 
+            />
       {/* 🟢 [UPDATED] Tutorial Overlay: แบบมีปุ่ม "ไม่ต้องแสดงอีก" */}
       {showAuctionTutorial && (
         <div className="fixed inset-0 z-[9999] bg-black/90 backdrop-blur-md flex items-center justify-center p-4 animate-fade-in" onClick={handleCloseTutorial}>
