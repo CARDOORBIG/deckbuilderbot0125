@@ -42,23 +42,13 @@ const LayoutFeedIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" 
 // 🟢 Component ป้ายไฟ LED (แบบต่อเนื่อง Seamless Loop)
 const LEDBanner = () => {
   const message = "🚨 หากผู้ซืื้อได้ทำการประมูลชนะหรือกดซื้อไปแล้ว ให้ทำการติดต่อส่วนตัวกับผู้ขาย หากตรวจสอบพบเห็นว่าเงียบหายจะถือว่าก่อกวน จะทำการเตือนก่อนที่จะลงโทษตามกฏของเว็ปนะครับ 🚨";
-  
-  // กำหนดช่องไฟ (Spacing) ประมาณ 2 วินาทีด้วยระยะห่างทางกายภาพ
-  // mr-32 (128px) หรือ mr-[10vw] จะช่วยเว้นระยะห่างให้พอดีสายตา
   const gapClass = "mr-32 md:mr-48"; 
 
   return (
     <div className="w-full bg-black border-y-2 border-red-600/50 overflow-hidden relative py-2 shadow-[0_0_15px_rgba(220,38,38,0.3)] mb-4 mx-0 md:mx-4 md:w-auto md:rounded-xl mt-4 flex">
-      {/* Wrapper ที่ขยับไปทางซ้าย */}
       <div className="animate-marquee flex items-center">
-        {/* ข้อความชุดที่ 1 */}
-        <span className={`text-red-500 font-led font-bold text-base md:text-lg tracking-wider whitespace-nowrap ${gapClass}`}>
-          {message}
-        </span>
-        {/* ข้อความชุดที่ 2 (เพื่อให้เวลาชุดแรกเลื่อนพ้นจอ ชุดนี้จะมาแทนที่ทันทีแบบเนียนๆ) */}
-        <span className={`text-red-500 font-led font-bold text-base md:text-lg tracking-wider whitespace-nowrap ${gapClass}`}>
-          {message}
-        </span>
+        <span className={`text-red-500 font-led font-bold text-base md:text-lg tracking-wider whitespace-nowrap ${gapClass}`}>{message}</span>
+        <span className={`text-red-500 font-led font-bold text-base md:text-lg tracking-wider whitespace-nowrap ${gapClass}`}>{message}</span>
       </div>
     </div>
   );
@@ -163,7 +153,7 @@ export default function AuctionMarket() {
   useEffect(() => { const ua = navigator.userAgent || navigator.vendor || window.opera; const isInApp = /(Line|FBAN|FBAV|Instagram|Messenger)/i.test(ua); if (isInApp) { navigate(`/open-browser?redirect=${encodeURIComponent(location.pathname + location.search)}`, { replace: true }); } }, [location, navigate]);
   useEffect(() => { const root = document.documentElement; if (theme === 'dark') root.classList.add('dark'); else root.classList.remove('dark'); }, [theme]);
   const setTheme = (newTheme) => { setThemeState(newTheme); localStorage.setItem("bot-theme", JSON.stringify(newTheme)); };
-  const displayUser = useMemo(() => { if (!userProfile) return null; if (!customProfile) return userProfile; return { ...userProfile, name: customProfile.displayName || userProfile.name, picture: customProfile.avatarUrl || userProfile.picture }; }, [userProfile, customProfile]);
+  const displayUser = useMemo(() => { if (!userProfile) return null; if (!customProfile) return userProfile; return { ...userProfile,...customProfile, name: customProfile.displayName || userProfile.name, picture: customProfile.avatarUrl || userProfile.picture }; }, [userProfile, customProfile]);
   useEffect(() => { if (userProfile?.email) { const fetchProfile = async () => { try { const docSnap = await getDoc(doc(db, "users", userProfile.email)); if (docSnap.exists()) setCustomProfile(docSnap.data()); } catch (e) { console.error("Profile fetch error", e); } }; fetchProfile(); } }, [userProfile]);
   const fetchReputations = async () => { const { data } = await supabase.from('user_stats').select('user_email, total_score, penalty_level, wallet_balance'); const map = {}; data?.forEach(u => map[u.user_email] = u); setUserReputation(map); };
   useEffect(() => { const channel = supabase.channel('market_balance_update').on('postgres_changes', { event: '*', schema: 'public', table: 'user_stats' }, (payload) => { fetchReputations(); }).subscribe(); return () => { supabase.removeChannel(channel); }; }, []);
@@ -250,8 +240,30 @@ export default function AuctionMarket() {
   async function handleDeleteMyAuction(item, e) { if (e && e.stopPropagation) e.stopPropagation(); if (!confirm("⚠️ ยืนยันการลบประวัติรายการนี้ออกจากรายการของคุณ?\n(รายการจะหายไปจากหน้าจอของคุณเท่านั้น)")) return; const isSeller = item.seller_email === userProfile.email; const table = item.type === 'market' ? 'market_listings' : 'auctions'; const field = isSeller ? 'seller_hidden' : (item.type === 'market' ? 'buyer_hidden' : 'winner_hidden'); const { error } = await supabase.from(table).update({ [field]: true }).eq('id', item.id); if (error) { alert("Error: " + error.message); } else { setMyAuctions(prev => prev.filter(i => i.id !== item.id)); } }
   
   const handleLogout = () => { googleLogout(); localStorage.removeItem("bot-userProfile-v1"); setUserProfile(null); navigate('/'); };
-  const handleSaveProfile = async (data) => { if (!userProfile) return; try { await setDoc(doc(db, "users", userProfile.email), { displayName: data.displayName, avatarUrl: data.avatarUrl, isSetup: true, updatedAt: serverTimestamp() }, { merge: true }); setCustomProfile(p => ({ ...p, ...data })); setIsProfileModalOpen(false); alert("บันทึกข้อมูลเรียบร้อย!"); } catch (e) { console.error(e); alert("บันทึกไม่สำเร็จ"); } };
-  
+  // ใน src/AuctionMarket.jsx
+
+  const handleSaveProfile = async (data) => { 
+      if (!userProfile) return; 
+      try { 
+          // 🟢 แก้ไข: เพิ่มการบันทึกช่องทางติดต่อ
+          await setDoc(doc(db, "users", userProfile.email), { 
+              displayName: data.displayName, 
+              avatarUrl: data.avatarUrl, 
+              facebook: data.facebook || "",
+              lineId: data.lineId || "",
+              phone: data.phone || "",
+              isSetup: true, 
+              updatedAt: serverTimestamp() 
+          }, { merge: true }); 
+          
+          setCustomProfile(p => ({ ...p, ...data })); 
+          setIsProfileModalOpen(false); 
+          alert("บันทึกข้อมูลเรียบร้อย!"); 
+      } catch (e) { 
+          console.error(e); 
+          alert("บันทึกไม่สำเร็จ"); 
+      } 
+  };
   const handleStartAuctionClick = () => { setIsBulkModalOpen(true); };
   const handleStartMarketListingClick = () => { setIsMarketModalOpen(true); }
   const handleSelectType = (type) => { setIsTypeSelectionOpen(false); if (type === 'single') { navigate('/', { state: { showAuctionTutorial: true } }); } else { setIsBulkModalOpen(true); } };
@@ -274,7 +286,8 @@ export default function AuctionMarket() {
             setIsMyDecksOpen={setIsDeckListModalOpen}
           />
           
-          <div className="flex justify-center py-2 px-2 md:px-4">
+          {/* 🟢 แก้ไข: เพิ่ม pt-9 (Padding Top) เพื่อเว้นที่ให้ปุ่มลิ้นชักด้านบนไม่บัง */}
+          <div className="flex justify-center pb-2 pt-9 px-2 md:px-4">
             <div className="flex w-full md:w-auto bg-slate-200 dark:bg-slate-800 rounded-full p-1 shadow-inner relative">
                 <button onClick={() => setActiveTab('auction')} className={`flex-1 md:flex-none flex items-center justify-center gap-1 md:gap-2 px-4 py-2 rounded-full font-bold text-xs md:text-sm transition-all whitespace-nowrap ${activeTab === 'auction' ? 'bg-white dark:bg-slate-700 text-amber-600 dark:text-amber-400 shadow-md' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}><GavelIcon /> ลานประมูล</button>
                 <button onClick={() => setActiveTab('market')} className={`flex-1 md:flex-none flex items-center justify-center gap-1 md:gap-2 px-4 py-2 rounded-full font-bold text-xs md:text-sm transition-all whitespace-nowrap ${activeTab === 'market' ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-md' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}><ShoppingBagIcon /> ตลาดซื้อขาย</button>
@@ -292,12 +305,12 @@ export default function AuctionMarket() {
 
       <main className="flex-grow overflow-y-auto p-0 md:p-8 w-full pb-40 relative">
         
-        {/* 🟢 แสดงป้ายไฟวิ่ง เฉพาะในหน้า Auction และ Market */}
+        {/* แสดงป้ายไฟวิ่ง เฉพาะในหน้า Auction และ Market */}
         {(activeTab === 'auction' || activeTab === 'market') && <LEDBanner />}
 
         {activeTab === 'auction' && (
             <div className="animate-fade-in w-full md:px-8">
-                <div className="mb-6 mx-4 md:mx-0 mt-0"> {/* ปรับ mt-4 เป็น mt-0 */}
+                <div className="mb-6 mx-4 md:mx-0 mt-0">
                     <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border border-slate-200 dark:border-slate-800 p-3 rounded-2xl shadow-sm flex flex-col gap-3">
                         <div className="flex gap-2 items-center w-full">
                             <div className="relative flex-grow">

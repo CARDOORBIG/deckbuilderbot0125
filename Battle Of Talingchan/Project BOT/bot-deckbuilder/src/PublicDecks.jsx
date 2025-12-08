@@ -182,23 +182,31 @@ const FeedbackModal = ({ isOpen, onClose, userProfile, showAlert }) => {
     );
 };
 
-// === Comment System ===
+// ค้นหา CommentItem function เดิม แล้วแทนที่ด้วยอันนี้ครับ
+
 function CommentItem({ comment, replies, userProfile, deckOwnerEmail, onReply, onEdit, onDelete }) {
   const [isEditing, setIsEditing] = useState(false);
   const [editVal, setEditVal] = useState(comment.text);
   const [isReplying, setIsReplying] = useState(false);
   const [replyVal, setReplyVal] = useState('');
-  const canDelete = userProfile && (userProfile?.email
- === comment.userId || userProfile?.email
- === deckOwnerEmail);
-  const canEdit = userProfile && userProfile?.email
- === comment.userId;
+  const canDelete = userProfile && (userProfile.email === comment.userId || userProfile.email === deckOwnerEmail);
+  const canEdit = userProfile && userProfile.email === comment.userId;
   const formatTime = (t) => t ? t.toDate().toLocaleString('th-TH', {day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}) : 'Just now';
   const handleSendReply = (e) => { e.preventDefault(); if(replyVal.trim()){ onReply(comment.id, replyVal); setIsReplying(false); setReplyVal(''); } };
+  
   return (
     <div className="flex flex-col gap-2 animate-fade-in">
       <div className="flex gap-3">
-        <img src={comment.userPicture} alt={comment.userName} className="w-8 h-8 rounded-full border border-slate-300 dark:border-slate-600 mt-1 shrink-0 object-cover" />
+        {/* 🟢 ใช้ UserBadge แทน img */}
+        <div className="mt-1 shrink-0 scale-90 origin-top">
+            <UserBadge 
+                email={comment.userId} 
+                name="" // ไม่แสดงชื่อซ้ำ
+                picture={comment.userPicture} 
+                size="sm" 
+            />
+        </div>
+
         <div className="flex flex-col flex-grow min-w-0">
           <div className="bg-slate-200 dark:bg-slate-800/80 rounded-2xl rounded-tl-none px-4 py-2 border border-slate-300 dark:border-slate-700/50 relative">
             <div className="flex items-baseline gap-2 mb-0.5">
@@ -236,6 +244,9 @@ function CommentItem({ comment, replies, userProfile, deckOwnerEmail, onReply, o
     </div>
   );
 }
+
+// ... อย่าลืม import UserBadge ด้านบนไฟล์ด้วยนะครับ
+// import UserBadge from './components/UserBadge';
 
 function CommentSection({ deckId, userProfile, showAlert, deckOwnerEmail }) {
   const [comments, setComments] = useState([]);

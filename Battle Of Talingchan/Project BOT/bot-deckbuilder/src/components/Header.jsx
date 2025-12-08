@@ -2,19 +2,15 @@ import React, { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import NotificationCenter from '../NotificationCenter'; 
 import { 
-  MenuIcon, StoreIcon, HomeIcon, UsersIcon, CrownIcon 
+  MenuIcon, StoreIcon, HomeIcon, UsersIcon, CrownIcon,
+  ShieldBanIcon, BookOpenIcon, MedalIcon, MessageCircleIcon,
+  TrophyIcon, AlertIcon, LayersIcon
 } from './Icons';
+import CreditCheckModal from './CreditCheckModal'; 
 
-// 🟢 ไอคอนต่างๆ
+// ... (HeaderButton และ Icons อื่นๆ คงเดิม) ...
 const ChevronDownIcon = ({ className }) => <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polyline points="6 9 12 15 18 9"></polyline></svg>;
 const SettingsIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>;
-const ShieldBanIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line></svg>;
-const BookOpenIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg>;
-const MedalIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="7"></circle><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"></polyline></svg>;
-const MessageCircleIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>;
-const TrophyIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M8 21h8m-4-9v9m-8-3h16M6 4h12a2 2 0 0 1 2 2v2a6 6 0 0 1-6 6H10a6 6 0 0 1-6-6V6a2 2 0 0 1 2-2z"></path></svg>;
-const AlertIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>;
-const LayersIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>;
 
 const HeaderButton = ({ className = "", children, ...props }) => (
   <button className={`flex items-center justify-center gap-1 md:gap-2 px-2 md:px-4 py-1.5 md:py-2 rounded-lg font-bold text-[10px] md:text-sm transition-all active:scale-[.98] disabled:opacity-40 disabled:cursor-not-allowed border ${className}`} {...props}>
@@ -33,10 +29,10 @@ export default function Header({
   const navigate = useNavigate();
   const location = useLocation();
   const [isPanelOpen, setIsPanelOpen] = useState(false);
+  const [isCreditModalOpen, setIsCreditModalOpen] = useState(false); 
 
   const isActive = (path) => location.pathname === path;
 
-  // ฟังก์ชันสำหรับกดปุ่ม My Decks
   const handleMyDecksClick = () => {
     if (setIsMyDecksOpen) {
         setIsMyDecksOpen(true);
@@ -44,12 +40,15 @@ export default function Header({
     setIsPanelOpen(false);
   };
 
+  const handleCreditCheckClick = () => {
+      setIsCreditModalOpen(true);
+      setIsPanelOpen(false);
+  };
+
   const comingSoonItems = [
     { icon: <ShieldBanIcon />, label: "บัญชี BlackList" },
     { icon: <BookOpenIcon />, label: "กฏการใช้งาน" },
-    { icon: <MedalIcon />, label: "ยศต่างๆ" },
     { icon: <MessageCircleIcon />, label: "พูดคุยสาธารณะ" },
-    { icon: <TrophyIcon />, label: "Leader Board" },
     { icon: <AlertIcon />, label: "แจ้งปัญหา" },
     { icon: <SettingsIcon />, label: "การตั้งค่า" }
   ];
@@ -72,21 +71,14 @@ export default function Header({
                 </button>
             )}
 
-            {/* ✅✅✅ แทนที่ข้อความ Marketplace ด้วยรูป LOGO.png ✅✅✅ */}
             <Link to="/" className="flex items-center ml-1">
                 <img 
                     src="/assets/LOGO.png" 
                     alt="Logo" 
                     className="h-16 md:h-18 w-auto object-contain hover:scale-105 transition-transform" 
-                    onError={(e) => { 
-                        // กรณีโหลดรูปไม่ได้ ให้แสดงข้อความแทน (เผื่อ path ผิด)
-                        e.target.style.display = 'none'; 
-                        e.target.nextSibling.style.display = 'block'; 
-                    }}
+                    onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'block'; }}
                 />
-                <span style={{ display: 'none' }} className="text-xl font-bold bg-gradient-to-r from-amber-500 to-emerald-600 bg-clip-text text-transparent">
-                    Marketplace
-                </span>
+                <span style={{ display: 'none' }} className="text-xl font-bold bg-gradient-to-r from-amber-500 to-emerald-600 bg-clip-text text-transparent">Marketplace</span>
             </Link>
         </div>
 
@@ -144,6 +136,13 @@ export default function Header({
                       <span className="text-[10px] font-bold text-slate-600 dark:text-slate-300">My Decks</span>
                   </button>
 
+                  <button onClick={handleCreditCheckClick} className="flex flex-col items-center gap-1 group w-full">
+                      <div className="w-10 h-10 rounded-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center text-blue-500 group-hover:text-blue-600 group-hover:border-blue-500 transition-all shadow-sm">
+                          <MedalIcon />
+                      </div>
+                      <span className="text-[10px] font-bold text-slate-600 dark:text-slate-300">เครดิตผู้ใช้</span>
+                  </button>
+
                   {comingSoonItems.map((item, index) => (
                       <div key={index} className="flex flex-col items-center gap-1 w-full opacity-50 grayscale cursor-not-allowed select-none">
                           <div className="w-10 h-10 rounded-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-400 shadow-sm">
@@ -158,12 +157,25 @@ export default function Header({
           </div>
       </div>
 
-      {/* --- ส่วนที่ 3: ปุ่มกดเลื่อน (Handle Bar) --- */}
-      <div className="h-3 w-full bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 flex items-center justify-center cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors group absolute -bottom-3 left-0 right-0 shadow-sm rounded-b-lg z-40" onClick={() => setIsPanelOpen(!isPanelOpen)} title="คลิกเพื่อเปิด/ปิด แผงเมนู">
-          <div className={`transition-transform duration-300 ${isPanelOpen ? 'rotate-180' : 'rotate-0'}`}>
-              <ChevronDownIcon className="w-3 h-3 text-slate-400 group-hover:text-emerald-500" />
-          </div>
+      {/* --- ส่วนที่ 3: ปุ่มกดเลื่อน (Handle Bar - Redesigned) --- */}
+      {/* 🟢 แก้ไข: ปุ่ม Pull Tab ขนาดใหญ่ ตรงกลาง + เพิ่ม Backdrop Blur เพื่อให้ดูโปร่งแสง */}
+      <div className="absolute -bottom-6 left-0 right-0 flex justify-center z-40 pointer-events-none drop-shadow-md">
+          <button 
+              onClick={() => setIsPanelOpen(!isPanelOpen)}
+              className="pointer-events-auto cursor-pointer bg-white/95 dark:bg-slate-900/95 backdrop-blur-md w-32 h-6 flex items-center justify-center rounded-b-2xl border-x border-b border-emerald-500/30 dark:border-emerald-500/50 hover:h-8 hover:bg-emerald-50 dark:hover:bg-slate-800 transition-all duration-200 group active:scale-95"
+              title="คลิกเพื่อเปิดเมนูเพิ่มเติม"
+          >
+              <div className={`flex items-center gap-1 transition-all duration-300 ${isPanelOpen ? 'rotate-180' : 'rotate-0'}`}>
+                  {/* แถบขีดเล็กๆ ด้านบนไอคอน */}
+                  <div className={`h-1 w-8 bg-slate-300 dark:bg-slate-600 rounded-full absolute -top-3 left-1/2 -translate-x-1/2 group-hover:bg-emerald-400 transition-colors ${isPanelOpen ? 'opacity-0' : 'opacity-100'}`}></div>
+                  
+                  {/* ไอคอน Chevron */}
+                  <ChevronDownIcon className="w-5 h-5 text-slate-400 group-hover:text-emerald-600 dark:text-slate-300 dark:group-hover:text-emerald-400" />
+              </div>
+          </button>
       </div>
+
+      <CreditCheckModal isOpen={isCreditModalOpen} onClose={() => setIsCreditModalOpen(false)} />
 
     </header>
   );

@@ -11,6 +11,7 @@ import {
     ChatBubbleIcon, CloseIcon, SendIcon, GavelIcon, ShoppingBagIcon,
     CoinIcon 
 } from './Icons';
+import UserBadge from './UserBadge'; // 🟢 Import UserBadge
 
 export default function AuctionRoomModal({ isOpen, onClose, auction, userProfile, onBid, onBuyNow }) {
     const [messages, setMessages] = useState([]);
@@ -52,11 +53,7 @@ export default function AuctionRoomModal({ isOpen, onClose, auction, userProfile
                     const docSnap = await getDoc(doc(db, "users", auction.seller_email));
                     if (docSnap.exists()) setSellerAvatar(docSnap.data().avatarUrl);
                 } catch (e) {}
-                try {
-                    const { data } = await supabase.from('user_stats').select('*').eq('user_email', auction.seller_email).maybeSingle();
-                    if (data) setSellerStats(data);
-                    else setSellerStats({ total_score: 0, penalty_level: 0 });
-                } catch (e) {}
+                // Stats จะถูกดึงโดย UserBadge แล้ว ไม่ต้องดึงซ้ำตรงนี้ก็ได้ แต่ถ้าอยากโชว์แยกก็เก็บไว้
             };
             fetchData();
         }
@@ -109,8 +106,7 @@ export default function AuctionRoomModal({ isOpen, onClose, auction, userProfile
     }, [isOpen, showFullGallery, allImages.length]);
 
     const scrollToBottom = () => { setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100); };
-    const handleSendMessage = async (e) => { e.preventDefault(); if (!newMessage.trim() || !userProfile) return; await supabase.from('auction_comments').insert({ auction_id: auction.id, user_email: userProfile?.email
-, user_name: userProfile.name, user_picture: userProfile.picture, message: newMessage.trim() }); setNewMessage(""); };
+    const handleSendMessage = async (e) => { e.preventDefault(); if (!newMessage.trim() || !userProfile) return; await supabase.from('auction_comments').insert({ auction_id: auction.id, user_email: userProfile.email, user_name: userProfile.name, user_picture: userProfile.picture, message: newMessage.trim() }); setNewMessage(""); };
     
     const handleNext = (e) => { e?.stopPropagation(); if(activeProofIndex < allImages.length - 1) setActiveProofIndex(prev => prev + 1); };
     const handlePrev = (e) => { e?.stopPropagation(); if(activeProofIndex > 0) setActiveProofIndex(prev => prev - 1); };
@@ -134,7 +130,6 @@ export default function AuctionRoomModal({ isOpen, onClose, auction, userProfile
     const isOwner = userProfile?.email === auction.seller_email;
     const isRestricted = (auction.status === 'sold' || auction.status === 'completed') && !(isOwner || userProfile?.email === auction.winner_email);
 
-    // ✅ ป้องกัน Crash: ใช้ตัวแปรนี้แทนการเรียก auction.xxx โดยตรงใน JSX
     const currentPrice = auction.current_price || auction.price || 0;
     const buyNowPrice = auction.buy_now_price || auction.price || 0;
     const minBid = auction.min_bid_increment || 0;
@@ -168,7 +163,7 @@ export default function AuctionRoomModal({ isOpen, onClose, auction, userProfile
                         
                         {allImages.length > 1 && (<><button onClick={handlePrev} className={`absolute left-2 top-1/2 -translate-y-1/2 z-30 p-2 bg-black/30 hover:bg-black/60 text-white rounded-full transition-all hidden md:block ${activeProofIndex === 0 ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}><ChevronLeftIcon width="24" height="24" /></button><button onClick={handleNext} className={`absolute right-2 top-1/2 -translate-y-1/2 z-30 p-2 bg-black/30 hover:bg-black/60 text-white rounded-full transition-all hidden md:block ${activeProofIndex === allImages.length - 1 ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}><ChevronRightIcon width="24" height="24" /></button></>)}
                         <div className="absolute bottom-4 right-4 bg-black/50 text-white p-1.5 rounded-full pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity"><ExpandIcon /></div>
-                        {/* ✅ ใช้ minBid ที่ประกาศไว้ด้านบน */}
+                        
                         <div className="absolute top-4 right-4 z-10 flex items-center gap-2">{allImages.length > 1 && (<div className="bg-black/60 text-white text-xs px-2 py-1 rounded-full backdrop-blur-md font-mono border border-white/10">{activeProofIndex + 1} / {allImages.length}</div>)}{(minBid > 0 && !isEnded && auction.end_time) && <TimeLeft endTime={auction.end_time} />}</div>
                         {auction.description && (<div className="absolute bottom-4 left-4 z-20"><button onClick={(e) => { e.stopPropagation(); setShowDesc(true); }} className="bg-black/60 hover:bg-black/80 text-white px-3 py-1.5 rounded-full text-xs backdrop-blur-md flex items-center gap-1 transition-all border border-white/20"><span className="text-lg">📝</span> อ่านรายละเอียด</button></div>)}
                     </div>
@@ -198,8 +193,20 @@ export default function AuctionRoomModal({ isOpen, onClose, auction, userProfile
                         <button onClick={onClose} className="hidden md:block text-slate-400 hover:text-red-500"><CloseIcon /></button>
                     </div>
 
-                    {/* Seller Info */}
-                    <div className="p-3 bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800 shrink-0"><div className="flex items-start gap-3"><img src={sellerAvatar || `https://ui-avatars.com/api/?name=${auction.seller_name}`} className="w-10 h-10 rounded-full border-2 border-slate-200 dark:border-slate-700 object-cover"/><div className="flex-grow min-w-0"><div className="flex items-center justify-between"><span className="font-bold text-sm text-slate-900 dark:text-white truncate max-w-[120px]">{auction.seller_name}</span>{sellerStats && <RatingBadge score={sellerStats.total_score} />}</div><p className="text-[10px] text-slate-400 mt-0.5">สถานะ: {auction.status === 'sold' ? '🔴 ขายแล้ว' : '🟢 กำลังขาย'}</p></div></div></div>
+                    {/* 🟢 แก้ไข: ใช้ UserBadge สำหรับ Seller Info */}
+                    <div className="p-3 bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800 shrink-0">
+                        <div className="flex items-center justify-between">
+                            <UserBadge 
+                                email={auction.seller_email}
+                                name={auction.seller_name}
+                                picture={sellerAvatar}
+                                size="md"
+                            />
+                            <span className="text-[10px] text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-full border border-slate-200 dark:border-slate-700">
+                                สถานะ: {auction.status === 'sold' ? '🔴 ขายแล้ว' : '🟢 กำลังขาย'}
+                            </span>
+                        </div>
+                    </div>
                     
                     {/* Content Area */}
                     {showBidders ? (
@@ -218,7 +225,11 @@ export default function AuctionRoomModal({ isOpen, onClose, auction, userProfile
                                             <div key={i} className={`flex items-center justify-between p-3 rounded-lg border ${isTop ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-300 dark:border-amber-700 shadow-sm' : 'bg-white dark:bg-slate-800/50 border-slate-100 dark:border-slate-700/50'}`}>
                                                 <div className="flex items-center gap-3">
                                                     <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs shadow-sm text-white ${isTop ? 'bg-gradient-to-br from-amber-400 to-orange-500' : 'bg-slate-400'}`}>{isTop ? '1st' : i + 1}</div>
-                                                    <div className="flex flex-col"><span className={`text-xs font-bold truncate max-w-[100px] ${isTop ? 'text-amber-700 dark:text-amber-400' : 'text-slate-700 dark:text-slate-300'}`}>{b.bidder_name}</span><span className="text-[9px] text-slate-400">{new Date(b.created_at).toLocaleTimeString('th-TH', {hour: '2-digit', minute:'2-digit'})}</span></div>
+                                                    <div className="flex flex-col">
+                                                        {/* 🟢 ใช้ UserBadge สำหรับรายชื่อคนบิด (ถ้าต้องการ) หรือใส่แค่ชื่อก็ได้ */}
+                                                        <span className={`text-xs font-bold truncate max-w-[100px] ${isTop ? 'text-amber-700 dark:text-amber-400' : 'text-slate-700 dark:text-slate-300'}`}>{b.bidder_name}</span>
+                                                        <span className="text-[9px] text-slate-400">{new Date(b.created_at).toLocaleTimeString('th-TH', {hour: '2-digit', minute:'2-digit'})}</span>
+                                                    </div>
                                                 </div>
                                                 <div className="text-right"><div className={`font-bold font-mono ${isTop ? 'text-lg text-emerald-600 dark:text-emerald-400' : 'text-sm text-slate-600 dark:text-slate-400'}`}>฿{b.amount.toLocaleString()}</div><div className="text-[9px] text-slate-400">(ก่อนหน้า: {prevBid.toLocaleString()})</div></div>
                                             </div>
@@ -229,12 +240,26 @@ export default function AuctionRoomModal({ isOpen, onClose, auction, userProfile
                         </div>
                     ) : (
                         <div className="flex-grow overflow-y-auto p-4 space-y-3 scrollbar-thin scrollbar-thumb-slate-300 dark:scrollbar-thumb-slate-700 min-h-0">
-                            {messages.length === 0 ? (<div className="flex flex-col items-center justify-center h-full text-slate-400 text-sm gap-2"><span className="text-4xl opacity-20">💬</span><p>เริ่มการสนทนาได้เลย...</p></div>) : messages.map((msg) => (
-                                <div key={msg.id} className={`flex gap-2 ${msg.user_email === userProfile?.email ? 'flex-row-reverse' : ''}`}>
-                                    <img src={msg.user_picture} className="w-8 h-8 rounded-full bg-slate-700 object-cover shrink-0" />
-                                    <div className={`max-w-[85%] px-3 py-2 rounded-xl text-sm ${msg.user_email === userProfile?.email ? 'bg-emerald-600 text-white rounded-tr-none' : 'bg-slate-200 dark:bg-slate-800 text-slate-900 dark:text-slate-200 rounded-tl-none'}`}><p className="text-[10px] opacity-70 mb-0.5">{msg.user_name}</p><p>{msg.message}</p></div>
-                                </div>
-                            ))}
+                            {messages.length === 0 ? (<div className="flex flex-col items-center justify-center h-full text-slate-400 text-sm gap-2"><span className="text-4xl opacity-20">💬</span><p>เริ่มการสนทนาได้เลย...</p></div>) : messages.map((msg) => {
+                                const isMe = msg.user_email === userProfile?.email;
+                                return (
+                                    <div key={msg.id} className={`flex gap-2 ${isMe ? 'flex-row-reverse' : ''}`}>
+                                        {/* 🟢 แก้ไข: ใช้ UserBadge สำหรับรูปในแชท */}
+                                        <div className="shrink-0 scale-75 origin-top">
+                                            <UserBadge 
+                                                email={msg.user_email} 
+                                                picture={msg.user_picture} 
+                                                name="" // ไม่ต้องโชว์ชื่อ เพราะพื้นที่น้อย
+                                                size="sm"
+                                            />
+                                        </div>
+                                        <div className={`max-w-[85%] px-3 py-2 rounded-xl text-sm ${isMe ? 'bg-emerald-600 text-white rounded-tr-none' : 'bg-slate-200 dark:bg-slate-800 text-slate-900 dark:text-slate-200 rounded-tl-none'}`}>
+                                            <p className="text-[10px] opacity-70 mb-0.5">{msg.user_name}</p>
+                                            <p>{msg.message}</p>
+                                        </div>
+                                    </div>
+                                );
+                            })}
                             <div ref={chatEndRef} />
                         </div>
                     )}

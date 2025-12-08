@@ -639,6 +639,7 @@ export default function App() {
     if (!customProfile) return userProfile;
     return {
       ...userProfile,
+      ...customProfile,
       name: customProfile.displayName || userProfile.name,
       picture: customProfile.avatarUrl || userProfile.picture
     };
@@ -740,36 +741,45 @@ export default function App() {
     if (!userProfile) return;
     try {
       const batch = writeBatch(db);
-      batch.set(doc(db, "users", userProfile?.email
-), {
+      
+      // 🟢 แก้ไข: เพิ่ม facebook, lineId, phone ลงใน Database
+      batch.set(doc(db, "users", userProfile.email), {
         displayName: data.displayName,
         avatarUrl: data.avatarUrl,
+        facebook: data.facebook || "", // บันทึกค่าว่างถ้าไม่มี
+        lineId: data.lineId || "",
+        phone: data.phone || "",
         isSetup: true,
         updatedAt: serverTimestamp()
       }, { merge: true });
-      const decksSnap = await getDocs(query(collection(db, "publicDecks"), where("user.email", "==", userProfile?.email
-)));
+
+      // อัปเดตชื่อ/รูปใน Public Decks (เหมือนเดิม)
+      const decksSnap = await getDocs(query(collection(db, "publicDecks"), where("user.email", "==", userProfile.email)));
       decksSnap.forEach(doc => batch.update(doc.ref, { "user.name": data.displayName, "user.picture": data.avatarUrl }));
+      
+      // อัปเดตใน Comment (เหมือนเดิม)
       const allDecksSnap = await getDocs(collection(db, "publicDecks"));
       const currentName = customProfile?.displayName || userProfile.name;
-      const oldNameTarget = "Siwakorn Reangchinda";
+      const oldNameTarget = "Siwakorn Reangchinda"; // หรือชื่อเก่าที่ต้องการแก้
       for (const deckDoc of allDecksSnap.docs) {
         const commentsSnap = await getDocs(collection(db, "publicDecks", deckDoc.id, "comments"));
         commentsSnap.forEach(cDoc => {
           const cData = cDoc.data();
-          if (cData.userId === userProfile?.email
- || cData.userName === currentName || cData.userName === oldNameTarget) {
+          if (cData.userId === userProfile.email || cData.userName === currentName || cData.userName === oldNameTarget) {
             batch.update(cDoc.ref, {
-              userId: userProfile?.email
-,
+              userId: userProfile.email,
               userName: data.displayName,
               userPicture: data.avatarUrl
             });
           }
         });
       }
+
       await batch.commit();
+      
+      // 🟢 อัปเดตตัวแปรในเครื่องทันทีเพื่อให้เห็นผลเลย
       setCustomProfile(p => ({ ...p, ...data, isSetup: true }));
+      
       setIsProfileModalOpen(false);
       showAlert("Success", "บันทึกข้อมูลเรียบร้อย!");
     } catch (e) {

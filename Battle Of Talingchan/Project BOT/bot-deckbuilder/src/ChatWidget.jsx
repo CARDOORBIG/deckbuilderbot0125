@@ -30,14 +30,28 @@ export default function ChatWidget({ userProfile, isMobileMenuOpen }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [isFetchingUsers, setIsFetchingUsers] = useState(false);
   
-  // 🟢 State สำหรับนับจำนวนข้อความ (รวม และ แยกรายคน)
   const [totalUnreadCount, setTotalUnreadCount] = useState(0); 
-  const [unreadPerUser, setUnreadPerUser] = useState({}); // { 'email1': 5, 'email2': 1 }
+  const [unreadPerUser, setUnreadPerUser] = useState({}); 
   const [isAnimating, setIsAnimating] = useState(false);
 
   const messagesEndRef = useRef(null);
 
-  // 1. Fetch Data (Friends & Requests)
+  // 🟢 1. Listener สำหรับเปิดแชทจากภายนอก (User Profile Popup)
+  useEffect(() => {
+    const handleOpenChat = (event) => {
+        const targetUser = event.detail; // รับข้อมูล User ที่ส่งมา
+        if (targetUser && userProfile && targetUser.email !== userProfile.email) {
+            setActiveFriend(targetUser); // ตั้งค่าคนคุย
+            setView('chat'); // เปลี่ยนหน้าเป็นแชท
+            setIsOpen(true); // เปิด Widget
+        }
+    };
+
+    window.addEventListener('OPEN_CHAT_WITH_USER', handleOpenChat);
+    return () => window.removeEventListener('OPEN_CHAT_WITH_USER', handleOpenChat);
+  }, [userProfile]);
+
+  // Fetch Data (Friends & Requests)
   const fetchFriendsAndRequests = async () => {
     if (!userProfile) return;
     const { data: fData } = await supabase.from('friendships').select('*').or(`requester_id.eq.${userProfile.email},receiver_id.eq.${userProfile.email}`);
@@ -69,22 +83,18 @@ export default function ChatWidget({ userProfile, isMobileMenuOpen }) {
     } catch (error) { console.error("Error", error); } finally { setIsFetchingUsers(false); }
   };
 
-  // 🟢 2. Fetch Unread Messages (ดึงข้อมูลแล้วมานับแยกรายคน)
+  // Fetch Unread Messages
   const fetchUnreadStats = async () => {
       if (!userProfile) return;
       
-      // ดึงข้อความทั้งหมดที่ส่งถึงเรา และยังไม่อ่าน
       const { data } = await supabase
           .from('messages')
-          .select('sender_id') // เอาแค่ sender_id มานับ
+          .select('sender_id') 
           .eq('receiver_id', userProfile.email)
           .eq('is_read', false);
       
       if (data) {
-          // คำนวณผลรวม
           setTotalUnreadCount(data.length);
-
-          // คำนวณแยกรายคน
           const counts = {};
           data.forEach(msg => {
               counts[msg.sender_id] = (counts[msg.sender_id] || 0) + 1;
@@ -98,30 +108,23 @@ export default function ChatWidget({ userProfile, isMobileMenuOpen }) {
         fetchFriendsAndRequests();
         if (view === 'add') fetchAllSystemUsers();
     }
-    // โหลดครั้งแรก
     fetchUnreadStats(); 
-    fetchFriendsAndRequests(); // โหลด requests ตั้งแต่แรกเพื่อให้ปุ่มแดงโชว์
+    fetchFriendsAndRequests(); 
 
-    // Listener 1: Friends update (เช่น มีคนแอดมา)
     const friendChannel = supabase.channel('friends_update_v3')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'friendships' }, () => { 
-            fetchFriendsAndRequests(); // อัปเดตตัวเลข request สีแดงทันที
+            fetchFriendsAndRequests(); 
         })
         .subscribe();
     
-    // Listener 2: Messages update (มีคนทักมา)
     const msgChannel = supabase.channel('global_messages_v3')
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `receiver_id=eq.${userProfile.email}` }, (payload) => {
-            // เมื่อมีข้อความใหม่ส่งถึงเรา
             const sender = payload.new.sender_id;
-            
-            // อัปเดต state ทันทีโดยไม่ต้อง fetch ใหม่
             setTotalUnreadCount(prev => prev + 1);
             setUnreadPerUser(prev => ({
                 ...prev,
                 [sender]: (prev[sender] || 0) + 1
             }));
-
             setIsAnimating(true);
             setTimeout(() => setIsAnimating(false), 1000); 
         })
@@ -133,7 +136,7 @@ export default function ChatWidget({ userProfile, isMobileMenuOpen }) {
     };
   }, [isOpen, userProfile, view]);
 
-  // 3. Chat Logic (Active Chat Room)
+  // Chat Logic (Active Chat Room)
   useEffect(() => {
     if (!activeFriend || !userProfile) return;
     
@@ -142,19 +145,17 @@ export default function ChatWidget({ userProfile, isMobileMenuOpen }) {
         setMessages(data || []);
         scrollToBottom();
 
-        // 🟢 เมื่อเข้าห้องแชท -> เคลียร์ unread ของเพื่อนคนนี้ใน DB
         await supabase.from('messages')
             .update({ is_read: true })
             .eq('sender_id', activeFriend.email)
             .eq('receiver_id', userProfile.email)
             .eq('is_read', false);
         
-        // 🟢 เคลียร์ state หน้าจอด้วย
         setUnreadPerUser(prev => {
             const newCounts = { ...prev };
             const countToSubtract = newCounts[activeFriend.email] || 0;
-            delete newCounts[activeFriend.email]; // ลบkeyนี้ออก
-            setTotalUnreadCount(prevTotal => Math.max(0, prevTotal - countToSubtract)); // ลดยอดรวม
+            delete newCounts[activeFriend.email]; 
+            setTotalUnreadCount(prevTotal => Math.max(0, prevTotal - countToSubtract)); 
             return newCounts;
         });
     };
@@ -164,7 +165,6 @@ export default function ChatWidget({ userProfile, isMobileMenuOpen }) {
         if (payload.new.sender_id === activeFriend.email) { 
             setMessages(prev => [...prev, payload.new]); 
             scrollToBottom(); 
-            // ถ้าเปิดหน้าจอแชทกับคนนี้อยู่ ให้ mark read ทันที และไม่เพิ่ม count
             supabase.from('messages').update({ is_read: true }).eq('id', payload.new.id);
         }
     }).subscribe();
@@ -173,7 +173,6 @@ export default function ChatWidget({ userProfile, isMobileMenuOpen }) {
 
   const scrollToBottom = () => { setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100); };
 
-  // 4. Actions
   const handleSendMessage = async () => {
     if (!inputText.trim()) return;
     const text = inputText.trim();
@@ -207,7 +206,6 @@ export default function ChatWidget({ userProfile, isMobileMenuOpen }) {
 
   if (!userProfile) return null;
 
-  // 🟢 คำนวณยอดแจ้งเตือนรวม (ข้อความ + คำขอเพื่อน)
   const totalNotifications = requests.length + totalUnreadCount;
 
   return createPortal(
@@ -230,7 +228,7 @@ export default function ChatWidget({ userProfile, isMobileMenuOpen }) {
                     )}
                 </div>
                 <div className="flex items-center gap-2">
-                    {view === 'chat' && <button onClick={() => handleRemoveFriend(activeFriend.id, activeFriend.profile.displayName || activeFriend.email)} className="p-1.5 hover:bg-white/20 rounded text-red-100 hover:text-red-300 transition-colors"><TrashIcon /></button>}
+                    {view === 'chat' && activeFriend.id && <button onClick={() => handleRemoveFriend(activeFriend.id, activeFriend.profile.displayName || activeFriend.email)} className="p-1.5 hover:bg-white/20 rounded text-red-100 hover:text-red-300 transition-colors"><TrashIcon /></button>}
                     {view === 'list' && requests.length > 0 && (
                         <div className="relative animate-pulse" title="คำขอเป็นเพื่อน"><BellIcon /><span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[9px] font-bold w-4 h-4 rounded-full flex items-center justify-center border border-white dark:border-slate-900">{requests.length}</span></div>
                     )}
@@ -268,7 +266,6 @@ export default function ChatWidget({ userProfile, isMobileMenuOpen }) {
                                     </div>
                                     <div className="flex-grow min-w-0"><p className="font-bold text-sm text-slate-800 dark:text-white truncate">{f.profile.displayName || f.email}</p><p className="text-xs text-slate-400 truncate">แตะเพื่อแชท</p></div>
                                     
-                                    {/* 🟢 แสดงจำนวนข้อความที่ยังไม่ได้อ่านของเพื่อนคนนี้ (ถ้ามี) */}
                                     {unreadPerUser[f.email] > 0 && (
                                         <div className="bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-md animate-pulse">
                                             {unreadPerUser[f.email] > 9 ? '9+' : unreadPerUser[f.email]}
@@ -352,7 +349,6 @@ export default function ChatWidget({ userProfile, isMobileMenuOpen }) {
       <button onClick={() => setIsOpen(!isOpen)} className={`w-14 h-14 bg-emerald-600 hover:bg-emerald-500 text-white rounded-full shadow-[0_4px_14px_rgba(16,185,129,0.4)] flex items-center justify-center transition-all hover:scale-110 active:scale-95 relative ${isAnimating ? 'animate-bounce' : ''}`}>
         {isOpen ? <CloseIcon /> : <ChatIcon />}
         
-        {/* 🟢 Red Mark Real-time รวม (ข้อความ + คำขอ) */}
         {totalNotifications > 0 && !isOpen && (
             <span className="absolute -top-1 -right-1 w-6 h-6 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center border-2 border-white dark:border-black animate-pulse shadow-md">
                 {totalNotifications > 9 ? '9+' : totalNotifications}

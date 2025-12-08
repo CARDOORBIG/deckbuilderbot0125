@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from './supabaseClient';
 import { ShoppingBagIcon, ChatBubbleIcon, ShieldCheckIcon, HistoryIcon } from './components/Icons';
+import UserBadge from './components/UserBadge'; // 🟢 Import
 
 const LayoutGridIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>;
 const LayoutFeedIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="3" y1="15" x2="21" y2="15"></line></svg>;
@@ -39,18 +40,17 @@ export default function FleaMarket({ userProfile, onChat, onBuy, viewMode = 'gri
         try { const images = JSON.parse(item.images); return images[0] || 'https://placehold.co/300x420/1e293b/ffffff?text=No+Image'; } catch { return 'https://placehold.co/300x420/1e293b/ffffff?text=Error'; }
     };
 
-    // ✅ ฟังก์ชันแปลงข้อมูล (Mapping) ให้ตรงกับหน้า Chat
     const handleChatClick = (item) => {
         const mappedItem = {
             ...item,
             id: item.id,
-            card_name: item.title,          // แปลง title -> card_name
-            current_price: item.price,      // แปลง price -> current_price
-            buy_now_price: item.price,      // แปลง price -> buy_now_price
-            min_bid_increment: 0,           // ไม่มีบิด
-            type: 'market',                 // ระบุประเภท
+            card_name: item.title,
+            current_price: item.price,
+            buy_now_price: item.price,
+            min_bid_increment: 0,
+            type: 'market',
             card_image_path: 'CUSTOM_ITEM',
-            proof_image: item.images,       // แปลง images -> proof_image
+            proof_image: item.images,
             seller_email: item.seller_email,
             seller_name: item.seller_name,
             status: item.status
@@ -61,7 +61,6 @@ export default function FleaMarket({ userProfile, onChat, onBuy, viewMode = 'gri
     return (
         <div className="animate-fade-in w-full md:px-8">
             <div className="mb-6 mx-4 md:mx-0 mt-4">
-                {/* ... (ส่วน Header/Search ยังคงเดิม) ... */}
                 <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border border-slate-200 dark:border-slate-800 p-3 rounded-2xl shadow-sm flex flex-col gap-3">
                     <div className="flex gap-2 items-center w-full">
                         <div className="relative flex-grow">
@@ -98,7 +97,6 @@ export default function FleaMarket({ userProfile, onChat, onBuy, viewMode = 'gri
                     <div 
                         key={item.id} 
                         className="relative group cursor-pointer bg-white dark:bg-slate-900/70 backdrop-blur-sm p-2 md:p-3 rounded-xl border border-slate-200 dark:border-emerald-500/20 shadow-lg transition-all hover:border-amber-400/50 hover:shadow-amber-500/10 flex flex-col h-full"
-                        // ✅ เรียกใช้ handleChatClick แทน onChat ตรงๆ
                         onClick={() => handleChatClick(item)}
                     >
                         <div className="aspect-[5/7] w-full rounded mb-2 overflow-hidden bg-slate-200 dark:bg-slate-800 relative shadow-inner">
@@ -106,10 +104,23 @@ export default function FleaMarket({ userProfile, onChat, onBuy, viewMode = 'gri
                             {item.is_escrow && (<div className="absolute top-2 right-2 bg-gradient-to-br from-blue-500 to-blue-700 text-white p-2 rounded-full shadow-lg shadow-blue-500/40 border-[1.5px] border-white/50 z-10 transform scale-125" title="Escrow Protected"><ShieldCheckIcon width="20" height="20" className="drop-shadow-md" /></div>)}
                         </div>
                         <h3 className="text-xs md:text-sm font-bold text-slate-900 dark:text-white mb-2 line-clamp-1 leading-tight">{item.title}</h3>
+                        
+                        {/* 🟢 แก้ไขส่วนแสดงผู้ขาย */}
                         <div className="flex justify-between items-end mb-4">
-                            <div className="flex items-center gap-1.5 overflow-hidden max-w-[40%]"><span className="text-[10px] text-slate-500 dark:text-slate-400 truncate bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded-full">{item.seller_name}</span></div>
-                            <div className="text-right flex-1 pl-2"><p className="text-[9px] text-slate-400 uppercase font-bold leading-none mb-0.5">Price</p><p className="text-3xl md:text-4xl font-black text-emerald-500 dark:text-emerald-400 leading-none drop-shadow-sm tracking-tighter">฿{item.price.toLocaleString()}</p></div>
+                            <div className="flex-1 overflow-hidden">
+                                {item.seller_name && (
+                                    <div className="scale-90 origin-bottom-left">
+                                        <UserBadge 
+                                            email={item.seller_email}
+                                            name={item.seller_name}
+                                            size="sm"
+                                        />
+                                    </div>
+                                )}
+                            </div>
+                            <div className="text-right flex-shrink-0 pl-1"><p className="text-[9px] text-slate-400 uppercase font-bold leading-none mb-0.5">Price</p><p className="text-3xl md:text-4xl font-black text-emerald-500 dark:text-emerald-400 leading-none drop-shadow-sm tracking-tighter">฿{item.price.toLocaleString()}</p></div>
                         </div>
+
                         <div className="mt-auto flex gap-2">
                             {userProfile?.email !== item.seller_email && (
                                 <button 
@@ -119,7 +130,6 @@ export default function FleaMarket({ userProfile, onChat, onBuy, viewMode = 'gri
                                     <ShoppingBagIcon className="w-4 h-4 md:w-5 md:h-5 drop-shadow-sm" /><span>BUY NOW</span>
                                 </button>
                             )}
-                            {/* ✅ ปุ่ม Chat ก็ต้องเรียก handleChatClick ด้วย */}
                             <button onClick={(e) => { e.stopPropagation(); handleChatClick(item); }} className="p-2 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"><ChatBubbleIcon /></button>
                         </div>
                     </div>

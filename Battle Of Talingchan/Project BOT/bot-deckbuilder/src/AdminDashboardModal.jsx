@@ -1,7 +1,6 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { supabase } from './supabaseClient';
 import { db } from './firebase'; 
-// 🟢 เพิ่ม writeBatch ใน import
 import { collection, getDocs, orderBy, query, limit, updateDoc, doc, writeBatch } from 'firebase/firestore';
 
 // 🟢 Helper Components
@@ -11,11 +10,171 @@ const StatusBadge = ({ status, winner, endTime }) => {
     if (status === 'cancelled') {
         return <span className="px-2 py-0.5 bg-red-100 text-red-600 rounded text-[10px] font-bold border border-red-200">❌ ยกเลิก</span>;
     }
+    if (status === 'completed') {
+        return <span className="px-2 py-0.5 bg-emerald-100 text-emerald-600 rounded text-[10px] font-bold border border-emerald-200">🎉 สำเร็จ</span>;
+    }
     if (isEnded) {
-        if (winner) return <span className="px-2 py-0.5 bg-emerald-100 text-emerald-600 rounded text-[10px] font-bold border border-emerald-200">✅ จบ/มีผู้ชนะ</span>;
+        if (winner) return <span className="px-2 py-0.5 bg-blue-100 text-blue-600 rounded text-[10px] font-bold border border-blue-200">⚖️ จบประมูล/รอเคลียร์</span>;
         return <span className="px-2 py-0.5 bg-slate-200 text-slate-500 rounded text-[10px] font-bold border border-slate-300">💨 จบ/ไร้คนบิด</span>;
     }
-    return <span className="px-2 py-0.5 bg-blue-100 text-blue-600 rounded text-[10px] font-bold border border-blue-200">⏳ กำลังประมูล</span>;
+    return <span className="px-2 py-0.5 bg-amber-100 text-amber-600 rounded text-[10px] font-bold border border-amber-200">⏳ กำลังประมูล</span>;
+};
+
+// 🟢 Modal ย่อย: สำหรับดูรายละเอียดเจาะลึก (Transaction Inspector)
+const TransactionInspectorModal = ({ isOpen, onClose, auction }) => {
+    const [chatLogs, setChatLogs] = useState([]);
+    const [loading, setLoading] = useState(false);
+
+    useEffect(() => {
+        if (isOpen && auction) {
+            fetchChatLogs();
+        }
+    }, [isOpen, auction]);
+
+    const fetchChatLogs = async () => {
+        setLoading(true);
+        const { data } = await supabase
+            .from('auction_comments')
+            .select('*')
+            .eq('auction_id', auction.id)
+            .order('created_at', { ascending: true });
+        setChatLogs(data || []);
+        setLoading(false);
+    };
+
+    if (!isOpen || !auction) return null;
+
+    return (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-[1100] p-4 animate-fade-in" onClick={onClose}>
+            <div className="bg-slate-900 border-2 border-blue-500 rounded-xl shadow-2xl w-full max-w-4xl h-[85vh] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
+                
+                {/* Header */}
+                <div className="p-4 bg-slate-800 border-b border-slate-700 flex justify-between items-center shrink-0">
+                    <h3 className="text-lg font-bold text-blue-400 flex items-center gap-2">
+                        🕵️‍♂️ ตรวจสอบธุรกรรม: {auction.card_name}
+                    </h3>
+                    <button onClick={onClose} className="text-slate-400 hover:text-white bg-slate-700 w-8 h-8 rounded-full">✕</button>
+                </div>
+
+                <div className="flex-grow flex flex-col md:flex-row overflow-hidden">
+                    
+                    {/* Left: Transaction Info */}
+                    <div className="w-full md:w-1/2 p-6 overflow-y-auto border-r border-slate-700 space-y-6">
+                        
+                        {/* 1. Status Tracker */}
+                        <div className="bg-slate-800/50 p-4 rounded-xl border border-slate-700">
+                            <h4 className="text-slate-300 font-bold mb-3 border-b border-slate-600 pb-2">📌 สถานะปัจจุบัน</h4>
+                            <div className="grid grid-cols-2 gap-4 text-sm">
+                                <div>
+                                    <p className="text-slate-500">Status:</p>
+                                    <p className="text-white font-bold">{auction.status || 'Active'}</p>
+                                </div>
+                                <div>
+                                    <p className="text-slate-500">Transaction State:</p>
+                                    <p className={`font-bold ${auction.transaction_status === 'completed' ? 'text-emerald-400' : 'text-amber-400'}`}>
+                                        {auction.transaction_status || '-'}
+                                    </p>
+                                </div>
+                                <div>
+                                    <p className="text-slate-500">ระบบ Escrow:</p>
+                                    <p className={auction.is_escrow ? "text-blue-400 font-bold" : "text-slate-400"}>
+                                        {auction.is_escrow ? "✅ เปิดใช้งาน" : "❌ ไม่ใช้ (โอนตรง)"}
+                                    </p>
+                                </div>
+                                <div>
+                                    <p className="text-slate-500">ราคาจบ:</p>
+                                    <p className="text-emerald-400 font-mono font-bold text-lg">฿{auction.current_price?.toLocaleString()}</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* 2. Participants */}
+                        <div className="bg-slate-800/50 p-4 rounded-xl border border-slate-700">
+                            <h4 className="text-slate-300 font-bold mb-3 border-b border-slate-600 pb-2">👥 คู่กรณี</h4>
+                            <div className="space-y-3">
+                                <div className="flex justify-between items-center">
+                                    <span className="text-xs bg-red-900/50 text-red-300 px-2 py-1 rounded">ผู้ขาย (Seller)</span>
+                                    <div className="text-right">
+                                        <p className="text-white font-bold text-sm">{auction.seller_name}</p>
+                                        <p className="text-slate-500 text-xs">{auction.seller_email}</p>
+                                    </div>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                    <span className="text-xs bg-emerald-900/50 text-emerald-300 px-2 py-1 rounded">ผู้ซื้อ (Buyer)</span>
+                                    <div className="text-right">
+                                        <p className="text-white font-bold text-sm">{auction.winner_name || '-'}</p>
+                                        <p className="text-slate-500 text-xs">{auction.winner_email || '-'}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* 3. Shipping Info */}
+                        <div className="bg-slate-800/50 p-4 rounded-xl border border-slate-700">
+                            <h4 className="text-slate-300 font-bold mb-3 border-b border-slate-600 pb-2">🚚 การจัดส่ง</h4>
+                            {auction.is_shipped ? (
+                                <div className="space-y-3">
+                                    <div className="grid grid-cols-2 gap-2 text-sm">
+                                        <div><p className="text-slate-500">ขนส่ง:</p><p className="text-white">{auction.courier_name}</p></div>
+                                        <div><p className="text-slate-500">Tracking:</p><p className="text-white font-mono select-all">{auction.tracking_number}</p></div>
+                                        <div><p className="text-slate-500">วันที่ส่ง:</p><p className="text-white">{new Date(auction.shipping_date).toLocaleDateString('th-TH')}</p></div>
+                                    </div>
+                                    {auction.shipping_proof && (
+                                        <div className="mt-2">
+                                            <p className="text-slate-500 text-xs mb-1">รูปหลักฐาน:</p>
+                                            <a href={auction.shipping_proof} target="_blank" rel="noreferrer" className="block relative h-32 rounded-lg overflow-hidden border border-slate-600 group">
+                                                <img src={auction.shipping_proof} className="w-full h-full object-cover transition-transform group-hover:scale-110" />
+                                                <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    <span className="text-white text-xs">คลิกดูรูปใหญ่</span>
+                                                </div>
+                                            </a>
+                                        </div>
+                                    )}
+                                </div>
+                            ) : (
+                                <p className="text-slate-500 text-center py-4 italic">ยังไม่มีข้อมูลการจัดส่ง</p>
+                            )}
+                        </div>
+
+                    </div>
+
+                    {/* Right: Chat Logs */}
+                    <div className="w-full md:w-1/2 flex flex-col bg-slate-950 border-l border-slate-700">
+                        <div className="p-3 bg-slate-800 border-b border-slate-700">
+                            <h4 className="text-slate-300 font-bold flex items-center gap-2">💬 ประวัติแชท ({chatLogs.length})</h4>
+                        </div>
+                        <div className="flex-grow overflow-y-auto p-4 space-y-3 scrollbar-thin scrollbar-thumb-slate-700">
+                            {loading ? (
+                                <p className="text-slate-500 text-center mt-10">กำลังโหลดแชท...</p>
+                            ) : chatLogs.length === 0 ? (
+                                <p className="text-slate-600 text-center mt-10">ไม่มีประวัติการสนทนา</p>
+                            ) : (
+                                chatLogs.map((msg) => {
+                                    const isSystem = msg.user_email === 'SYSTEM';
+                                    const isSeller = msg.user_email === auction.seller_email;
+                                    
+                                    return (
+                                        <div key={msg.id} className={`flex flex-col ${isSystem ? 'items-center' : (isSeller ? 'items-start' : 'items-end')}`}>
+                                            {isSystem ? (
+                                                <span className="text-[10px] bg-slate-800 text-slate-400 px-2 py-1 rounded-full mb-1 border border-slate-700">🔔 {msg.message}</span>
+                                            ) : (
+                                                <div className={`max-w-[85%] p-3 rounded-xl text-sm border ${isSeller ? 'bg-slate-800 border-slate-700 text-slate-200 rounded-tl-none' : 'bg-blue-900/30 border-blue-800 text-blue-100 rounded-tr-none'}`}>
+                                                    <p className="text-[10px] font-bold opacity-50 mb-1">{msg.user_name} ({isSeller ? 'Seller' : 'Buyer'})</p>
+                                                    <p>{msg.message}</p>
+                                                    <p className="text-[9px] opacity-30 text-right mt-1">{new Date(msg.created_at).toLocaleString('th-TH')}</p>
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })
+                            )}
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    );
 };
 
 // 🟢 ไอคอนต่างๆ
@@ -23,6 +182,8 @@ const DefaultUserIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="24"
 const SearchIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>;
 const TrashIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>;
 const SettingsIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>;
+// 🟢 เพิ่ม MenuIcon สำหรับปุ่มกดดูรายละเอียด
+const MenuIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>;
 
 export default function AdminDashboardModal({ isOpen, onClose, adminEmail }) {
   const [activeTab, setActiveTab] = useState('transactions');
@@ -37,10 +198,11 @@ export default function AdminDashboardModal({ isOpen, onClose, adminEmail }) {
   const [wipeEmail, setWipeEmail] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // 🟢 State สำหรับ Warning Popup
-  const [warningMsg, setWarningMsg] = useState('');
+  // 🟢 State ใหม่สำหรับ Transaction Inspector
+  const [inspectAuction, setInspectAuction] = useState(null);
 
-  // 🟢 State สำหรับ System Config (Top Up Status)
+  // State Warning & Config
+  const [warningMsg, setWarningMsg] = useState('');
   const [topupStatus, setTopupStatus] = useState('open'); 
 
   // Data States
@@ -49,17 +211,16 @@ export default function AdminDashboardModal({ isOpen, onClose, adminEmail }) {
   const [transactions, setTransactions] = useState([]); 
   const [isLoadingData, setIsLoadingData] = useState(false);
 
-  // 🟢 Summary & Filter State
+  // Summary & Filter State
   const [startDate, setStartDate] = useState(() => {
       const d = new Date();
-      d.setDate(d.getDate() - 30); // Default ย้อนหลัง 30 วัน
+      d.setDate(d.getDate() - 30);
       return d.toISOString().split('T')[0];
   });
   const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 50;
 
-  // Search State
   const [userSearchTerm, setUserSearchTerm] = useState('');
 
   const callAdminRpc = async (rpcName, params) => {
@@ -70,7 +231,6 @@ export default function AdminDashboardModal({ isOpen, onClose, adminEmail }) {
     else alert(data.message);
   };
 
-  // 🟢 ฟังก์ชันส่ง Warning Popup (รายบุคคล)
   const handleSendWarning = async () => {
       if (!targetEmail.trim() || !warningMsg.trim()) return alert("กรุณาระบุ Email และข้อความเตือน");
       if (!confirm(`ยืนยันส่งข้อความเตือนไปยัง "${targetEmail}" ?\nข้อความ: ${warningMsg}`)) return;
@@ -78,30 +238,23 @@ export default function AdminDashboardModal({ isOpen, onClose, adminEmail }) {
       setIsProcessing(true);
       try {
           const userRef = doc(db, "users", targetEmail);
-          await updateDoc(userRef, {
-              warningMessage: warningMsg
-          });
-          alert("✅ ส่งข้อความเตือนสำเร็จ! ผู้ใช้จะเห็นทันทีที่เข้าเว็บ");
+          await updateDoc(userRef, { warningMessage: warningMsg });
+          alert("✅ ส่งข้อความเตือนสำเร็จ!");
           setWarningMsg("");
       } catch (error) {
-          console.error("Error sending warning:", error);
-          alert("❌ ไม่สามารถส่งข้อความได้ (User อาจไม่มีอยู่ในระบบ Firebase): " + error.message);
+          alert("❌ ไม่สามารถส่งข้อความได้: " + error.message);
       } finally {
           setIsProcessing(false);
       }
   };
 
-  // 🟢 [NEW] ฟังก์ชันส่ง Global Warning (ทุกคน)
   const handleSendGlobalWarning = async () => {
       if (!warningMsg.trim()) return alert("กรุณาระบุข้อความเตือนก่อนกดส่ง Global");
       if (!confirm(`⚠️⚠️⚠️ ยืนยันส่งข้อความเตือนหา "ทุกคนในระบบ" ??\n(ผู้ใช้ทุกคนจะเห็น Popup นี้ทันที)\n\nข้อความ: ${warningMsg}`)) return;
 
       setIsProcessing(true);
       try {
-          // 1. ดึง User ทั้งหมดจาก Firebase
           const usersSnap = await getDocs(collection(db, "users"));
-          
-          // 2. แบ่ง Batch (Firestore จำกัด 500 per batch)
           const chunks = [];
           let currentBatch = writeBatch(db);
           let counter = 0;
@@ -116,8 +269,6 @@ export default function AdminDashboardModal({ isOpen, onClose, adminEmail }) {
               }
           });
           if (counter > 0) chunks.push(currentBatch.commit());
-
-          // 3. รันทุก Batch
           await Promise.all(chunks);
 
           alert(`✅ ส่ง Global Warning สำเร็จ! (${usersSnap.size} คน)`);
@@ -130,30 +281,21 @@ export default function AdminDashboardModal({ isOpen, onClose, adminEmail }) {
       }
   };
 
-  // 🟢 ฟังก์ชันโหลด Config ระบบ (สถานะเติมเงิน)
   const fetchSystemConfig = async () => {
       try {
           const { data } = await supabase.from('system_config').select('value').eq('key', 'topup_status').single();
           if (data) setTopupStatus(data.value);
-      } catch (e) {
-          console.error("Fetch config error", e);
-      }
+      } catch (e) { console.error(e); }
   };
 
-  // 🟢 ฟังก์ชันอัปเดตสถานะเติมเงิน
   const updateTopupStatus = async (status) => {
       if (!confirm(`ยืนยันเปลี่ยนสถานะระบบเติมเงินเป็น "${status.toUpperCase()}" ?`)) return;
       setIsProcessing(true);
       try {
-          const { error } = await supabase.from('system_config').upsert({ key: 'topup_status', value: status });
-          if (error) throw error;
+          await supabase.from('system_config').upsert({ key: 'topup_status', value: status });
           setTopupStatus(status);
           alert("✅ อัปเดตสถานะเรียบร้อย!");
-      } catch (e) {
-          alert("❌ Error: " + e.message);
-      } finally {
-          setIsProcessing(false);
-      }
+      } catch (e) { alert("❌ Error: " + e.message); } finally { setIsProcessing(false); }
   };
 
   const fetchAllUsers = async () => {
@@ -288,16 +430,11 @@ export default function AdminDashboardModal({ isOpen, onClose, adminEmail }) {
                         <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
                             <SettingsIcon /> สถานะระบบเติมเงิน (Top Up System)
                         </h3>
-                        
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div className="md:col-span-3 bg-slate-900 p-4 rounded-lg text-center border border-slate-600 mb-2">
                                 <p className="text-slate-400 text-sm mb-1">สถานะปัจจุบัน</p>
-                                <p className={`text-3xl font-black uppercase ${
-                                    topupStatus === 'open' ? 'text-emerald-500' :
-                                    topupStatus === 'maintenance' ? 'text-amber-500' : 'text-red-500'
-                                }`}>
-                                    {topupStatus === 'open' ? '🟢 เปิดใช้งาน (OPEN)' :
-                                     topupStatus === 'maintenance' ? '⚠️ ปรับปรุง (MAINTENANCE)' : '⛔ ปิดใช้งาน (CLOSED)'}
+                                <p className={`text-3xl font-black uppercase ${topupStatus === 'open' ? 'text-emerald-500' : topupStatus === 'maintenance' ? 'text-amber-500' : 'text-red-500'}`}>
+                                    {topupStatus === 'open' ? '🟢 เปิดใช้งาน (OPEN)' : topupStatus === 'maintenance' ? '⚠️ ปรับปรุง (MAINTENANCE)' : '⛔ ปิดใช้งาน (CLOSED)'}
                                 </p>
                             </div>
                             <button onClick={() => updateTopupStatus('open')} disabled={isProcessing || topupStatus === 'open'} className={`py-4 rounded-xl font-bold text-white transition-all transform active:scale-95 ${topupStatus === 'open' ? 'bg-emerald-900/50 text-emerald-500 border border-emerald-800 cursor-default' : 'bg-emerald-600 hover:bg-emerald-500 shadow-lg'}`}>✅ เปิดระบบ (Open)</button>
@@ -326,7 +463,18 @@ export default function AdminDashboardModal({ isOpen, onClose, adminEmail }) {
                         <div>
                             <div className="overflow-x-auto rounded-t-xl border border-slate-700">
                                 <table className="w-full text-left border-collapse">
-                                    <thead><tr className="bg-slate-800 text-slate-300 text-xs uppercase tracking-wider"><th className="p-3 w-12 text-center">#</th><th className="p-3">สถานะ</th><th className="p-3">สินค้า</th><th className="p-3">ราคาจบ</th><th className="p-3">ผู้ชนะ</th><th className="p-3">ผู้ขาย</th><th className="p-3 text-right">เวลาจบ</th><th className="p-3 text-center">จัดการ</th></tr></thead>
+                                    <thead>
+                                        <tr className="bg-slate-800 text-slate-300 text-xs uppercase tracking-wider">
+                                            <th className="p-3 w-12 text-center">#</th>
+                                            <th className="p-3">สถานะ</th>
+                                            <th className="p-3">สินค้า</th>
+                                            <th className="p-3">ราคาจบ</th>
+                                            <th className="p-3">ผู้ชนะ</th>
+                                            <th className="p-3">ผู้ขาย</th>
+                                            <th className="p-3 text-right">เวลาจบ</th>
+                                            <th className="p-3 text-center">จัดการ</th>
+                                        </tr>
+                                    </thead>
                                     <tbody className="text-sm divide-y divide-slate-800">
                                         {paginatedTransactions.map((tx, index) => (
                                             <tr key={tx.id} className="hover:bg-slate-800/50 group transition-colors">
@@ -337,7 +485,16 @@ export default function AdminDashboardModal({ isOpen, onClose, adminEmail }) {
                                                 <td className="p-3">{tx.winner_email ? <div className="flex flex-col"><span className="text-white font-bold text-xs">{tx.winner_name}</span><span className="text-slate-500 text-[10px]">{tx.winner_email}</span></div> : <span className="text-slate-600">-</span>}</td>
                                                 <td className="p-3"><div className="flex flex-col"><span className="text-slate-300 text-xs">{tx.seller_name}</span><span className="text-slate-500 text-[10px]">{tx.seller_email}</span></div></td>
                                                 <td className="p-3 text-right text-slate-400 text-xs">{new Date(tx.end_time).toLocaleString('th-TH')}</td>
-                                                <td className="p-3 text-center"><button onClick={() => handleDeleteTransaction(tx.id, tx.card_name)} className="p-1.5 bg-red-900/20 text-red-500 rounded hover:bg-red-600 hover:text-white transition-colors opacity-50 group-hover:opacity-100"><TrashIcon /></button></td>
+                                                <td className="p-3 text-center flex items-center justify-center gap-2">
+                                                    {/* 🟢 ปุ่มดูรายละเอียด */}
+                                                    <button onClick={() => setInspectAuction(tx)} className="p-1.5 bg-blue-900/20 text-blue-400 rounded hover:bg-blue-600 hover:text-white transition-colors" title="ดูรายละเอียด">
+                                                        <MenuIcon />
+                                                    </button>
+                                                    {/* ปุ่มลบ */}
+                                                    <button onClick={() => handleDeleteTransaction(tx.id, tx.card_name)} className="p-1.5 bg-red-900/20 text-red-500 rounded hover:bg-red-600 hover:text-white transition-colors opacity-50 group-hover:opacity-100" title="ลบรายการ">
+                                                        <TrashIcon />
+                                                    </button>
+                                                </td>
                                             </tr>
                                         ))}
                                     </tbody>
@@ -366,32 +523,16 @@ export default function AdminDashboardModal({ isOpen, onClose, adminEmail }) {
                         <input list="userEmails" value={targetEmail} onChange={e=>setTargetEmail(e.target.value)} className="w-full bg-slate-800 border border-slate-600 rounded-lg p-3 text-white focus:border-red-500 outline-none" placeholder="พิมพ์เพื่อค้นหาชื่อ หรือ อีเมล..." />
                         <datalist id="userEmails">{allUsers.map(u => (<option key={u.id} value={u.id}>{u.displayName ? `${u.displayName} (${u.id})` : u.id}</option>))}</datalist>
                     </div>
-                    
                     <div className="grid grid-cols-2 gap-4">
                         <div className="p-3 bg-red-950/30 rounded-xl border border-red-900/50"><h4 className="text-red-400 font-bold text-sm mb-2">⛔ แบน (Cooldown)</h4><div className="flex gap-2 mb-2"><input type="number" value={banHours} onChange={e=>setBanHours(e.target.value)} className="w-16 bg-slate-900 border border-red-900 rounded p-1 text-center text-white" /><span className="text-slate-400 self-center text-xs">ชม.</span></div><button onClick={() => callAdminRpc('admin_manage_user', { p_admin_email: adminEmail, p_target_email: targetEmail, p_action: 'ban', p_hours: parseInt(banHours) })} className="w-full py-1 bg-red-600 text-white text-xs rounded hover:bg-red-500">แบน</button></div>
                         <div className="p-3 bg-emerald-950/30 rounded-xl border border-emerald-900/50 flex flex-col justify-between"><h4 className="text-emerald-400 font-bold text-sm">😇 ปลดโทษ</h4><button onClick={() => callAdminRpc('admin_manage_user', { p_admin_email: adminEmail, p_target_email: targetEmail, p_action: 'reset' })} className="w-full py-1 bg-emerald-600 text-white text-xs rounded hover:bg-emerald-500">รีเซ็ต</button></div>
                     </div>
-
-                    {/* 🟢 ส่วนส่งข้อความเตือน (Popup) */}
                     <div className="p-4 bg-amber-950/20 rounded-xl border border-amber-800/50">
                         <h4 className="text-amber-400 font-bold text-sm mb-2 flex items-center gap-2">⚠️ ส่งข้อความเตือน (One-time Popup)</h4>
-                        <textarea value={warningMsg} onChange={e => setWarningMsg(e.target.value)} placeholder="ระบุข้อความตักเตือน... (เมื่อ User เข้าเว็บจะเห็นทันที)" className="w-full p-2 bg-slate-900 border border-amber-900/50 rounded-lg text-white text-sm outline-none focus:border-amber-500 mb-2 resize-none h-20" />
-                        
+                        <textarea value={warningMsg} onChange={e => setWarningMsg(e.target.value)} placeholder="ระบุข้อความตักเตือน..." className="w-full p-2 bg-slate-900 border border-amber-900/50 rounded-lg text-white text-sm outline-none focus:border-amber-500 mb-2 resize-none h-20" />
                         <div className="flex gap-2">
-                            <button 
-                                onClick={handleSendWarning} 
-                                disabled={isProcessing}
-                                className="flex-1 py-2 bg-amber-600 text-white text-xs font-bold rounded hover:bg-amber-500 disabled:opacity-50"
-                            >
-                                ส่งหาคนนี้ ({targetEmail || 'ระบุอีเมล'})
-                            </button>
-                            <button 
-                                onClick={handleSendGlobalWarning} 
-                                disabled={isProcessing}
-                                className="flex-1 py-2 bg-red-600 text-white text-xs font-bold rounded hover:bg-red-500 disabled:opacity-50 border border-red-400"
-                            >
-                                📢 ส่งหาทุกคน (Global)
-                            </button>
+                            <button onClick={handleSendWarning} disabled={isProcessing} className="flex-1 py-2 bg-amber-600 text-white text-xs font-bold rounded hover:bg-amber-500 disabled:opacity-50">ส่งหาคนนี้</button>
+                            <button onClick={handleSendGlobalWarning} disabled={isProcessing} className="flex-1 py-2 bg-red-600 text-white text-xs font-bold rounded hover:bg-red-500 disabled:opacity-50 border border-red-400">📢 ส่งหาทุกคน (Global)</button>
                         </div>
                     </div>
                 </div>
@@ -436,6 +577,10 @@ export default function AdminDashboardModal({ isOpen, onClose, adminEmail }) {
 
         </div>
       </div>
+
+      {/* Render Inspector Modal */}
+      <TransactionInspectorModal isOpen={!!inspectAuction} onClose={() => setInspectAuction(null)} auction={inspectAuction} />
+
     </div>
   );
 }

@@ -1,12 +1,11 @@
 import React from 'react';
-// 🟢 เพิ่ม ShareIcon
 import { ShieldCheckIcon, ShoppingBagIcon, GavelIcon, ShareIcon } from './Icons';
 import TimeLeft from './TimeLeft';
 import { getAuctionThumbnail } from '../utils/auctionUtils';
+import UserBadge from './UserBadge'; // 🟢 Import UserBadge
 
 const SingleAuctionCard = ({ item, onChat, onBid, onBuyNow }) => {
     
-    // 🟢 ฟังก์ชันแชร์
     const handleShare = (e) => {
         e.stopPropagation();
         const url = `${window.location.origin}/auction?id=${item.id}&type=${item.type || 'auction'}`;
@@ -31,7 +30,6 @@ const SingleAuctionCard = ({ item, onChat, onBid, onBuyNow }) => {
                     alt={item.card_name}
                 />
                 
-                {/* 🟢 Share Button (Top-Left) */}
                 <button 
                     onClick={handleShare}
                     className="absolute top-2 left-2 p-1.5 bg-black/50 text-white rounded-full backdrop-blur-md hover:bg-emerald-500 transition-colors z-20"
@@ -40,7 +38,6 @@ const SingleAuctionCard = ({ item, onChat, onBid, onBuyNow }) => {
                     <ShareIcon />
                 </button>
 
-                {/* Escrow Icon */}
                 {item.is_escrow && (
                     <div 
                         className="absolute top-2 right-2 bg-gradient-to-br from-blue-500 to-blue-700 text-white p-2 rounded-full shadow-lg shadow-blue-500/30 border border-blue-300/50 z-10 scale-110" 
@@ -62,18 +59,22 @@ const SingleAuctionCard = ({ item, onChat, onBid, onBuyNow }) => {
                 {item.card_name}
             </h3>
             
-            {/* Info Row */}
+            {/* 🟢 แก้ไขส่วนแสดงผู้ขาย: ใช้ UserBadge แทน text ธรรมดา */}
             <div className="flex justify-between items-end mb-4">
-                <div className="flex items-center gap-1.5 overflow-hidden max-w-[60%]">
+                <div className="flex-1 overflow-hidden">
                     {item.seller_name && (
-                        <span className="text-[10px] text-slate-500 dark:text-slate-400 truncate bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded-full">
-                            {item.seller_name}
-                        </span>
+                        <div className="scale-90 origin-bottom-left">
+                            <UserBadge 
+                                email={item.seller_email}
+                                name={item.seller_name}
+                                size="sm" // ใช้ขนาดเล็ก
+                            />
+                        </div>
                     )}
                 </div>
-                <div className="text-right flex-1 pl-2">
-                    <p className="text-[9px] text-slate-400 uppercase font-bold leading-none mb-0.5">Current Bid</p>
-                    <p className="text-3xl md:text-4xl font-black text-emerald-500 dark:text-emerald-400 leading-none drop-shadow-sm tracking-tighter">
+                <div className="text-right flex-shrink-0 pl-1">
+                    <p className="text-[9px] text-slate-400 uppercase font-bold leading-none mb-0.5">Price</p>
+                    <p className="text-2xl md:text-3xl font-black text-emerald-500 dark:text-emerald-400 leading-none drop-shadow-sm tracking-tighter">
                         ฿{item.current_price.toLocaleString()}
                     </p>
                 </div>
