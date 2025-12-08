@@ -7,19 +7,33 @@
     @apply h-full m-0 p-0 overflow-hidden font-sans;
   }
 
-  /* 1. Light Mode (Default) - ธีมสว่าง (ค่าเริ่มต้น) */
   html {
     @apply bg-slate-100 text-slate-900;
   }
 
-  /* 2. Dark Mode (เมื่อ <html> มีคลาส .dark) */
   html.dark {
     @apply bg-slate-950 text-slate-200;
   }
 
-  /* 3. Scrollbar (ใช้ได้ทั้ง 2 โหมด) */
   ::-webkit-scrollbar { @apply w-2; }
   ::-webkit-scrollbar-track { @apply bg-slate-300 dark:bg-slate-700/50; }
   ::-webkit-scrollbar-thumb { @apply bg-slate-500 rounded-full; }
   ::-webkit-scrollbar-thumb:hover { @apply bg-slate-600 dark:bg-slate-400; }
+}
+
+/* 🟢 ปรับปรุง: Animation สำหรับการวนลูปแบบต่อเนื่อง (Seamless) */
+@keyframes marquee {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); } /* ขยับไปทางซ้าย 50% (เพราะเรามีข้อความ 2 ชุดต่อกัน) */
+}
+
+.animate-marquee {
+  display: flex;
+  width: max-content; /* ให้กว้างเท่ากับเนื้อหาข้างใน */
+  animation: marquee 30s linear infinite; /* ความเร็ว 45 วินาทีต่อรอบ */
+}
+
+.font-led {
+  font-family: 'Courier New', Courier, monospace;
+  text-shadow: 0 0 5px rgba(239, 68, 68, 0.8), 0 0 10px rgba(239, 68, 68, 0.5);
 }

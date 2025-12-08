@@ -35,8 +35,10 @@ export default function FeedbackModal({ isOpen, onClose, userProfile, showAlert 
         type: type,
         user: userProfile ? { 
           name: userProfile.name, 
-          email: userProfile.email, 
-          uid: userProfile.email 
+          email: userProfile?.email
+, 
+          uid: userProfile?.email
+ 
         } : "Anonymous",
         createdAt: serverTimestamp(),
         status: "new",

@@ -140,7 +140,9 @@ const FeedbackModal = ({ isOpen, onClose, userProfile, showAlert }) => {
     try {
       await addDoc(collection(db, "feedbacks"), {
         text: text.trim(), type: type,
-        user: userProfile ? { name: userProfile.name, email: userProfile.email, uid: userProfile.email } : "Anonymous",
+        user: userProfile ? { name: userProfile.name, email: userProfile?.email
+, uid: userProfile?.email
+ } : "Anonymous",
         createdAt: serverTimestamp(), status: "new", version: "1.0"
       });
       showAlert("ขอบคุณค่ะ! ", "เราได้รับข้อมูลของท่านแล้ว ทีมงานจะนำไปปรับปรุงให้ดียิ่งขึ้น");
@@ -358,7 +360,8 @@ function DeckListModal({ isOpen, onClose, userProfile, userDecks, setUserDecks, 
   const [importCode, setImportCode] = useState('');
 
   if (!isOpen || !userProfile) return null;
-  const email = userProfile.email;
+  const email = userProfile?.email
+;
   const getUserSlots = () => {
     const defaultSlots = [{ name: "Slot 1", main: [], life: [] }, { name: "Slot 2", main: [], life: [] }];
     const userData = userDecks[email] || { slots: defaultSlots };
@@ -378,7 +381,8 @@ function DeckListModal({ isOpen, onClose, userProfile, userDecks, setUserDecks, 
     const slot = slots[index]; const only1Card = slot.main.find(c => c.onlyRank === 1);
     if (!only1Card) { showAlert("ไม่สามารถแชร์ได้", "เด็คของคุณต้องมี 'Only #1' Card (การ์ดหลัก) ก่อนจึงจะแชร์ได้ค่ะ"); return; }
     try {
-      const q = query(collection(db, "publicDecks"), where("user.email", "==", userProfile.email));
+      const q = query(collection(db, "publicDecks"), where("user.email", "==", userProfile?.email
+));
       const querySnapshot = await getDocs(q);
       const existingDecks = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       const performShare = async (targetDeckId = null) => {
@@ -389,7 +393,8 @@ function DeckListModal({ isOpen, onClose, userProfile, userDecks, setUserDecks, 
           const deckId = newDeckRef.id;
           const allCardsInDeck = [...slot.main, ...slot.life];
           const factions = [...new Set(allCardsInDeck.map(c => c.faction).filter(Boolean))];
-          const listData = { deckName: slot.name, only1CardData: { id: only1Card.id, name: only1Card.name, imagePath: only1Card.imagePath }, user: { name: userProfile.name, picture: userProfile.picture, email: userProfile.email }, sharedAt: serverTimestamp(), likeCount: 0, likedBy: [], factions: factions, viewCount: 0 };
+          const listData = { deckName: slot.name, only1CardData: { id: only1Card.id, name: only1Card.name, imagePath: only1Card.imagePath }, user: { name: userProfile.name, picture: userProfile.picture, email: userProfile?.email
+ }, sharedAt: serverTimestamp(), likeCount: 0, likedBy: [], factions: factions, viewCount: 0 };
           const detailData = { mainDeck: slot.main.map(c => c.id), lifeDeck: slot.life.map(c => c.id) };
           batch.set(newDeckRef, listData); batch.set(doc(db, "publicDeckDetails", deckId), detailData); await batch.commit();
           showAlert(targetDeckId ? "เขียนทับเรียบร้อย!" : "แชร์เด็คสำเร็จ!", `เด็ค "${slot.name}" ถูกแชร์แล้ว!`);
@@ -581,7 +586,8 @@ export default function App() {
   // 🟢 Realtime Listener สำหรับ Warning Message
   useEffect(() => {
     if (!userProfile?.email) return;
-    const unsub = onSnapshot(doc(db, "users", userProfile.email), (docSnap) => {
+    const unsub = onSnapshot(doc(db, "users", userProfile?.email
+), (docSnap) => {
         if (docSnap.exists()) {
             const data = docSnap.data();
             // เช็คว่ามี Warning message ไหม
@@ -599,7 +605,8 @@ export default function App() {
   const handleClearWarning = async () => {
       if (!userProfile?.email) return;
       try {
-          await updateDoc(doc(db, "users", userProfile.email), {
+          await updateDoc(doc(db, "users", userProfile?.email
+), {
               warningMessage: deleteField()
           });
           setWarningMessage(null);
@@ -678,6 +685,13 @@ export default function App() {
       }
       
       fetchUserProfile(profileData.email);
+      
+      if (location.state?.from) {
+          navigate(location.state.from);
+      } else {
+          // ถ้าเข้าหน้าแรกปกติ ก็ไม่ต้อง Redirect (อยู่หน้า Dashboard)
+          // หรือถ้าต้องการให้ default ไป Auction ก็ใส่ navigate('/auction') ตรงนี้
+      }
 
     } catch (error) {
       console.error("Facebook Login Error:", error);
@@ -701,7 +715,14 @@ export default function App() {
           }
         }));
       }
-      fetchUserProfile(decoded.email);
+      
+      // ✅ ตรวจสอบว่ามีหน้าเดิมที่ต้องกลับไปไหม
+      if (location.state?.from) {
+          navigate(location.state.from);
+      } else {
+          // เข้ามาแบบปกติ ไม่ต้องทำอะไร (แสดงหน้า App)
+      }
+      
     } catch (error) { console.error("Failed to decode JWT:", error); }
   };
 
@@ -719,13 +740,15 @@ export default function App() {
     if (!userProfile) return;
     try {
       const batch = writeBatch(db);
-      batch.set(doc(db, "users", userProfile.email), {
+      batch.set(doc(db, "users", userProfile?.email
+), {
         displayName: data.displayName,
         avatarUrl: data.avatarUrl,
         isSetup: true,
         updatedAt: serverTimestamp()
       }, { merge: true });
-      const decksSnap = await getDocs(query(collection(db, "publicDecks"), where("user.email", "==", userProfile.email)));
+      const decksSnap = await getDocs(query(collection(db, "publicDecks"), where("user.email", "==", userProfile?.email
+)));
       decksSnap.forEach(doc => batch.update(doc.ref, { "user.name": data.displayName, "user.picture": data.avatarUrl }));
       const allDecksSnap = await getDocs(collection(db, "publicDecks"));
       const currentName = customProfile?.displayName || userProfile.name;
@@ -734,9 +757,11 @@ export default function App() {
         const commentsSnap = await getDocs(collection(db, "publicDecks", deckDoc.id, "comments"));
         commentsSnap.forEach(cDoc => {
           const cData = cDoc.data();
-          if (cData.userId === userProfile.email || cData.userName === currentName || cData.userName === oldNameTarget) {
+          if (cData.userId === userProfile?.email
+ || cData.userName === currentName || cData.userName === oldNameTarget) {
             batch.update(cDoc.ref, {
-              userId: userProfile.email,
+              userId: userProfile?.email
+,
               userName: data.displayName,
               userPicture: data.avatarUrl
             });
@@ -765,7 +790,8 @@ export default function App() {
   useEffect(() => { if (cardDb.length === 0) { handleReloadFromTxt(); } }, []);
   useEffect(() => { setCurrentPage(1); }, [searchTerm, filterTypes, filterMagicType, filterColors, filterRarities, selectedSets, statFilters]);
   useEffect(() => {
-    if (userProfile?.email) fetchUserProfile(userProfile.email);
+    if (userProfile?.email) fetchUserProfile(userProfile?.email
+);
   }, []);
 
  // 🟢 [UPDATED] ดึงข้อมูล User + ยอดเงิน (Wallet)
@@ -775,7 +801,8 @@ export default function App() {
         const { data, error } = await supabase
           .from('user_stats')
           .select('user_email, total_score, wallet_balance') 
-          .eq('user_email', userProfile.email)
+          .eq('user_email', userProfile?.email
+)
           .single();
         
         if (data) {
@@ -793,7 +820,8 @@ export default function App() {
           'postgres_changes',
           { event: '*', schema: 'public', table: 'user_stats' }, 
           (payload) => {
-            if (payload.new && payload.new.user_email === userProfile.email) {
+            if (payload.new && payload.new.user_email === userProfile?.email
+) {
                 console.log("🔔 ยอดเงินเปลี่ยน!", payload.new.wallet_balance);
                 fetchStats(); 
             }
@@ -814,7 +842,8 @@ export default function App() {
     if (!only1) return showAlert("Error", "เด็คต้องมี 'Only #1' Card (การ์ดหลัก) ก่อนจึงจะแชร์ได้ครับ");
 
     try {
-      const q = query(collection(db, "publicDecks"), where("user.email", "==", userProfile.email));
+      const q = query(collection(db, "publicDecks"), where("user.email", "==", userProfile?.email
+));
       const snap = await getDocs(q);
       const existing = snap.docs.map(d => ({ id: d.id, ...d.data() }));
 
@@ -831,7 +860,8 @@ export default function App() {
             batch.set(ref, {
                 deckName: deckName,
                 only1CardData: { id: only1.id, name: only1.name, imagePath: only1.imagePath },
-                user: { name: userProfile.name, picture: userProfile.picture, email: userProfile.email },
+                user: { name: userProfile.name, picture: userProfile.picture, email: userProfile?.email
+ },
                 sharedAt: serverTimestamp(),
                 likeCount: 0, likedBy: [], factions, viewCount: 0
             });

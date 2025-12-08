@@ -33,7 +33,8 @@ export default function TopUpModal({ isOpen, onClose, userProfile, onSuccess }) 
     try {
       const formData = new FormData();
       formData.append('file', file);
-      formData.append('email', userProfile.email);
+      formData.append('email', userProfile?.email
+);
 
       // 👇 URL ของ Supabase Function
       const SUPABASE_FUNCTION_URL = "https://whrirlmtsowzlabnyaib.supabase.co/functions/v1/topup";

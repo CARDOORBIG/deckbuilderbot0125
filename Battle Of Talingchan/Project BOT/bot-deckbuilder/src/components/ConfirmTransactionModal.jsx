@@ -14,7 +14,8 @@ export default function ConfirmTransactionModal({ isOpen, onClose, auction, user
     const [isSuccess, setIsSuccess] = useState(false); 
 
     if (!isOpen || !auction || !userProfile) return null;
-    const isSeller = userProfile.email === auction.seller_email;
+    const isSeller = userProfile?.email
+ === auction.seller_email;
     const targetEmail = isSeller ? auction.winner_email : auction.seller_email;
     const targetName = isSeller ? auction.winner_name : auction.seller_name;
     if (auction.end_time > new Date().toISOString() && auction.type !== 'market') return null;
@@ -35,7 +36,8 @@ export default function ConfirmTransactionModal({ isOpen, onClose, auction, user
         setIsSubmitting(true);
         setShowFinalConfirm(false); 
         const { data, error } = await supabase.rpc('submit_reputation', {
-            p_auction_id: auction.id, p_reporter_email: userProfile.email, p_target_email: targetEmail,
+            p_auction_id: auction.id, p_reporter_email: userProfile?.email
+, p_target_email: targetEmail,
             p_score_change: score, p_reason_code: reason
         });
         if (error) { alert("Error: " + error.message); setIsSubmitting(false); }

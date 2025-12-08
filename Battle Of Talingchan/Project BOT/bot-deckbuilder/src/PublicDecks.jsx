@@ -107,8 +107,10 @@ const FeedbackModal = ({ isOpen, onClose, userProfile, showAlert }) => {
           type: type,
           user: userProfile ? { 
             name: userProfile.name, 
-            email: userProfile.email, 
-            uid: userProfile.email 
+            email: userProfile?.email
+, 
+            uid: userProfile?.email
+ 
           } : "Anonymous",
           createdAt: serverTimestamp(),
           status: "new",
@@ -186,8 +188,11 @@ function CommentItem({ comment, replies, userProfile, deckOwnerEmail, onReply, o
   const [editVal, setEditVal] = useState(comment.text);
   const [isReplying, setIsReplying] = useState(false);
   const [replyVal, setReplyVal] = useState('');
-  const canDelete = userProfile && (userProfile.email === comment.userId || userProfile.email === deckOwnerEmail);
-  const canEdit = userProfile && userProfile.email === comment.userId;
+  const canDelete = userProfile && (userProfile?.email
+ === comment.userId || userProfile?.email
+ === deckOwnerEmail);
+  const canEdit = userProfile && userProfile?.email
+ === comment.userId;
   const formatTime = (t) => t ? t.toDate().toLocaleString('th-TH', {day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}) : 'Just now';
   const handleSendReply = (e) => { e.preventDefault(); if(replyVal.trim()){ onReply(comment.id, replyVal); setIsReplying(false); setReplyVal(''); } };
   return (
@@ -244,7 +249,8 @@ function CommentSection({ deckId, userProfile, showAlert, deckOwnerEmail }) {
   useEffect(() => { if(comments.length > 0) endRef.current?.scrollIntoView({ behavior: "smooth" }); }, [comments.length]);
   const handleAdd = async (text, parentId = null) => {
     if (!userProfile) return showAlert("กรุณาเข้าสู่ระบบ", "Login ก่อนนะครับ");
-    try { await addDoc(collection(db, "publicDecks", deckId, "comments"), { text: text.trim(), userId: userProfile.email, userName: userProfile.name, userPicture: userProfile.picture, createdAt: serverTimestamp(), parentId }); if (!parentId) setNewComment(''); } catch (e) { console.error(e); showAlert("Error", "ส่งคอมเม้นท์ไม่สำเร็จ"); }
+    try { await addDoc(collection(db, "publicDecks", deckId, "comments"), { text: text.trim(), userId: userProfile?.email
+, userName: userProfile.name, userPicture: userProfile.picture, createdAt: serverTimestamp(), parentId }); if (!parentId) setNewComment(''); } catch (e) { console.error(e); showAlert("Error", "ส่งคอมเม้นท์ไม่สำเร็จ"); }
   };
   const handleEdit = async (id, txt) => { try { await updateDoc(doc(db, "publicDecks", deckId, "comments", id), { text: txt }); } catch (e) { console.error(e); } };
   const handleDelete = async (id) => { if(window.confirm("ยืนยันการลบ?")) try { await deleteDoc(doc(db, "publicDecks", deckId, "comments", id)); } catch (e) { showAlert("Error", "ลบไม่สำเร็จ"); } };
@@ -467,8 +473,10 @@ function DeckCard({ deck, onViewDeck, userProfile, onDeleteDeck, isDetailLoading
     return `/cards/${encodePath(deck.only1CardData.imagePath)}/${encodeURIComponent(deck.only1CardData.id.replace(' - Only#1', ''))}.png`;
   }, [deck.only1CardData]);
 
-  const isOwner = userProfile && userProfile.email === deck.user.email;
-  const isLiked = userProfile && (deck.likedBy || []).includes(userProfile.email);
+  const isOwner = userProfile && userProfile?.email
+ === deck.user.email;
+  const isLiked = userProfile && (deck.likedBy || []).includes(userProfile?.email
+);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -673,14 +681,16 @@ export default function PublicDecks() {
 useEffect(() => {
   if (userProfile?.email) {
       // 1. ดึง Profile
-      getDoc(doc(db, "users", userProfile.email)).then(s => s.exists() && setCustomProfile(s.data()));
+      getDoc(doc(db, "users", userProfile?.email
+)).then(s => s.exists() && setCustomProfile(s.data()));
 
       // 2. ดึง Stats + เงิน (Supabase)
       const fetchStats = async () => {
            const { data } = await supabase
              .from('user_stats')
              .select('user_email, total_score, wallet_balance') // ✅ ต้องมี wallet_balance
-             .eq('user_email', userProfile.email)
+             .eq('user_email', userProfile?.email
+)
              .single();
              
            if(data) setUserReputation({ [data.user_email]: data });
@@ -692,7 +702,8 @@ useEffect(() => {
         .channel('public_decks_balance')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'user_stats' }, 
         (payload) => {
-            if (payload.new.user_email === userProfile.email) {
+            if (payload.new.user_email === userProfile?.email
+) {
                 fetchStats();
             }
         })
@@ -830,10 +841,15 @@ useEffect(() => {
   const handleLike = async (deck) => {
     if (!userProfile) return showAlert("Login", "เข้าสู่ระบบก่อนนะครับ");
     if (isLiking) return; setIsLiking(true);
-    const isLiked = (deck.likedBy || []).includes(userProfile.email);
+    const isLiked = (deck.likedBy || []).includes(userProfile?.email
+);
     try {
-      await updateDoc(doc(db, "publicDecks", deck.id), { likeCount: increment(isLiked ? -1 : 1), likedBy: isLiked ? arrayRemove(userProfile.email) : arrayUnion(userProfile.email) });
-      setSharedDecks(prev => prev.map(d => d.id === deck.id ? { ...d, likeCount: (d.likeCount||0) + (isLiked ? -1 : 1), likedBy: isLiked ? d.likedBy.filter(e=>e!==userProfile.email) : [...(d.likedBy||[]), userProfile.email] } : d));
+      await updateDoc(doc(db, "publicDecks", deck.id), { likeCount: increment(isLiked ? -1 : 1), likedBy: isLiked ? arrayRemove(userProfile?.email
+) : arrayUnion(userProfile?.email
+) });
+      setSharedDecks(prev => prev.map(d => d.id === deck.id ? { ...d, likeCount: (d.likeCount||0) + (isLiked ? -1 : 1), likedBy: isLiked ? d.likedBy.filter(e=>e!==userProfile?.email
+) : [...(d.likedBy||[]), userProfile?.email
+] } : d));
     } catch { showAlert("Error", "Like failed"); } finally { setIsLiking(false); }
   };
 
@@ -863,7 +879,8 @@ useEffect(() => {
   
   const handleCloneDeck = (targetDeck) => {
     if (!userProfile) return showAlert("Login", "กรุณาเข้าสู่ระบบก่อน Clone เด็คครับ");
-    const email = userProfile.email;
+    const email = userProfile?.email
+;
     const userData = userDecks[email] || { slots: [{ name: "Slot 1", main: [], life: [] }, { name: "Slot 2", main: [], life: [] }] };
     const slots = userData.slots;
     setModal({
@@ -898,8 +915,10 @@ useEffect(() => {
     if (!userProfile) return;
     try {
       const batch = writeBatch(db);
-      batch.set(doc(db, "users", userProfile.email), { displayName: data.displayName, avatarUrl: data.avatarUrl, isSetup: true, updatedAt: serverTimestamp() }, { merge: true });
-      const decksSnap = await getDocs(query(collection(db, "publicDecks"), where("user.email", "==", userProfile.email)));
+      batch.set(doc(db, "users", userProfile?.email
+), { displayName: data.displayName, avatarUrl: data.avatarUrl, isSetup: true, updatedAt: serverTimestamp() }, { merge: true });
+      const decksSnap = await getDocs(query(collection(db, "publicDecks"), where("user.email", "==", userProfile?.email
+)));
       decksSnap.forEach(doc => batch.update(doc.ref, { "user.name": data.displayName, "user.picture": data.avatarUrl }));
       await batch.commit();
       setCustomProfile(p => ({ ...p, ...data, isSetup: true })); setIsProfileModalOpen(false); showAlert("Success", "บันทึกข้อมูลเรียบร้อย!");

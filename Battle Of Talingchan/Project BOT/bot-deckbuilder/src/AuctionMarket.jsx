@@ -39,6 +39,31 @@ import {
 const LayoutGridIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>;
 const LayoutFeedIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="3" y1="15" x2="21" y2="15"></line></svg>;
 
+// 🟢 Component ป้ายไฟ LED (แบบต่อเนื่อง Seamless Loop)
+const LEDBanner = () => {
+  const message = "🚨 หากผู้ซืื้อได้ทำการประมูลชนะหรือกดซื้อไปแล้ว ให้ทำการติดต่อส่วนตัวกับผู้ขาย หากตรวจสอบพบเห็นว่าเงียบหายจะถือว่าก่อกวน จะทำการเตือนก่อนที่จะลงโทษตามกฏของเว็ปนะครับ 🚨";
+  
+  // กำหนดช่องไฟ (Spacing) ประมาณ 2 วินาทีด้วยระยะห่างทางกายภาพ
+  // mr-32 (128px) หรือ mr-[10vw] จะช่วยเว้นระยะห่างให้พอดีสายตา
+  const gapClass = "mr-32 md:mr-48"; 
+
+  return (
+    <div className="w-full bg-black border-y-2 border-red-600/50 overflow-hidden relative py-2 shadow-[0_0_15px_rgba(220,38,38,0.3)] mb-4 mx-0 md:mx-4 md:w-auto md:rounded-xl mt-4 flex">
+      {/* Wrapper ที่ขยับไปทางซ้าย */}
+      <div className="animate-marquee flex items-center">
+        {/* ข้อความชุดที่ 1 */}
+        <span className={`text-red-500 font-led font-bold text-base md:text-lg tracking-wider whitespace-nowrap ${gapClass}`}>
+          {message}
+        </span>
+        {/* ข้อความชุดที่ 2 (เพื่อให้เวลาชุดแรกเลื่อนพ้นจอ ชุดนี้จะมาแทนที่ทันทีแบบเนียนๆ) */}
+        <span className={`text-red-500 font-led font-bold text-base md:text-lg tracking-wider whitespace-nowrap ${gapClass}`}>
+          {message}
+        </span>
+      </div>
+    </div>
+  );
+};
+
 // Placeholder Modals
 const ManageBiddersModal = ({ isOpen, onClose }) => (!isOpen ? null : <div className="fixed inset-0 bg-black/80 flex items-center justify-center text-white"><div className="bg-slate-900 p-4 rounded">Manage Bidders (Placeholder)<button onClick={onClose} className="ml-4 bg-red-500 px-2 rounded">Close</button></div></div>);
 const BidHistoryModal = ({ isOpen, onClose }) => (!isOpen ? null : <div className="fixed inset-0 bg-black/80 flex items-center justify-center text-white"><div className="bg-slate-900 p-4 rounded">Bid History (Placeholder)<button onClick={onClose} className="ml-4 bg-red-500 px-2 rounded">Close</button></div></div>);
@@ -86,27 +111,31 @@ export default function AuctionMarket() {
   const [confirmTransaction, setConfirmTransaction] = useState(null);
   const [chatAuction, setChatAuction] = useState(null);
   const [customProfile, setCustomProfile] = useState(null);
+  
+  // โหลด User Profile จาก LocalStorage
   const [userProfile, setUserProfile] = useState(() => { try { return JSON.parse(localStorage.getItem("bot-userProfile-v1")); } catch { return null; } });
   const [theme, setThemeState] = useState(() => { try { return JSON.parse(localStorage.getItem("bot-theme")) || 'dark'; } catch { return 'dark'; } });
 
-  // 🟢 Deep Link Handler: เปิดสินค้าทันทีถ้ามี ?id=xxx&type=xxx ใน URL
+  // 1. เพิ่ม Effect ตรวจสอบ Login
+  useEffect(() => {
+    if (!userProfile) {
+        navigate('/', { replace: true, state: { from: location } });
+    }
+  }, [userProfile, navigate, location]);
+
+  // Deep Link Handler
   useEffect(() => {
       const params = new URLSearchParams(location.search);
       const shareId = params.get('id');
-      const shareType = params.get('type'); // 'auction' or 'market'
+      const shareType = params.get('type');
 
       if (shareId) {
           const fetchSharedItem = async () => {
               const table = shareType === 'market' ? 'market_listings' : 'auctions';
-              const { data, error } = await supabase
-                  .from(table)
-                  .select('*')
-                  .eq('id', shareId)
-                  .single();
+              const { data, error } = await supabase.from(table).select('*').eq('id', shareId).single();
               
               if (data) {
                   let item = data;
-                  // ปรับโครงสร้างข้อมูล Market ให้เข้ากับ AuctionRoomModal
                   if (shareType === 'market') {
                        item = { 
                           ...data, 
@@ -263,9 +292,12 @@ export default function AuctionMarket() {
 
       <main className="flex-grow overflow-y-auto p-0 md:p-8 w-full pb-40 relative">
         
+        {/* 🟢 แสดงป้ายไฟวิ่ง เฉพาะในหน้า Auction และ Market */}
+        {(activeTab === 'auction' || activeTab === 'market') && <LEDBanner />}
+
         {activeTab === 'auction' && (
             <div className="animate-fade-in w-full md:px-8">
-                <div className="mb-6 mx-4 md:mx-0 mt-4">
+                <div className="mb-6 mx-4 md:mx-0 mt-0"> {/* ปรับ mt-4 เป็น mt-0 */}
                     <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border border-slate-200 dark:border-slate-800 p-3 rounded-2xl shadow-sm flex flex-col gap-3">
                         <div className="flex gap-2 items-center w-full">
                             <div className="relative flex-grow">
@@ -322,7 +354,10 @@ export default function AuctionMarket() {
         )}
 
         {activeTab === 'market' && (
-            <FleaMarket userProfile={displayUser} onChat={(item) => setChatAuction(item)} onBuy={handleBuyMarketItem} viewMode={viewMode} setViewMode={setViewMode} onCreate={handleStartMarketListingClick} />
+            <div className="relative">
+                {/* ส่ง props viewMode, setViewMode ไปให้ FleaMarket เพื่อให้ปรับ Layout ได้ */}
+                <FleaMarket userProfile={displayUser} onChat={(item) => setChatAuction(item)} onBuy={handleBuyMarketItem} viewMode={viewMode} setViewMode={setViewMode} onCreate={handleStartMarketListingClick} />
+            </div>
         )}
 
         {activeTab === 'management' && (

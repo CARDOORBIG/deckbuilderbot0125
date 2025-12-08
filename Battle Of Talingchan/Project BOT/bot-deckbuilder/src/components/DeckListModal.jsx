@@ -58,7 +58,8 @@ export default function DeckListModal({
     const [modal, setModal] = useState({ isOpen: false });
 
     if (!isOpen || !userProfile) return null;
-    const email = userProfile.email;
+    const email = userProfile?.email
+;
 
     const getUserSlots = () => {
         const defaultSlots = [{ name: "Slot 1", main: [], life: [] }, { name: "Slot 2", main: [], life: [] }];

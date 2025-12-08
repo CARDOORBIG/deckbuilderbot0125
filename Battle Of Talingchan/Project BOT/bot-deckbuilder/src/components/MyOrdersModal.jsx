@@ -34,7 +34,8 @@ export default function MyOrdersModal({ isOpen, onClose, userProfile, showAlert 
       try {
         const q = query(
           collection(db, "orders"), 
-          where(activeTab === 'buying' ? 'buyerEmail' : 'sellerEmail', '==', userProfile.email)
+          where(activeTab === 'buying' ? 'buyerEmail' : 'sellerEmail', '==', userProfile?.email
+)
         );
         
         const snapshot = await getDocs(q);
