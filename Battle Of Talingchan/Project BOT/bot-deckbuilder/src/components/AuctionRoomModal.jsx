@@ -12,7 +12,7 @@ import {
     CoinIcon 
 } from './Icons';
 import UserBadge from './UserBadge';
-import UserProfilePopup from './UserProfilePopup'; // 🟢 เพิ่ม Profile Popup
+import UserProfilePopup from './UserProfilePopup';
 
 export default function AuctionRoomModal({ isOpen, onClose, auction, userProfile, onBid, onBuyNow }) {
     const [messages, setMessages] = useState([]);
@@ -30,7 +30,6 @@ export default function AuctionRoomModal({ isOpen, onClose, auction, userProfile
     const [bidders, setBidders] = useState([]);
     const [showBidders, setShowBidders] = useState(false);
     
-    // 🟢 เพิ่ม State สำหรับเปิด Profile Popup
     const [selectedProfileId, setSelectedProfileId] = useState(null);
 
     const allImages = useMemo(() => {
@@ -108,37 +107,75 @@ export default function AuctionRoomModal({ isOpen, onClose, auction, userProfile
     }, [isOpen, showFullGallery, allImages.length]);
 
     const scrollToBottom = () => { setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100); };
-    const handleSendMessage = async (e) => { e.preventDefault(); if (!newMessage.trim() || !userProfile) return; await supabase.from('auction_comments').insert({ auction_id: auction.id, user_email: userProfile.email, user_name: userProfile.name, user_picture: userProfile.picture, message: newMessage.trim() }); setNewMessage(""); };
+
+    const handleSendMessage = async (e) => { 
+        e.preventDefault(); 
+        if (!newMessage.trim() || !userProfile) return; 
+        
+        const msgContent = newMessage.trim();
+        await supabase.from('auction_comments').insert({ 
+            auction_id: auction.id, 
+            user_email: userProfile.email, 
+            user_name: userProfile.name, 
+            user_picture: userProfile.picture, 
+            message: msgContent 
+        }); 
+        
+        setNewMessage("");
+
+        try {
+            const isSeller = userProfile.email === auction.seller_email;
+            const notiTitle = `💬 ข้อความใหม่จาก ${userProfile.name}`;
+            const notiMsg = `ในรายการ "${auction.card_name}": ${msgContent}`;
+
+            if (!isSeller) {
+                await supabase.from('notifications').insert({
+                    user_email: auction.seller_email, type: 'chat', title: notiTitle, message: notiMsg, auction_id: auction.id, is_read: false
+                });
+            } else {
+                const { data: chatHistory } = await supabase.from('auction_comments').select('user_email').eq('auction_id', auction.id).neq('user_email', userProfile.email);
+                if (chatHistory && chatHistory.length > 0) {
+                    const uniqueEmails = [...new Set(chatHistory.map(c => c.user_email))];
+                    const notifications = uniqueEmails.map(email => ({ user_email: email, type: 'chat', title: `💬 ข้อความใหม่จากผู้ขาย`, message: notiMsg, auction_id: auction.id, is_read: false }));
+                    if (notifications.length > 0) await supabase.from('notifications').insert(notifications);
+                }
+            }
+        } catch (err) { console.error(err); }
+    };
     
     const handleNext = (e) => { e?.stopPropagation(); if(activeProofIndex < allImages.length - 1) setActiveProofIndex(prev => prev + 1); };
     const handlePrev = (e) => { e?.stopPropagation(); if(activeProofIndex > 0) setActiveProofIndex(prev => prev - 1); };
     const onTouchStart = (e) => { setIsSwiping(true); setTouchStart(e.targetTouches[0].clientX); };
     const onTouchMove = (e) => { setTouchMove(e.targetTouches[0].clientX - touchStart); };
     const onTouchEnd = () => { setIsSwiping(false); if (touchMove < -minSwipeDistance) handleNext(); else if (touchMove > minSwipeDistance) handlePrev(); setTouchMove(0); };
-    
-    const getTrackStyle = () => {
-        const count = allImages.length || 1;
-        const percentagePerSlide = 100 / count;
-        const baseTranslate = activeProofIndex * percentagePerSlide; 
-        const translateValue = isSwiping ? `calc(-${baseTranslate}% + ${touchMove}px)` : `-${baseTranslate}%`;
-        return { transform: `translateX(${translateValue})`, transition: isSwiping ? 'none' : 'transform 0.3s cubic-bezier(0.25, 1, 0.5, 1)', width: `${count * 100}%`, display: 'flex', height: '100%' };
-    };
+    const getTrackStyle = () => { const count = allImages.length || 1; const percentagePerSlide = 100 / count; const baseTranslate = activeProofIndex * percentagePerSlide; const translateValue = isSwiping ? `calc(-${baseTranslate}% + ${touchMove}px)` : `-${baseTranslate}%`; return { transform: `translateX(${translateValue})`, transition: isSwiping ? 'none' : 'transform 0.3s cubic-bezier(0.25, 1, 0.5, 1)', width: `${count * 100}%`, display: 'flex', height: '100%' }; };
 
     if (!isOpen || !auction) return null;
     
+    // 🟢 ตรวจสอบสถานะ: มีการตกลงซื้อขายแล้วหรือไม่ (ไม่ใช่ Active และ ไม่ใช่ Cancelled)
+    const isOwner = userProfile?.email === auction.seller_email;
+    const isWinner = userProfile?.email === auction.winner_email;
+    const hasWinner = !!auction.winner_email;
+    const isActive = auction.status === 'active';
+    const isCancelled = auction.status === 'cancelled';
+    
+    // ดีลเกิดขึ้นแล้ว (Deal Active)
+    const isDealActive = hasWinner && !isActive && !isCancelled;
+
+    // 🟢 Lock Room: ถ้าดีลเกิดแล้ว คนอื่นห้ามเข้า
+    const isRestricted = isDealActive && !(isOwner || isWinner);
+
     const isEnded = auction.status !== 'active' || (auction.end_time && new Date(auction.end_time) < new Date());
     const isCompleted = auction.status === 'completed'; 
     const isChatDisabled = isCompleted || !userProfile;
-    const isOwner = userProfile?.email === auction.seller_email;
-    const isRestricted = (auction.status === 'sold' || auction.status === 'completed') && !(isOwner || userProfile?.email === auction.winner_email);
-
+    
     const currentPrice = auction.current_price || auction.price || 0;
     const buyNowPrice = auction.buy_now_price || auction.price || 0;
     const minBid = auction.min_bid_increment || 0;
 
     if (isRestricted) {
         return (
-            <div className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center z-[700] p-4" onClick={onClose}>
+            <div className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center z-[700] p-4 animate-fade-in" onClick={onClose}>
                 <div className="bg-white dark:bg-slate-900 p-8 rounded-2xl text-center max-w-sm shadow-2xl border border-red-500/50" onClick={e => e.stopPropagation()}>
                     <div className="text-6xl mb-4">🔒</div>
                     <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-2">เนื้อหานี้ถูกจำกัด</h2>
@@ -176,20 +213,34 @@ export default function AuctionRoomModal({ isOpen, onClose, auction, userProfile
                 {/* Right Side: Chat & Actions */}
                 <div className="w-full md:w-1/3 flex flex-col border-l border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 h-full max-h-[60vh] md:max-h-full">
                     
-                    {/* Header */}
-                    <div className="p-3 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 flex justify-between items-center shrink-0">
-                        <div className="flex items-center gap-2">
-                            <h3 className="font-bold text-slate-700 dark:text-slate-200 flex items-center gap-2">
-                                <ChatBubbleIcon /> {auction.status === 'sold' ? 'Private Chat' : 'Live Chat'}
-                            </h3>
-                            {auction.type !== 'market' && (
-                                <button 
-                                    onClick={() => setShowBidders(!showBidders)} 
-                                    className={`ml-2 px-2 py-1 rounded-full text-xs font-bold flex items-center gap-1 transition-all ${showBidders ? 'bg-amber-100 text-amber-600 border border-amber-200' : 'bg-slate-200 text-slate-600 dark:bg-slate-800 dark:text-slate-400 hover:bg-slate-300'}`}
-                                    title="ดูประวัติการบิด"
-                                >
-                                    <CoinIcon /> <span>{bidders.length}</span>
-                                </button>
+                    {/* Header - 🟢 เปลี่ยนสีตามสถานะ Deal */}
+                    <div className={`p-3 border-b shrink-0 flex justify-between items-center transition-colors duration-300 ${
+                        isDealActive 
+                        ? 'bg-emerald-100 dark:bg-emerald-900/30 border-emerald-200 dark:border-emerald-800' 
+                        : 'bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800'
+                    }`}>
+                        <div className="flex flex-col">
+                            <div className="flex items-center gap-2">
+                                <h3 className={`font-bold flex items-center gap-2 ${isDealActive ? 'text-emerald-800 dark:text-emerald-300' : 'text-slate-700 dark:text-slate-200'}`}>
+                                    <ChatBubbleIcon /> {isDealActive ? 'Private Chat' : 'Live Chat'}
+                                </h3>
+                                {auction.type !== 'market' && (
+                                    <button 
+                                        onClick={() => setShowBidders(!showBidders)} 
+                                        className={`ml-2 px-2 py-1 rounded-full text-xs font-bold flex items-center gap-1 transition-all ${showBidders ? 'bg-amber-100 text-amber-600 border border-amber-200' : 'bg-slate-200 text-slate-600 dark:bg-slate-800 dark:text-slate-400 hover:bg-slate-300'}`}
+                                        title="ดูประวัติการบิด"
+                                    >
+                                        <CoinIcon /> <span>{bidders.length}</span>
+                                    </button>
+                                )}
+                            </div>
+                            
+                            {/* 🟢 เพิ่มข้อความเล็กๆ บอกให้ติดต่อ */}
+                            {isDealActive && (
+                                <p className="text-[10px] text-emerald-600 dark:text-emerald-400 mt-1 ml-6 font-bold flex items-center gap-1 animate-pulse">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                    {isOwner ? `ติดต่อผู้ซื้อโดยตรง (${auction.winner_name || 'Buyer'})` : `ติดต่อผู้ขายโดยตรง (${auction.seller_name})`}
+                                </p>
                             )}
                         </div>
                         <button onClick={onClose} className="hidden md:block text-slate-400 hover:text-red-500"><CloseIcon /></button>
@@ -205,17 +256,15 @@ export default function AuctionRoomModal({ isOpen, onClose, auction, userProfile
                                 size="md"
                             />
                             <span className="text-[10px] text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-full border border-slate-200 dark:border-slate-700">
-                                สถานะ: {auction.status === 'sold' ? '🔴 ขายแล้ว' : '🟢 กำลังขาย'}
+                                สถานะ: {auction.status === 'sold' || auction.status === 'completed' ? '🔴 ขายแล้ว' : '🟢 กำลังขาย'}
                             </span>
                         </div>
                     </div>
                     
-                    {/* Content Area */}
+                    {/* Content Area (Chat/Bidders) */}
                     {showBidders ? (
                         <div className="flex-grow overflow-y-auto p-4 scrollbar-thin scrollbar-thumb-slate-300 dark:scrollbar-thumb-slate-700 min-h-0 bg-slate-50 dark:bg-black/20">
-                            <h4 className="text-xs font-bold text-slate-500 uppercase mb-3 sticky top-0 bg-slate-50 dark:bg-slate-900/95 py-2 z-10 backdrop-blur-sm border-b border-slate-200 dark:border-slate-800 flex justify-between px-2">
-                                <span>ผู้บิด</span><span>ยอดบิด / (ก่อนหน้า)</span>
-                            </h4>
+                            {/* ... (Bidder List logic same as before) ... */}
                             {bidders.length === 0 ? (
                                 <div className="flex flex-col items-center justify-center h-40 text-slate-400 text-sm gap-2"><span className="text-3xl opacity-30">📭</span><p>ยังไม่มีใครบิด</p></div>
                             ) : (
@@ -240,7 +289,6 @@ export default function AuctionRoomModal({ isOpen, onClose, auction, userProfile
                             )}
                         </div>
                     ) : (
-                        // 🟢 ส่วนแสดงแชทที่แก้ใหม่ (Clean Chat)
                         <div className="flex-grow overflow-y-auto p-4 space-y-3 scrollbar-thin scrollbar-thumb-slate-300 dark:scrollbar-thumb-slate-700 min-h-0">
                             {messages.length === 0 ? (<div className="flex flex-col items-center justify-center h-full text-slate-400 text-sm gap-2"><span className="text-4xl opacity-20">💬</span><p>เริ่มการสนทนาได้เลย...</p></div>) : messages.map((msg, i) => {
                                 const isSystem = msg.user_email === 'SYSTEM';
@@ -250,13 +298,11 @@ export default function AuctionRoomModal({ isOpen, onClose, auction, userProfile
                                 
                                 return (
                                     <div key={msg.id} className={`flex gap-2 ${isMe ? 'flex-row-reverse' : ''}`}>
-                                        
-                                        {/* 🟢 1. รูปโปรไฟล์แบบกดได้ (ใช้ img ธรรมดาแทน UserBadge) */}
                                         <div 
                                             className="shrink-0 cursor-pointer hover:opacity-80 transition-opacity self-start mt-1"
                                             onClick={(e) => {
                                                 e.stopPropagation();
-                                                setSelectedProfileId(msg.user_email); // เปิด Profile Popup
+                                                setSelectedProfileId(msg.user_email); 
                                             }}
                                             title="ดูโปรไฟล์"
                                         >
@@ -267,15 +313,11 @@ export default function AuctionRoomModal({ isOpen, onClose, auction, userProfile
                                             />
                                         </div>
 
-                                        {/* 🟢 2. กล่องข้อความ (ตัด UserBadge ออก) */}
                                         <div className={`max-w-[75%] px-3 py-2 rounded-xl text-sm shadow-sm break-words leading-relaxed ${
                                             isMe 
                                             ? 'bg-emerald-600 text-white rounded-tr-none' 
                                             : 'bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-200 rounded-tl-none border border-slate-200 dark:border-slate-700'
                                         }`}>
-                                            {/* แสดงชื่อเฉพาะข้อความที่ไม่ใช่ของเรา (Optional) ถ้าต้องการ */}
-                                            {/* {!isMe && <p className="text-[9px] font-bold opacity-50 mb-0.5 text-slate-500">{msg.user_name}</p>} */}
-                                            
                                             {msg.message}
                                         </div>
                                     </div>
@@ -297,7 +339,6 @@ export default function AuctionRoomModal({ isOpen, onClose, auction, userProfile
                                             <ShoppingBagIcon className="w-5 h-5 drop-shadow-sm" /><span>Buy ฿{buyNowPrice.toLocaleString()}</span>
                                         </button>
                                     )}
-                                    {/* ✅ ใช้ minBid ที่ป้องกันแล้ว */}
                                     {(minBid > 0) && (
                                         <button onClick={() => onBid(auction)} className="btn-glossy px-4 py-1.5 rounded-xl bg-gradient-to-br from-orange-500 via-red-500 to-purple-600 text-white text-xs font-black shadow-lg shadow-orange-500/30 border-t border-white/20 flex items-center justify-center gap-1.5">
                                             <GavelIcon className="w-5 h-5 drop-shadow-sm" /><span>Bid +{minBid.toLocaleString()}</span><span className="absolute top-1 right-1 flex h-2 w-2"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span><span className="relative inline-flex rounded-full h-2 w-2 bg-red-400"></span></span>
@@ -314,7 +355,6 @@ export default function AuctionRoomModal({ isOpen, onClose, auction, userProfile
                 </div>
             </div>
 
-            {/* 🟢 เพิ่ม Popup นามบัตร */}
             <UserProfilePopup 
                 isOpen={!!selectedProfileId} 
                 onClose={() => setSelectedProfileId(null)} 
