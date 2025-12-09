@@ -4,13 +4,13 @@ import NotificationCenter from '../NotificationCenter';
 import { 
   MenuIcon, StoreIcon, HomeIcon, UsersIcon, CrownIcon,
   ShieldBanIcon, BookOpenIcon, MedalIcon, MessageCircleIcon,
-  TrophyIcon, AlertIcon, LayersIcon
+  TrophyIcon, AlertIcon, LayersIcon, SettingsIcon
 } from './Icons';
 import CreditCheckModal from './CreditCheckModal'; 
+import BlackListModal from './BlackListModal'; 
+import RulesModal from './RulesModal'; // 🟢 1. Import RulesModal
 
-// ... (HeaderButton และ Icons อื่นๆ คงเดิม) ...
 const ChevronDownIcon = ({ className }) => <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polyline points="6 9 12 15 18 9"></polyline></svg>;
-const SettingsIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>;
 
 const HeaderButton = ({ className = "", children, ...props }) => (
   <button className={`flex items-center justify-center gap-1 md:gap-2 px-2 md:px-4 py-1.5 md:py-2 rounded-lg font-bold text-[10px] md:text-sm transition-all active:scale-[.98] disabled:opacity-40 disabled:cursor-not-allowed border ${className}`} {...props}>
@@ -30,13 +30,13 @@ export default function Header({
   const location = useLocation();
   const [isPanelOpen, setIsPanelOpen] = useState(false);
   const [isCreditModalOpen, setIsCreditModalOpen] = useState(false); 
+  const [isBlackListOpen, setIsBlackListOpen] = useState(false);
+  const [isRulesOpen, setIsRulesOpen] = useState(false); // 🟢 2. เพิ่ม State สำหรับ Rules
 
   const isActive = (path) => location.pathname === path;
 
   const handleMyDecksClick = () => {
-    if (setIsMyDecksOpen) {
-        setIsMyDecksOpen(true);
-    }
+    if (setIsMyDecksOpen) setIsMyDecksOpen(true);
     setIsPanelOpen(false);
   };
 
@@ -45,18 +45,28 @@ export default function Header({
       setIsPanelOpen(false);
   };
 
+  const handleBlackListClick = () => {
+      setIsBlackListOpen(true);
+      setIsPanelOpen(false);
+  };
+
+  // 🟢 3. เพิ่มฟังก์ชันกดปุ่ม Rules
+  const handleRulesClick = () => {
+      setIsRulesOpen(true);
+      setIsPanelOpen(false);
+  };
+
   const comingSoonItems = [
-    { icon: <ShieldBanIcon />, label: "บัญชี BlackList" },
-    { icon: <BookOpenIcon />, label: "กฏการใช้งาน" },
+    // ❌ ลบ Blacklist และ กฏการใช้งาน ออกจากตรงนี้
     { icon: <MessageCircleIcon />, label: "พูดคุยสาธารณะ" },
     { icon: <AlertIcon />, label: "แจ้งปัญหา" },
     { icon: <SettingsIcon />, label: "การตั้งค่า" }
   ];
 
   return (
-    <header className="border-b border-slate-300 dark:border-emerald-700/30 bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm sticky top-0 z-50 flex flex-col justify-center transition-all duration-300">
+    <header className="border-b border-slate-300 dark:border-emerald-700/30 bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm sticky top-0 z-50 flex flex-col justify-center transition-all duration-300 mb-8">
       
-      {/* --- ส่วนที่ 1: Main Header (ด้านบน) --- */}
+      {/* --- ส่วนที่ 1: Main Header --- */}
       <div className="px-2 md:px-6 py-2 h-14 flex items-center justify-between gap-1 md:gap-2 w-full relative z-20 bg-inherit"> 
         
         {/* ฝั่งซ้าย */}
@@ -143,6 +153,21 @@ export default function Header({
                       <span className="text-[10px] font-bold text-slate-600 dark:text-slate-300">เครดิตผู้ใช้</span>
                   </button>
 
+                  <button onClick={handleBlackListClick} className="flex flex-col items-center gap-1 group w-full">
+                      <div className="w-10 h-10 rounded-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center text-red-500 group-hover:text-red-600 group-hover:border-red-500 transition-all shadow-sm">
+                          <ShieldBanIcon />
+                      </div>
+                      <span className="text-[10px] font-bold text-slate-600 dark:text-slate-300">ตรวจสอบประวัติ</span>
+                  </button>
+
+                  {/* 🟢 4. เพิ่มปุ่ม "กฏการใช้งาน" (ใช้งานได้จริง) */}
+                  <button onClick={handleRulesClick} className="flex flex-col items-center gap-1 group w-full">
+                      <div className="w-10 h-10 rounded-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center text-amber-500 group-hover:text-amber-600 group-hover:border-amber-500 transition-all shadow-sm">
+                          <BookOpenIcon />
+                      </div>
+                      <span className="text-[10px] font-bold text-slate-600 dark:text-slate-300">คู่มือ / กฏ</span>
+                  </button>
+
                   {comingSoonItems.map((item, index) => (
                       <div key={index} className="flex flex-col items-center gap-1 w-full opacity-50 grayscale cursor-not-allowed select-none">
                           <div className="w-10 h-10 rounded-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-400 shadow-sm">
@@ -157,25 +182,26 @@ export default function Header({
           </div>
       </div>
 
-      {/* --- ส่วนที่ 3: ปุ่มกดเลื่อน (Handle Bar - Redesigned) --- */}
-      {/* 🟢 แก้ไข: ปุ่ม Pull Tab ขนาดใหญ่ ตรงกลาง + เพิ่ม Backdrop Blur เพื่อให้ดูโปร่งแสง */}
-      <div className="absolute -bottom-6 left-0 right-0 flex justify-center z-40 pointer-events-none drop-shadow-md">
+      {/* --- ส่วนที่ 3: ปุ่มกดเลื่อน --- */}
+      <div className="absolute -bottom-8 left-0 right-0 flex justify-center z-40 pointer-events-none drop-shadow-md">
           <button 
               onClick={() => setIsPanelOpen(!isPanelOpen)}
               className="pointer-events-auto cursor-pointer bg-white/95 dark:bg-slate-900/95 backdrop-blur-md w-32 h-6 flex items-center justify-center rounded-b-2xl border-x border-b border-emerald-500/30 dark:border-emerald-500/50 hover:h-8 hover:bg-emerald-50 dark:hover:bg-slate-800 transition-all duration-200 group active:scale-95"
               title="คลิกเพื่อเปิดเมนูเพิ่มเติม"
           >
               <div className={`flex items-center gap-1 transition-all duration-300 ${isPanelOpen ? 'rotate-180' : 'rotate-0'}`}>
-                  {/* แถบขีดเล็กๆ ด้านบนไอคอน */}
                   <div className={`h-1 w-8 bg-slate-300 dark:bg-slate-600 rounded-full absolute -top-3 left-1/2 -translate-x-1/2 group-hover:bg-emerald-400 transition-colors ${isPanelOpen ? 'opacity-0' : 'opacity-100'}`}></div>
-                  
-                  {/* ไอคอน Chevron */}
                   <ChevronDownIcon className="w-5 h-5 text-slate-400 group-hover:text-emerald-600 dark:text-slate-300 dark:group-hover:text-emerald-400" />
               </div>
           </button>
       </div>
 
+      {/* Render Modals */}
       <CreditCheckModal isOpen={isCreditModalOpen} onClose={() => setIsCreditModalOpen(false)} />
+      <BlackListModal isOpen={isBlackListOpen} onClose={() => setIsBlackListOpen(false)} userProfile={userProfile} />
+      
+      {/* 🟢 5. แสดงผล Rules Modal */}
+      <RulesModal isOpen={isRulesOpen} onClose={() => setIsRulesOpen(false)} />
 
     </header>
   );

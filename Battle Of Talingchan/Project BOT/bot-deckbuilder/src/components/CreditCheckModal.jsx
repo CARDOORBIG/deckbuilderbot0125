@@ -25,6 +25,7 @@ export default function CreditCheckModal({ isOpen, onClose }) {
         const { data } = await supabase
             .from('user_stats')
             .select('user_email, total_score')
+            .neq('total_score', 999999) // 🟢 กรองคะแนนที่เป็น 999,999 (ADMIN) ออกจาก Leaderboard
             .order('total_score', { ascending: false })
             .limit(10);
         
@@ -56,6 +57,13 @@ export default function CreditCheckModal({ isOpen, onClose }) {
                 .single();
             
             if (stats) {
+                // 🟢 เพิ่มการตรวจสอบ: ถ้าค้นหาเจอ ADMIN (999999) ให้บอกว่าไม่พบ (ถ้าต้องการซ่อนจาก Search ด้วย)
+                // หรือถ้าอยากให้ค้นหาเจอแต่ไม่โชว์ใน Leaderboard ก็ลบ if block นี้ออกได้ครับ
+                if (stats.total_score === 999999) {
+                     alert("❌ ไม่พบข้อมูลผู้ใช้งานนี้ (สงวนสิทธิ์สำหรับ Admin)");
+                     return;
+                }
+
                 // 2. ดึงข้อมูล Profile จาก Firebase
                 const userDoc = await getDoc(doc(db, "users", stats.user_email));
                 const profile = userDoc.exists() ? userDoc.data() : { displayName: 'Unknown', avatarUrl: null };
@@ -72,9 +80,9 @@ export default function CreditCheckModal({ isOpen, onClose }) {
                     profile,
                     successRate,
                     cancelRate: total > 0 ? Math.round((totalCancels / total) * 100) : 0,
-                    // Mock Data สำหรับ Chat (เนื่องจากยังไม่มีระบบ Log เวลาตอบ)
-                    chatResponse: Math.floor(Math.random() * 15) + 85, // สุ่ม 85-99%
-                    chatSpeed: Math.floor(Math.random() * 30) + 1 // สุ่ม 1-30 นาที
+                    // Mock Data สำหรับ Chat
+                    chatResponse: Math.floor(Math.random() * 15) + 85,
+                    chatSpeed: Math.floor(Math.random() * 30) + 1 
                 });
             } else {
                 alert("❌ ไม่พบข้อมูลผู้ใช้งานนี้ (กรุณาระบุ Email ให้ถูกต้อง)");

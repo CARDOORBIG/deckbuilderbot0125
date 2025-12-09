@@ -11,14 +11,14 @@ import {
     ChatBubbleIcon, CloseIcon, SendIcon, GavelIcon, ShoppingBagIcon,
     CoinIcon 
 } from './Icons';
-import UserBadge from './UserBadge'; // 🟢 Import UserBadge
+import UserBadge from './UserBadge';
+import UserProfilePopup from './UserProfilePopup'; // 🟢 เพิ่ม Profile Popup
 
 export default function AuctionRoomModal({ isOpen, onClose, auction, userProfile, onBid, onBuyNow }) {
     const [messages, setMessages] = useState([]);
     const [newMessage, setNewMessage] = useState("");
     const chatEndRef = useRef(null);
     const [sellerAvatar, setSellerAvatar] = useState(null);
-    const [sellerStats, setSellerStats] = useState(null);
     const [showDesc, setShowDesc] = useState(false);
     const [showFullGallery, setShowFullGallery] = useState(false);
     const [activeProofIndex, setActiveProofIndex] = useState(0);
@@ -29,6 +29,9 @@ export default function AuctionRoomModal({ isOpen, onClose, auction, userProfile
 
     const [bidders, setBidders] = useState([]);
     const [showBidders, setShowBidders] = useState(false);
+    
+    // 🟢 เพิ่ม State สำหรับเปิด Profile Popup
+    const [selectedProfileId, setSelectedProfileId] = useState(null);
 
     const allImages = useMemo(() => {
         if (!auction) return [];
@@ -53,7 +56,6 @@ export default function AuctionRoomModal({ isOpen, onClose, auction, userProfile
                     const docSnap = await getDoc(doc(db, "users", auction.seller_email));
                     if (docSnap.exists()) setSellerAvatar(docSnap.data().avatarUrl);
                 } catch (e) {}
-                // Stats จะถูกดึงโดย UserBadge แล้ว ไม่ต้องดึงซ้ำตรงนี้ก็ได้ แต่ถ้าอยากโชว์แยกก็เก็บไว้
             };
             fetchData();
         }
@@ -193,7 +195,7 @@ export default function AuctionRoomModal({ isOpen, onClose, auction, userProfile
                         <button onClick={onClose} className="hidden md:block text-slate-400 hover:text-red-500"><CloseIcon /></button>
                     </div>
 
-                    {/* 🟢 แก้ไข: ใช้ UserBadge สำหรับ Seller Info */}
+                    {/* Seller Info */}
                     <div className="p-3 bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800 shrink-0">
                         <div className="flex items-center justify-between">
                             <UserBadge 
@@ -226,7 +228,6 @@ export default function AuctionRoomModal({ isOpen, onClose, auction, userProfile
                                                 <div className="flex items-center gap-3">
                                                     <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs shadow-sm text-white ${isTop ? 'bg-gradient-to-br from-amber-400 to-orange-500' : 'bg-slate-400'}`}>{isTop ? '1st' : i + 1}</div>
                                                     <div className="flex flex-col">
-                                                        {/* 🟢 ใช้ UserBadge สำหรับรายชื่อคนบิด (ถ้าต้องการ) หรือใส่แค่ชื่อก็ได้ */}
                                                         <span className={`text-xs font-bold truncate max-w-[100px] ${isTop ? 'text-amber-700 dark:text-amber-400' : 'text-slate-700 dark:text-slate-300'}`}>{b.bidder_name}</span>
                                                         <span className="text-[9px] text-slate-400">{new Date(b.created_at).toLocaleTimeString('th-TH', {hour: '2-digit', minute:'2-digit'})}</span>
                                                     </div>
@@ -239,28 +240,48 @@ export default function AuctionRoomModal({ isOpen, onClose, auction, userProfile
                             )}
                         </div>
                     ) : (
+                        // 🟢 ส่วนแสดงแชทที่แก้ใหม่ (Clean Chat)
                         <div className="flex-grow overflow-y-auto p-4 space-y-3 scrollbar-thin scrollbar-thumb-slate-300 dark:scrollbar-thumb-slate-700 min-h-0">
-                            {messages.length === 0 ? (<div className="flex flex-col items-center justify-center h-full text-slate-400 text-sm gap-2"><span className="text-4xl opacity-20">💬</span><p>เริ่มการสนทนาได้เลย...</p></div>) : messages.map((msg) => {
+                            {messages.length === 0 ? (<div className="flex flex-col items-center justify-center h-full text-slate-400 text-sm gap-2"><span className="text-4xl opacity-20">💬</span><p>เริ่มการสนทนาได้เลย...</p></div>) : messages.map((msg, i) => {
+                                const isSystem = msg.user_email === 'SYSTEM';
                                 const isMe = msg.user_email === userProfile?.email;
+                                
+                                if (isSystem) return <div key={i} className="flex justify-center my-2"><div className="bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-xs px-3 py-1.5 rounded-full flex items-center gap-2 shadow-sm"><span>🔔</span> {msg.message}</div></div>;
+                                
                                 return (
                                     <div key={msg.id} className={`flex gap-2 ${isMe ? 'flex-row-reverse' : ''}`}>
-                                        {/* 🟢 แก้ไข: ใช้ UserBadge สำหรับรูปในแชท */}
-                                        <div className="shrink-0 scale-75 origin-top">
-                                            <UserBadge 
-                                                email={msg.user_email} 
-                                                picture={msg.user_picture} 
-                                                name="" // ไม่ต้องโชว์ชื่อ เพราะพื้นที่น้อย
-                                                size="sm"
+                                        
+                                        {/* 🟢 1. รูปโปรไฟล์แบบกดได้ (ใช้ img ธรรมดาแทน UserBadge) */}
+                                        <div 
+                                            className="shrink-0 cursor-pointer hover:opacity-80 transition-opacity self-start mt-1"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setSelectedProfileId(msg.user_email); // เปิด Profile Popup
+                                            }}
+                                            title="ดูโปรไฟล์"
+                                        >
+                                            <img 
+                                                src={msg.user_picture || "https://cdn-icons-png.flaticon.com/512/149/149071.png"} 
+                                                className="w-8 h-8 rounded-full object-cover border border-slate-200 dark:border-slate-700 shadow-sm"
+                                                onError={(e) => e.target.src = "https://cdn-icons-png.flaticon.com/512/149/149071.png"}
                                             />
                                         </div>
-                                        <div className={`max-w-[85%] px-3 py-2 rounded-xl text-sm ${isMe ? 'bg-emerald-600 text-white rounded-tr-none' : 'bg-slate-200 dark:bg-slate-800 text-slate-900 dark:text-slate-200 rounded-tl-none'}`}>
-                                            <p className="text-[10px] opacity-70 mb-0.5">{msg.user_name}</p>
-                                            <p>{msg.message}</p>
+
+                                        {/* 🟢 2. กล่องข้อความ (ตัด UserBadge ออก) */}
+                                        <div className={`max-w-[75%] px-3 py-2 rounded-xl text-sm shadow-sm break-words leading-relaxed ${
+                                            isMe 
+                                            ? 'bg-emerald-600 text-white rounded-tr-none' 
+                                            : 'bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-200 rounded-tl-none border border-slate-200 dark:border-slate-700'
+                                        }`}>
+                                            {/* แสดงชื่อเฉพาะข้อความที่ไม่ใช่ของเรา (Optional) ถ้าต้องการ */}
+                                            {/* {!isMe && <p className="text-[9px] font-bold opacity-50 mb-0.5 text-slate-500">{msg.user_name}</p>} */}
+                                            
+                                            {msg.message}
                                         </div>
                                     </div>
                                 );
                             })}
-                            <div ref={chatEndRef} />
+                            <div ref={chatEndRef}></div>
                         </div>
                     )}
 
@@ -292,6 +313,14 @@ export default function AuctionRoomModal({ isOpen, onClose, auction, userProfile
                     </div>
                 </div>
             </div>
+
+            {/* 🟢 เพิ่ม Popup นามบัตร */}
+            <UserProfilePopup 
+                isOpen={!!selectedProfileId} 
+                onClose={() => setSelectedProfileId(null)} 
+                userId={selectedProfileId} 
+            />
+
         </div>, document.body
     );
 }

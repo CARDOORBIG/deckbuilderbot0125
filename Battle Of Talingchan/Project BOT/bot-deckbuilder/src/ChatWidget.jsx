@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { supabase } from './supabaseClient';
 import { db } from './firebase'; 
 import { collection, getDocs, doc, getDoc } from 'firebase/firestore';
+import UserProfilePopup from './components/UserProfilePopup'; 
 
 // --- Icons ---
 const ChatIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>;
@@ -32,34 +33,38 @@ export default function ChatWidget({ userProfile, isMobileMenuOpen }) {
   
   const [totalUnreadCount, setTotalUnreadCount] = useState(0); 
   const [unreadPerUser, setUnreadPerUser] = useState({}); 
+  const [strangerChats, setStrangerChats] = useState([]);
+
   const [isAnimating, setIsAnimating] = useState(false);
-
   const messagesEndRef = useRef(null);
+  
+  // State สำหรับเปิด Profile Popup
+  const [selectedProfileId, setSelectedProfileId] = useState(null);
 
-  // 🟢 1. Listener สำหรับเปิดแชทจากภายนอก (User Profile Popup)
   useEffect(() => {
     const handleOpenChat = (event) => {
-        const targetUser = event.detail; // รับข้อมูล User ที่ส่งมา
+        const targetUser = event.detail;
         if (targetUser && userProfile && targetUser.email !== userProfile.email) {
-            setActiveFriend(targetUser); // ตั้งค่าคนคุย
-            setView('chat'); // เปลี่ยนหน้าเป็นแชท
-            setIsOpen(true); // เปิด Widget
+            setActiveFriend(targetUser);
+            setView('chat');
+            setIsOpen(true);
         }
     };
-
     window.addEventListener('OPEN_CHAT_WITH_USER', handleOpenChat);
     return () => window.removeEventListener('OPEN_CHAT_WITH_USER', handleOpenChat);
   }, [userProfile]);
 
-  // Fetch Data (Friends & Requests)
   const fetchFriendsAndRequests = async () => {
     if (!userProfile) return;
     const { data: fData } = await supabase.from('friendships').select('*').or(`requester_id.eq.${userProfile.email},receiver_id.eq.${userProfile.email}`);
     
+    let currentFriendEmails = [];
+
     if (fData) {
         const acceptedRaw = fData.filter(f => f.status === 'accepted');
         const friendsWithProfile = await Promise.all(acceptedRaw.map(async (f) => {
             const friendEmail = f.requester_id === userProfile.email ? f.receiver_id : f.requester_id;
+            currentFriendEmails.push(friendEmail);
             let profile = null;
             try {
                 const docSnap = await getDoc(doc(db, "users", friendEmail));
@@ -72,6 +77,35 @@ export default function ChatWidget({ userProfile, isMobileMenuOpen }) {
         const sent = fData.filter(f => f.status === 'pending' && f.requester_id === userProfile.email);
         setSentRequests(sent.map(s => s.receiver_id));
     }
+
+    const { data: unreadMsgs } = await supabase
+        .from('messages')
+        .select('sender_id')
+        .eq('receiver_id', userProfile.email)
+        .eq('is_read', false);
+
+    if (unreadMsgs) {
+        const uniqueSenders = [...new Set(unreadMsgs.map(m => m.sender_id))];
+        const strangerEmails = uniqueSenders.filter(email => !currentFriendEmails.includes(email));
+
+        if (strangerEmails.length > 0) {
+            const strangersWithProfile = await Promise.all(strangerEmails.map(async (email) => {
+                let profile = null;
+                try {
+                    const docSnap = await getDoc(doc(db, "users", email));
+                    if (docSnap.exists()) profile = docSnap.data();
+                } catch (e) {}
+                return { 
+                    email: email, 
+                    isStranger: true,
+                    profile: profile || { displayName: email, avatarUrl: null } 
+                };
+            }));
+            setStrangerChats(strangersWithProfile);
+        } else {
+            setStrangerChats([]);
+        }
+    }
   };
 
   const fetchAllSystemUsers = async () => {
@@ -83,22 +117,13 @@ export default function ChatWidget({ userProfile, isMobileMenuOpen }) {
     } catch (error) { console.error("Error", error); } finally { setIsFetchingUsers(false); }
   };
 
-  // Fetch Unread Messages
   const fetchUnreadStats = async () => {
       if (!userProfile) return;
-      
-      const { data } = await supabase
-          .from('messages')
-          .select('sender_id') 
-          .eq('receiver_id', userProfile.email)
-          .eq('is_read', false);
-      
+      const { data } = await supabase.from('messages').select('sender_id').eq('receiver_id', userProfile.email).eq('is_read', false);
       if (data) {
           setTotalUnreadCount(data.length);
           const counts = {};
-          data.forEach(msg => {
-              counts[msg.sender_id] = (counts[msg.sender_id] || 0) + 1;
-          });
+          data.forEach(msg => { counts[msg.sender_id] = (counts[msg.sender_id] || 0) + 1; });
           setUnreadPerUser(counts);
       }
   };
@@ -112,45 +137,30 @@ export default function ChatWidget({ userProfile, isMobileMenuOpen }) {
     fetchFriendsAndRequests(); 
 
     const friendChannel = supabase.channel('friends_update_v3')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'friendships' }, () => { 
-            fetchFriendsAndRequests(); 
-        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'friendships' }, () => { fetchFriendsAndRequests(); })
         .subscribe();
     
     const msgChannel = supabase.channel('global_messages_v3')
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `receiver_id=eq.${userProfile.email}` }, (payload) => {
             const sender = payload.new.sender_id;
             setTotalUnreadCount(prev => prev + 1);
-            setUnreadPerUser(prev => ({
-                ...prev,
-                [sender]: (prev[sender] || 0) + 1
-            }));
+            setUnreadPerUser(prev => ({ ...prev, [sender]: (prev[sender] || 0) + 1 }));
+            fetchFriendsAndRequests();
             setIsAnimating(true);
             setTimeout(() => setIsAnimating(false), 1000); 
         })
         .subscribe();
 
-    return () => {
-        supabase.removeChannel(friendChannel);
-        supabase.removeChannel(msgChannel);
-    };
+    return () => { supabase.removeChannel(friendChannel); supabase.removeChannel(msgChannel); };
   }, [isOpen, userProfile, view]);
 
-  // Chat Logic (Active Chat Room)
   useEffect(() => {
     if (!activeFriend || !userProfile) return;
-    
     const loadMessages = async () => {
         const { data } = await supabase.from('messages').select('*').or(`and(sender_id.eq.${userProfile.email},receiver_id.eq.${activeFriend.email}),and(sender_id.eq.${activeFriend.email},receiver_id.eq.${userProfile.email})`).order('created_at', { ascending: true });
         setMessages(data || []);
         scrollToBottom();
-
-        await supabase.from('messages')
-            .update({ is_read: true })
-            .eq('sender_id', activeFriend.email)
-            .eq('receiver_id', userProfile.email)
-            .eq('is_read', false);
-        
+        await supabase.from('messages').update({ is_read: true }).eq('sender_id', activeFriend.email).eq('receiver_id', userProfile.email).eq('is_read', false);
         setUnreadPerUser(prev => {
             const newCounts = { ...prev };
             const countToSubtract = newCounts[activeFriend.email] || 0;
@@ -158,6 +168,7 @@ export default function ChatWidget({ userProfile, isMobileMenuOpen }) {
             setTotalUnreadCount(prevTotal => Math.max(0, prevTotal - countToSubtract)); 
             return newCounts;
         });
+        setStrangerChats(prev => prev.filter(u => u.email !== activeFriend.email));
     };
     loadMessages();
 
@@ -172,7 +183,6 @@ export default function ChatWidget({ userProfile, isMobileMenuOpen }) {
   }, [activeFriend, userProfile]);
 
   const scrollToBottom = () => { setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100); };
-
   const handleSendMessage = async () => {
     if (!inputText.trim()) return;
     const text = inputText.trim();
@@ -205,15 +215,25 @@ export default function ChatWidget({ userProfile, isMobileMenuOpen }) {
   });
 
   if (!userProfile) return null;
-
   const totalNotifications = requests.length + totalUnreadCount;
 
   return createPortal(
-    <div className={`fixed bottom-4 right-4 z-[9999] flex-col items-end font-sans pointer-events-auto ${isMobileMenuOpen ? 'hidden md:flex' : 'flex'}`}>
+    <div className={`
+        z-[9999] font-sans pointer-events-auto
+        ${isMobileMenuOpen ? 'hidden md:flex' : 'flex'}
+        ${isOpen 
+            ? 'fixed inset-0 md:inset-auto md:bottom-4 md:right-4 md:flex-col md:items-end' 
+            : 'fixed bottom-4 right-4 flex-col items-end'
+        }
+    `}>
       
       {/* --- Main Window --- */}
       {isOpen && (
-        <div className="w-80 h-[500px] bg-white dark:bg-slate-900 border border-slate-300 dark:border-emerald-500/30 rounded-2xl shadow-2xl flex flex-col overflow-hidden mb-3 animate-fade-in-up">
+        <div className={`
+            bg-white dark:bg-slate-900 border border-slate-300 dark:border-emerald-500/30 shadow-2xl flex flex-col overflow-hidden animate-fade-in
+            w-full h-full rounded-none
+            md:w-80 md:h-[500px] md:rounded-2xl md:mb-3 md:animate-fade-in-up
+        `}>
             {/* Header */}
             <div className="bg-gradient-to-r from-emerald-600 to-teal-600 p-3 text-white flex justify-between items-center shadow-md shrink-0 h-14">
                 <div className="flex items-center gap-2 overflow-hidden">
@@ -221,7 +241,10 @@ export default function ChatWidget({ userProfile, isMobileMenuOpen }) {
                     {view === 'list' && <span className="font-bold text-lg">💬 Chat & Friends</span>}
                     {view === 'add' && <span className="font-bold text-lg">เพิ่มเพื่อน</span>}
                     {view === 'chat' && (
-                        <div className="flex items-center gap-2 overflow-hidden">
+                        <div 
+                            className="flex items-center gap-2 overflow-hidden cursor-pointer hover:opacity-80 transition-opacity"
+                            onClick={() => setSelectedProfileId(activeFriend.email)} // 🟢 กดที่ชื่อใน Header เพื่อดู Profile
+                        >
                             <img src={activeFriend.profile.avatarUrl || `https://ui-avatars.com/api/?name=${activeFriend.profile.displayName}&background=random`} className="w-8 h-8 rounded-full border-2 border-white/20" alt="avatar" />
                             <span className="font-bold text-sm truncate max-w-[120px]">{activeFriend.profile.displayName || activeFriend.email}</span>
                         </div>
@@ -239,8 +262,10 @@ export default function ChatWidget({ userProfile, isMobileMenuOpen }) {
 
             {/* Body */}
             <div className="flex-grow overflow-y-auto bg-slate-50 dark:bg-slate-900/50 scrollbar-thin">
+                
                 {view === 'list' && (
                     <div className="p-2 space-y-2">
+                        {/* List code... (เหมือนเดิม) */}
                         {requests.length > 0 && (
                             <div className="mb-2 bg-amber-50 dark:bg-amber-900/20 p-2 rounded-lg border border-amber-200 dark:border-amber-700 animate-fade-in">
                                 <p className="text-xs font-bold text-amber-600 mb-2 flex items-center gap-1"><BellIcon /> คำขอเป็นเพื่อน ({requests.length})</p>
@@ -248,6 +273,19 @@ export default function ChatWidget({ userProfile, isMobileMenuOpen }) {
                                     <div key={r.id} className="flex justify-between items-center text-sm mb-1 bg-white dark:bg-slate-800 p-2 rounded border border-amber-100 dark:border-amber-800/50">
                                         <span className="truncate w-32 font-medium">{r.requester_id}</span>
                                         <button onClick={() => handleAccept(r.id)} className="px-3 py-1 bg-emerald-500 text-white rounded-full text-xs hover:bg-emerald-600 shadow-sm">ยืนยัน</button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                        {strangerChats.length > 0 && (
+                            <div className="mb-2 bg-blue-50 dark:bg-blue-900/20 p-2 rounded-lg border border-blue-200 dark:border-blue-800 animate-fade-in">
+                                <p className="text-xs font-bold text-blue-600 mb-2">📩 ข้อความจากคนอื่น ({strangerChats.length})</p>
+                                {strangerChats.map(u => (
+                                    <div key={u.email} className="group flex items-center gap-3 p-2 bg-white dark:bg-slate-800 rounded-lg border border-slate-100 dark:border-slate-700 hover:shadow-md cursor-pointer transition-all active:scale-95 mb-1" onClick={() => { setActiveFriend(u); setView('chat'); }}>
+                                        <div className="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden flex items-center justify-center shrink-0">
+                                            {u.profile.avatarUrl ? <img src={u.profile.avatarUrl} className="w-full h-full object-cover" /> : <div className="text-slate-400"><UserIcon /></div>}
+                                        </div>
+                                        <div className="flex-grow min-w-0"><p className="font-bold text-xs text-slate-800 dark:text-white truncate">{u.profile.displayName || u.email}</p><p className="text-[10px] text-red-500 font-bold">ข้อความใหม่!</p></div>
                                     </div>
                                 ))}
                             </div>
@@ -313,11 +351,29 @@ export default function ChatWidget({ userProfile, isMobileMenuOpen }) {
                     <div className="p-3 space-y-3 min-h-full flex flex-col justify-end">
                         {messages.length === 0 && <p className="text-center text-xs text-slate-400 py-4">เริ่มการสนทนาได้เลย</p>}
                         {messages.map((m, i) => (
-                            <div key={i} className={`flex ${m.sender_id === userProfile.email ? 'justify-end' : 'justify-start'}`}>
-                                <div className={`max-w-[80%] px-3 py-2 rounded-2xl text-sm break-words shadow-sm ${
+                            <div key={i} className={`flex gap-2 ${m.sender_id === userProfile.email ? 'flex-row-reverse' : ''}`}>
+                                
+                                {/* 🟢 1. รูปโปรไฟล์ (Only Image, Clickable) */}
+                                <div 
+                                    className="shrink-0 cursor-pointer hover:opacity-80 transition-opacity self-end pb-1"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setSelectedProfileId(m.sender_id); // เปิด Popup
+                                    }}
+                                    title="ดูโปรไฟล์"
+                                >
+                                    <img 
+                                        src={m.user_picture || "https://cdn-icons-png.flaticon.com/512/149/149071.png"} 
+                                        className="w-8 h-8 rounded-full object-cover border border-slate-200 dark:border-slate-700 shadow-sm"
+                                        onError={(e) => e.target.src = "https://cdn-icons-png.flaticon.com/512/149/149071.png"}
+                                    />
+                                </div>
+
+                                {/* 🟢 2. กล่องข้อความ (Pure Text) */}
+                                <div className={`max-w-[75%] px-3 py-2 rounded-xl text-sm shadow-sm break-words ${
                                     m.sender_id === userProfile.email 
-                                    ? 'bg-emerald-500 text-white rounded-tr-none' 
-                                    : 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 rounded-tl-none border border-slate-200 dark:border-slate-600'
+                                    ? 'bg-emerald-500 text-white rounded-br-none' 
+                                    : 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 rounded-bl-none border border-slate-200 dark:border-slate-600'
                                 }`}>
                                     {m.content}
                                 </div>
@@ -346,7 +402,7 @@ export default function ChatWidget({ userProfile, isMobileMenuOpen }) {
       )}
 
       {/* --- Toggle Button --- */}
-      <button onClick={() => setIsOpen(!isOpen)} className={`w-14 h-14 bg-emerald-600 hover:bg-emerald-500 text-white rounded-full shadow-[0_4px_14px_rgba(16,185,129,0.4)] flex items-center justify-center transition-all hover:scale-110 active:scale-95 relative ${isAnimating ? 'animate-bounce' : ''}`}>
+      <button onClick={() => setIsOpen(!isOpen)} className={`w-14 h-14 bg-emerald-600 hover:bg-emerald-500 text-white rounded-full shadow-[0_4px_14px_rgba(16,185,129,0.4)] flex items-center justify-center transition-all hover:scale-110 active:scale-95 relative ${isAnimating ? 'animate-bounce' : ''} ${isOpen ? 'hidden md:flex' : 'flex'}`}>
         {isOpen ? <CloseIcon /> : <ChatIcon />}
         
         {totalNotifications > 0 && !isOpen && (
@@ -355,6 +411,13 @@ export default function ChatWidget({ userProfile, isMobileMenuOpen }) {
             </span>
         )}
       </button>
+
+      {/* 🟢 3. Profile Popup Component */}
+      <UserProfilePopup 
+          isOpen={!!selectedProfileId} 
+          onClose={() => setSelectedProfileId(null)} 
+          userId={selectedProfileId} 
+      />
 
     </div>,
     document.body

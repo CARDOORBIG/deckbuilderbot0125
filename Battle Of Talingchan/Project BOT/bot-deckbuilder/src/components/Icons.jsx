@@ -52,7 +52,12 @@ export const UserPlusIcon = () => (
     <line x1="23" y1="11" x2="17" y2="11"></line>
   </svg>
 );
-
+// 🟢 StarIcon (ดาว)
+export const StarIcon = ({ filled, className }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill={filled ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+    </svg>
+);
 export const ExpandIcon = () => <Svg p={<><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" y1="3" x2="14" y2="10"></line><line x1="3" y1="21" x2="10" y2="14"></line></>} />;
 export const CheckIcon = () => <Svg strokeWidth="2.5" p={<polyline points="20 6 9 17 4 12"></polyline>} />;
 export const TruckIcon = () => <Svg p={<><rect x="1" y="3" width="15" height="13"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></>} />;
@@ -70,20 +75,22 @@ export const ArchiveIcon = () => <Svg p={<><polyline points="21 8 21 21 3 21 3 8
 export const UserCogIcon = () => <Svg p={<><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle><circle cx="12" cy="12" r="3"></circle></>} />;
 export const UsersIcon = () => <Svg p={<><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></>} />;
 export const MessageIcon = () => <Svg p={<><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></>} />;
+export const MessageCircleIcon = () => <Svg p={<><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></>} />;
+
+// 🟢 ChatBubbleIcon (ตัวที่หายไป)
 export const ChatBubbleIcon = () => <Svg p={<><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></>} />;
+
 export const SendIcon = () => <Svg p={<><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></>} />;
 export const CrownIcon = () => <Svg p={<><path d="M2 4l3 12h14l3-12-6 7-4-7-4 7-6-7zm3 16h14v2H5z"></path></>} />;
 export const FlagIcon = () => <Svg p={<><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"></path><line x1="4" y1="22" x2="4" y2="15"></line></>} />;
 export const BanIcon = () => <Svg p={<><circle cx="12" cy="12" r="10"></circle><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line></>} />;
 export const ShieldCheckIcon = () => <Svg p={<><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path><path d="M9 12l2 2 4-4"></path></>} />;
 
-// ✅ 1. เพิ่มไอคอนใหม่
 export const MedalIcon = () => <Svg p={<><circle cx="12" cy="8" r="7"></circle><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"></polyline></>} />;
 export const TrophyIcon = ({ className }) => <Svg className={className} p={<><path d="M8 21h8m-4-9v9m-8-3h16M6 4h12a2 2 0 0 1 2 2v2a6 6 0 0 1-6 6H10a6 6 0 0 1-6-6V6a2 2 0 0 1 2-2z"></path></>} />;
 export const LayersIcon = () => <Svg p={<><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></>} />;
 export const ShieldBanIcon = () => <Svg p={<><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line></>} />;
 export const BookOpenIcon = () => <Svg p={<><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></>} />;
-export const MessageCircleIcon = () => <Svg p={<><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></>} />;
 export const AlertIcon = () => <Svg p={<><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></>} />;
 export const SettingsIcon = () => <Svg p={<><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></>} />;
 export const FacebookIcon = () => <Svg p={<path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"></path>} />;
@@ -100,4 +107,146 @@ export const NeonLightningIcon = ({ className = "w-4 h-4 md:w-5 md:h-5" }) => (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className={`${className} text-yellow-400 drop-shadow-[0_0_8px_rgba(250,204,21,1)] filter animate-pulse`}>
         <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
     </svg>
+);
+
+// ==========================================
+// 🟢 NEW LUXURY ICONS (สำหรับ RulesModal)
+// ==========================================
+
+export const HandWaveIcon = ({ className="w-6 h-6" }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0" className="text-amber-500"/>
+    <path d="M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v2" className="text-amber-500"/>
+    <path d="M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v8" className="text-amber-500"/>
+    <path d="M18 11a2 2 0 1 1 4 0v3a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15" className="text-slate-600 dark:text-slate-300"/>
+  </svg>
+);
+
+export const ToolsLuxuryIcon = ({ className="w-6 h-6" }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" className="text-blue-500"/>
+  </svg>
+);
+
+export const CartLuxuryIcon = ({ className="w-6 h-6" }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <circle cx="8" cy="21" r="1" className="text-emerald-500 fill-emerald-500"/>
+    <circle cx="19" cy="21" r="1" className="text-emerald-500 fill-emerald-500"/>
+    <path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12" className="text-slate-600 dark:text-slate-300"/>
+  </svg>
+);
+
+export const CardsLuxuryIcon = ({ className="w-6 h-6" }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <rect x="2" y="2" width="14" height="18" rx="2" className="text-indigo-500 fill-indigo-500/10" transform="rotate(-10 9 11)"/>
+    <rect x="8" y="4" width="14" height="18" rx="2" className="text-purple-500 fill-purple-500/10" transform="rotate(5 15 13)"/>
+  </svg>
+);
+
+export const ScaleLuxuryIcon = ({ className="w-6 h-6" }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1z" className="text-amber-500 fill-amber-500/20"/>
+    <path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1z" className="text-amber-500 fill-amber-500/20"/>
+    <path d="M7 21h10" className="text-slate-600 dark:text-slate-400"/>
+    <path d="M12 3v18" className="text-slate-600 dark:text-slate-400"/>
+    <path d="M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2" className="text-slate-600 dark:text-slate-400"/>
+  </svg>
+);
+
+export const HammerLuxuryIcon = ({ className="w-6 h-6" }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <path d="m15 12-8.5 8.5c-.83.83-2.17.83-3 0 0 1 0-3L12 9" className="text-slate-600 dark:text-slate-400"/>
+    <path d="M17.64 15 22 10.64" className="text-amber-600"/>
+    <path d="m20.91 11.7-1.25-1.25c-.6-.6-.93-1.4-.93-2.25V4.5A2.5 2.5 0 0 0 16.25 2H12l-9 9" className="text-amber-600 fill-amber-500/10"/>
+  </svg>
+);
+
+export const ShopLuxuryIcon = ({ className="w-6 h-6" }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" className="text-emerald-600 dark:text-emerald-400 fill-emerald-500/10"/>
+    <polyline points="9 22 9 12 15 12 15 22" className="text-emerald-600 dark:text-emerald-400"/>
+  </svg>
+);
+
+export const BanLuxuryIcon = ({ className="w-6 h-6" }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <circle cx="12" cy="12" r="10" className="text-red-500"/>
+    <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" className="text-red-500"/>
+  </svg>
+);
+
+export const ShieldLuxuryIcon = ({ className="w-6 h-6" }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" className="text-teal-500 fill-teal-500/10"/>
+    <path d="m9 12 2 2 4-4" className="text-teal-500"/>
+  </svg>
+);
+
+export const FutureLuxuryIcon = ({ className="w-6 h-6" }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z" className="text-blue-500 fill-blue-500/20 animate-pulse"/>
+  </svg>
+);
+
+export const SearchEyeLuxuryIcon = ({ className="w-6 h-6" }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" className="text-indigo-500"/>
+    <circle cx="12" cy="12" r="3" className="text-indigo-500 fill-indigo-500/20"/>
+  </svg>
+);
+
+export const ChatLuxuryIcon = ({ className="w-6 h-6" }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" className="text-pink-500 fill-pink-500/10"/>
+    <line x1="8" y1="10" x2="16" y2="10" className="text-pink-500"/>
+    <line x1="8" y1="6" x2="12" y2="6" className="text-pink-500"/>
+  </svg>
+);
+
+// --- Ranks ---
+export const EggIcon = ({ className="w-6 h-6" }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className={className}>
+    <path d="M12 2C8 2 5 6 5 12s3.5 10 7 10 7-4 7-10S16 2 12 2z" className="text-slate-300 dark:text-slate-600"/>
+  </svg>
+);
+
+export const SproutIcon = ({ className="w-6 h-6" }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <path d="M7 20h10" className="text-emerald-600"/>
+    <path d="M10 20c5.5-2.5.8-6.4 3-10" className="text-emerald-500"/>
+    <path d="M9.5 9.4c1.1.8 1.8 2.2 2.3 3.7-2 .4-3.5.4-4.8-.3-1.2-.6-2.3-1.9-3-4.2 2.8-.5 4.4 0 5.5.8z" className="text-emerald-400 fill-emerald-400/20"/>
+    <path d="M14.1 6a7 7 0 0 0-1.1 4c1.9-.1 3.3-.6 4.3-1.4 1-1 1.6-2.3 1.7-4.6-2.7.1-4 1-4.9 2z" className="text-emerald-500 fill-emerald-500/20"/>
+  </svg>
+);
+
+export const ShieldRankIcon = ({ className="w-6 h-6" }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" className="text-cyan-500 fill-cyan-500/20"/>
+  </svg>
+);
+
+export const DiamondRankIcon = ({ className="w-6 h-6" }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <path d="M6 3h12l4 6-10 13L2 9Z" className="text-fuchsia-500 fill-fuchsia-500/20"/>
+    <path d="M11 3 8 9l4 13 4-13-3-6" className="text-fuchsia-400"/>
+    <path d="M2 9h20" className="text-fuchsia-400"/>
+  </svg>
+);
+
+export const TycoonGoldIcon = ({ className="w-6 h-6" }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <path d="M2 4l3 12h14l3-12-6 7-4-7-4 7-6-7zm3 16h14v2H5z" className="text-yellow-500 fill-yellow-400/30"/>
+    <circle cx="12" cy="11" r="2" className="text-yellow-300 fill-yellow-100"/>
+  </svg>
+);
+
+export const LegendMaskIcon = ({ className="w-6 h-6" }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <path d="M12 2c-4 0-8 .5-8 7 0 1.2 0 3.4 1 5 1 5 4 8 7 8s6-3 7-8c1-1.6 1-3.8 1-5 0-6.5-4-7-8-7z" className="text-rose-600 fill-rose-900/20"/>
+    <path d="M9 11c.5 1 2.5 1 3 0" className="text-rose-500"/>
+    <path d="M15 11c-.5 1-2.5 1-3 0" className="text-rose-500"/>
+    <path d="M8 17s1.5 2 4 2 4-2 4-2" className="text-rose-500"/>
+    <path d="M2 9s2.5 2 5 0" className="text-rose-400"/>
+    <path d="M22 9s-2.5 2-5 0" className="text-rose-400"/>
+  </svg>
 );

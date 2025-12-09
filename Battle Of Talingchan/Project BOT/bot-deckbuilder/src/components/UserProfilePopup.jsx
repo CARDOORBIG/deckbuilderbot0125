@@ -47,13 +47,13 @@ export default function UserProfilePopup({ isOpen, onClose, userId }) {
         onClose();
     };
 
-    // 🟢 ฟังก์ชันเช็คว่าเป็นลิงก์หรือไม่
     const isLink = (str) => str && (str.startsWith('http://') || str.startsWith('https://'));
 
     if (!isOpen) return null;
 
     return createPortal(
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[1300] p-4 animate-fade-in" onClick={onClose}>
+        // 🟢 แก้ไขตรงนี้: เปลี่ยน Z-Index เป็น 60000 (เพื่อให้ทับหน้า BlacklistModal ที่เป็น 20000-50000)
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[60000] p-4 animate-fade-in" onClick={onClose}>
             <div className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-2xl shadow-2xl border border-slate-200 dark:border-emerald-500/30 overflow-hidden relative" onClick={e => e.stopPropagation()}>
                 
                 <div className="h-24 bg-gradient-to-r from-emerald-500 to-teal-600 relative">
@@ -92,7 +92,6 @@ export default function UserProfilePopup({ isOpen, onClose, userId }) {
                             <div className="space-y-3 mt-4">
                                 <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">ช่องทางติดต่ออื่น</p>
                                 
-                                {/* 🟢 ตรวจสอบ Facebook: ถ้าเป็นลิงก์ให้กดได้ ถ้าไม่ใช่ให้แสดงชื่อเฉยๆ */}
                                 {userData?.facebook ? (
                                     isLink(userData.facebook) ? (
                                         <a href={userData.facebook} target="_blank" rel="noreferrer" className="flex items-center gap-3 p-3 rounded-xl bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors">

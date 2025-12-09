@@ -5,7 +5,6 @@ const RatingBadge = ({ score, showProgress = false }) => {
     const rank = getRankFromScore(score);
     const progress = getNextRankProgress(score);
 
-    // 🟢 รวมไอคอน SVG ของคุณไว้ที่นี่
     const Icons = {
         Cross: <svg viewBox="0 0 24 24" fill="currentColor" className="w-3 h-3 md:w-4 md:h-4"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>,
         Warning: <svg viewBox="0 0 24 24" fill="currentColor" className="w-3 h-3 md:w-4 md:h-4"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>,
@@ -14,10 +13,11 @@ const RatingBadge = ({ score, showProgress = false }) => {
         Shield: <svg viewBox="0 0 24 24" fill="currentColor" className="w-3 h-3 md:w-4 md:h-4"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></svg>,
         Diamond: <svg viewBox="0 0 24 24" fill="currentColor" className="w-3 h-3 md:w-4 md:h-4"><path d="M19 3H5L2 9l10 12L22 9l-3-6z"/></svg>,
         Crown: <svg viewBox="0 0 24 24" fill="currentColor" className="w-3 h-3 md:w-4 md:h-4"><path d="M5 16L3 5l5.5 5L12 4l3.5 6L21 5l-2 11H5zm14 3c0 .6-.4 1-1 1H6c-.6 0-1-.4-1-1v-1h14v1z"/></svg>,
-        Sultan: <svg viewBox="0 0 24 24" fill="currentColor" className="w-3 h-3 md:w-4 md:h-4"><path d="M12 2L1 21h22L12 2zm0 3.5L18.5 19H5.5L12 5.5zM12 11a2 2 0 1 0 0 4 2 2 0 0 0 0-4z"/></svg>
+        Sultan: <svg viewBox="0 0 24 24" fill="currentColor" className="w-3 h-3 md:w-4 md:h-4"><path d="M12 2L1 21h22L12 2zm0 3.5L18.5 19H5.5L12 5.5zM12 11a2 2 0 1 0 0 4 2 2 0 0 0 0-4z"/></svg>,
+        // 🟢 เพิ่มไอคอน Admin (ใช้ดาว)
+        Admin: <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-3 h-3 md:w-4 md:h-4"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
     };
 
-    // 🟢 Map Rank ID จาก rankSystem เข้ากับ Style และ Icon ของคุณ
     let theme = {};
 
     switch (rank.id) {
@@ -42,13 +42,21 @@ const RatingBadge = ({ score, showProgress = false }) => {
         case 'LEGEND':
             theme = { icon: Icons.Sultan, style: 'text-rose-600 border-rose-500 bg-rose-50 dark:text-rose-100 dark:border-rose-500 dark:bg-rose-900/60 shadow-[0_0_20px_4px_rgba(244,63,94,0.9)] font-black animate-pulse border-2' };
             break;
+        
+        // 🟢 เพิ่มธีม ADMIN (สีรุ้ง + ไฟวิ่ง)
+        case 'ADMIN':
+            theme = { 
+                icon: Icons.Admin, 
+                style: 'text-white border-2 border-white/50 bg-gradient-to-r from-red-500 via-yellow-400 via-green-500 via-blue-500 to-purple-600 animate-rainbow bg-[length:400%_400%] shadow-[0_0_20px_rgba(255,255,255,0.8)] font-black tracking-widest' 
+            };
+            break;
+
         default:
             theme = { icon: Icons.New, style: 'text-slate-400 border-slate-400' };
     }
 
     return (
         <div className="flex flex-col items-start gap-1">
-            {/* Badge หลัก */}
             <div className={`
                 inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border 
                 text-[10px] md:text-xs transition-all duration-300
@@ -58,10 +66,9 @@ const RatingBadge = ({ score, showProgress = false }) => {
             title={`Credit Score: ${score}`}
             >
                 <span className="filter drop-shadow-md">{theme.icon}</span>
-                <span className="uppercase tracking-wider font-bold">{rank.name}</span>
+                <span className="uppercase font-bold">{rank.name}</span>
             </div>
 
-            {/* (Option) หลอด EXP อัปยศ (แสดงเฉพาะเมื่อมี props showProgress) */}
             {showProgress && progress.nextScore && score >= 0 && (
                 <div className="w-full pl-1 pr-1 mt-1 group relative">
                     <div className="h-1.5 w-full bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
@@ -69,12 +76,11 @@ const RatingBadge = ({ score, showProgress = false }) => {
                             className={`h-full transition-all duration-500 rounded-full`} 
                             style={{ 
                                 width: `${progress.percent}%`,
-                                backgroundColor: 'currentColor', // ใช้สีเดียวกับ text แม่
-                                color: 'inherit' // สืบทอดสี
+                                backgroundColor: 'currentColor', 
+                                color: 'inherit' 
                             }}
                         />
                     </div>
-                    {/* Tooltip บอกแต้มที่ขาด */}
                     <div className="absolute top-3 left-0 text-[9px] text-slate-500 dark:text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap bg-white dark:bg-slate-800 px-1 rounded shadow border border-slate-200 dark:border-slate-700 z-10">
                         อีก {progress.nextScore - score} แต้ม จะเป็น "{progress.nextName}"
                     </div>
