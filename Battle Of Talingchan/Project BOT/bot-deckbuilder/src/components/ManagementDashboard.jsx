@@ -30,7 +30,7 @@ const DashboardPopup = ({ isOpen, onClose, title, message, type, onConfirm, isLo
     }
 
     return createPortal(
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[2000] p-4 animate-fade-in" onClick={type !== 'confirm' ? onClose : undefined}>
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[2000] p-4 animate-fade-in" onClick={e => { e.stopPropagation(); if(type !== 'confirm') onClose(); }}>
             <div className={`bg-white dark:bg-slate-900 border-[3px] ${colorClass} rounded-2xl p-6 w-full max-w-sm shadow-2xl flex flex-col items-center text-center transform scale-100 transition-all`} onClick={e => e.stopPropagation()}>
                 <div className="mb-4">{icon}</div>
                 <h3 className="text-xl font-black text-slate-900 dark:text-white mb-2">{title}</h3>
@@ -39,12 +39,12 @@ const DashboardPopup = ({ isOpen, onClose, title, message, type, onConfirm, isLo
                 </div>
                 <div className="flex gap-3 w-full">
                     {type === 'confirm' && (
-                        <button onClick={onClose} disabled={isLoading} className="flex-1 py-2.5 bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold rounded-xl hover:bg-slate-300 dark:hover:bg-slate-700 transition-colors">
+                        <button onClick={(e) => { e.stopPropagation(); onClose(); }} disabled={isLoading} className="flex-1 py-2.5 bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold rounded-xl hover:bg-slate-300 dark:hover:bg-slate-700 transition-colors">
                             ยกเลิก
                         </button>
                     )}
                     <button 
-                        onClick={() => { if (onConfirm) onConfirm(); else onClose(); }} 
+                        onClick={(e) => { e.stopPropagation(); if (onConfirm) onConfirm(); else onClose(); }} 
                         disabled={isLoading}
                         className={`flex-1 py-2.5 text-white font-bold rounded-xl shadow-lg transition-transform active:scale-95 ${btnClass} ${type !== 'confirm' ? 'w-full' : ''}`}
                     >
@@ -109,28 +109,10 @@ export default function ManagementDashboard({
         setPopup({ isOpen: true, title, message, type, onConfirm, isLoading: false });
     };
 
-    // 🟢 🟢 🟢 Logic แยก Badge 🟢 🟢 🟢
-    
-    // 1. Selling Badge: คนขายต้องทำรายการ (รอยืนยันขาย, รอตรวจสลิป)
-    const sellingBadge = myAuctions.filter(i => 
-        i.seller_email === userProfile?.email && 
-        ['waiting_seller_confirmation', 'verifying_payment'].includes(i.status)
-    ).length;
-
-    // 2. Buying Badge: คนซื้อต้องทำรายการ (รอโอน, สลิปผิด, รอรับของ)
-    const buyingBadge = myAuctions.filter(i => 
-        i.winner_email === userProfile?.email && 
-        (['pending_payment', 'payment_rejected'].includes(i.status) || (i.is_shipped && i.status !== 'completed'))
-    ).length;
-
-    // 3. Shipping Badge: คนขายต้องส่งของ (รอส่ง)
-    const shippingBadge = myAuctions.filter(i => 
-        i.seller_email === userProfile?.email && 
-        (['pending_ship', 'sold'].includes(i.status) || (i.status === 'ended' && i.winner_email)) && 
-        !i.is_shipped
-    ).length;
-
-    // ----------------------------------------
+    // Counters
+    const sellingBadge = myAuctions.filter(i => i.seller_email === userProfile?.email && ['waiting_seller_confirmation', 'verifying_payment'].includes(i.status)).length;
+    const buyingBadge = myAuctions.filter(i => i.winner_email === userProfile?.email && (['pending_payment', 'payment_rejected'].includes(i.status) || (i.is_shipped && i.status !== 'completed'))).length;
+    const shippingBadge = myAuctions.filter(i => i.seller_email === userProfile?.email && (['pending_ship', 'sold'].includes(i.status) || (i.status === 'ended' && i.winner_email)) && !i.is_shipped).length;
 
     const handleSellerConfirmSale = (item) => {
         openPopup("ยืนยันการขาย", `ต้องการขายให้กับคุณ "${item.winner_name}" ใช่หรือไม่?\n(ผู้ซื้อจะมีเวลา 24 ชม. ในการโอนเงิน)`, 'confirm', async () => {
@@ -162,6 +144,7 @@ export default function ManagementDashboard({
     };
 
     const handleUploadSlip = async (e, item) => {
+        e.stopPropagation(); // 🟢 สำคัญ: หยุด event ที่ input file
         const file = e.target.files[0];
         if (!file) return;
         
@@ -213,33 +196,24 @@ export default function ManagementDashboard({
         }
     };
 
+    // Wrapper สำหรับปุ่มทั่วไป
+    const onBtnClick = (e, callback) => {
+        e.stopPropagation(); // 🟢 หัวใจสำคัญ: หยุด Event ที่ปุ่ม
+        callback();
+    };
+
     return (
         <div className="animate-fade-in w-full md:px-8">
-            {/* Sub-tab Navigation */}
             <div className="flex justify-center mb-6 mt-6">
                 <div className="bg-slate-200 dark:bg-slate-800 p-1 rounded-lg flex gap-2 overflow-visible relative z-10">
-                    
-                    <button onClick={() => setManagementTab('selling')} className={`relative px-4 py-2 rounded-md text-xs font-bold transition-all capitalize ${managementTab === 'selling' ? 'bg-white dark:bg-slate-600 shadow text-emerald-600 dark:text-emerald-400' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}>
-                        สินค้าที่ลงขาย
-                        {/* 🟢 Selling Badge */}
-                        {sellingBadge > 0 && managementTab !== 'selling' && <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full animate-pulse border border-white dark:border-slate-900"></span>}
-                        {sellingBadge > 0 && managementTab === 'selling' && <span className="ml-1 px-1.5 py-0.5 bg-red-500 text-white text-[10px] rounded-full">{sellingBadge}</span>}
-                    </button>
-
-                    <button onClick={() => setManagementTab('buying')} className={`relative px-4 py-2 rounded-md text-xs font-bold transition-all capitalize ${managementTab === 'buying' ? 'bg-white dark:bg-slate-600 shadow text-emerald-600 dark:text-emerald-400' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}>
-                        สินค้าที่ซื้อ
-                        {/* 🟢 Buying Badge */}
-                        {buyingBadge > 0 && managementTab !== 'buying' && <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full animate-pulse border border-white dark:border-slate-900"></span>}
-                        {buyingBadge > 0 && managementTab === 'buying' && <span className="ml-1 px-1.5 py-0.5 bg-red-500 text-white text-[10px] rounded-full">{buyingBadge}</span>}
-                    </button>
-
-                    <button onClick={() => setManagementTab('to-ship')} className={`relative px-4 py-2 rounded-md text-xs font-bold transition-all capitalize ${managementTab === 'to-ship' ? 'bg-white dark:bg-slate-600 shadow text-emerald-600 dark:text-emerald-400' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}>
-                        สินค้าต้องจัดส่ง
-                        {/* 🟢 Shipping Badge */}
-                        {shippingBadge > 0 && managementTab !== 'to-ship' && <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full animate-pulse border border-white dark:border-slate-900"></span>}
-                        {shippingBadge > 0 && managementTab === 'to-ship' && <span className="ml-1 px-1.5 py-0.5 bg-red-500 text-white text-[10px] rounded-full">{shippingBadge}</span>}
-                    </button>
-                    
+                    {['selling', 'buying', 'to-ship'].map(tab => (
+                        <button key={tab} onClick={() => setManagementTab(tab)} className={`relative px-4 py-2 rounded-md text-xs font-bold transition-all capitalize ${managementTab === tab ? 'bg-white dark:bg-slate-600 shadow text-emerald-600 dark:text-emerald-400' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}>
+                            {tab === 'selling' ? 'สินค้าที่ลงขาย' : tab === 'buying' ? 'สินค้าที่ซื้อ' : 'สินค้าต้องจัดส่ง'}
+                            {tab === 'selling' && sellingBadge > 0 && <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full animate-pulse border border-white dark:border-slate-900"></span>}
+                            {tab === 'buying' && buyingBadge > 0 && <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full animate-pulse border border-white dark:border-slate-900"></span>}
+                            {tab === 'to-ship' && shippingBadge > 0 && <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full animate-pulse border border-white dark:border-slate-900"></span>}
+                        </button>
+                    ))}
                 </div>
             </div>
 
@@ -253,7 +227,6 @@ export default function ManagementDashboard({
                     const isVerifying = item.status === 'verifying_payment';
                     const isPendingPay = item.status === 'pending_payment';
                     const isPendingShip = item.status === 'pending_ship' || item.status === 'sold';
-
                     return (
                         <div key={item.id} className={`bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-emerald-500/20 rounded-2xl shadow-md hover:shadow-xl transition-all duration-300 flex flex-col overflow-hidden relative group`} onClick={() => setChatAuction(item)}>
                             <div className="aspect-[4/5] bg-slate-100 dark:bg-slate-800/50 relative p-4 flex items-center justify-center">
@@ -268,12 +241,12 @@ export default function ManagementDashboard({
                                 <h3 className="font-bold text-sm text-slate-900 dark:text-white line-clamp-1">{item.card_name}</h3>
                                 <div className="text-center font-mono font-black text-xl text-slate-800 dark:text-white bg-slate-100 dark:bg-slate-800 rounded py-1">฿{item.current_price.toLocaleString()}</div>
                                 <div onClick={e => e.stopPropagation()} className="mt-auto space-y-2">
-                                    {isWaitingConfirm && (<div className="flex flex-col gap-2"><button onClick={() => handleSellerConfirmSale(item)} className="w-full py-2 bg-emerald-500 text-white rounded font-bold text-xs hover:bg-emerald-600 shadow-lg animate-pulse">✅ ยืนยันขาย</button><button onClick={() => handleSellerRejectSale(item)} className="w-full py-1 bg-red-100 text-red-600 rounded font-bold text-[10px] hover:bg-red-200">❌ ปฏิเสธ (เสียเครดิต)</button></div>)}
+                                    {isWaitingConfirm && (<div className="flex flex-col gap-2"><button onClick={(e) => onBtnClick(e, () => handleSellerConfirmSale(item))} className="w-full py-2 bg-emerald-500 text-white rounded font-bold text-xs hover:bg-emerald-600 shadow-lg animate-pulse">✅ ยืนยันขาย</button><button onClick={(e) => onBtnClick(e, () => handleSellerRejectSale(item))} className="w-full py-1 bg-red-100 text-red-600 rounded font-bold text-[10px] hover:bg-red-200">❌ ปฏิเสธ (เสียเครดิต)</button></div>)}
                                     {isPendingPay && item.payment_due_date && (<div className="bg-amber-50 dark:bg-amber-900/20 p-2 rounded border border-amber-200 dark:border-amber-800 flex flex-col items-center"><p className="text-[10px] text-amber-600 dark:text-amber-400 font-bold mb-1">⏳ ลูกค้าต้องโอนภายใน:</p><div className="scale-90"><TimeLeft endTime={item.payment_due_date} /></div></div>)}
-                                    {isVerifying && (<div className="flex flex-col gap-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded border border-blue-200 dark:border-blue-800"><p className="text-[10px] text-center font-bold text-blue-600 dark:text-blue-300">🔎 ผู้ซื้อส่งสลิปมาแล้ว</p><a href={item.payment_slip_url} target="_blank" className="block w-full h-20 bg-slate-200 rounded overflow-hidden relative group"><img src={item.payment_slip_url} className="w-full h-full object-cover" /><div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-white text-xs">คลิกดูรูป</div></a><div className="flex gap-1"><button onClick={() => handleVerifySlip(item, true)} className="flex-1 py-1.5 bg-emerald-500 text-white text-xs rounded hover:bg-emerald-600">ถูก ✅</button><button onClick={() => handleVerifySlip(item, false)} className="flex-1 py-1.5 bg-red-500 text-white text-xs rounded hover:bg-red-600">ผิด ❌</button></div></div>)}
-                                    {isPendingShip && !item.is_shipped && (<div className="flex flex-col gap-2"><div className="bg-indigo-50 dark:bg-indigo-900/20 p-2 rounded text-center border border-indigo-200 dark:border-indigo-800"><p className="text-[10px] font-bold text-indigo-600 dark:text-indigo-300">📦 สถานะ: รอการจัดส่ง</p><p className="text-[9px] text-slate-500">กรุณาจัดส่งและแจ้งเลขพัสดุ (Tab: สินค้าต้องจัดส่ง)</p></div><button onClick={() => setShipmentData(item)} className="w-full py-2 bg-blue-600 text-white rounded-lg text-xs font-bold hover:bg-blue-700 shadow flex justify-center items-center gap-1 animate-pulse"><TruckIcon /> แจ้งส่งสินค้า</button></div>)}
-                                    {!isWaitingConfirm && !isVerifying && !isPendingShip && !isCompleted && !isCancelled && item.status === 'active' && (<button onClick={() => handleCancel(item)} className="w-full py-1.5 bg-red-100 text-red-600 rounded text-xs font-bold">ยกเลิกขาย</button>)}
-                                    <button onClick={() => setChatAuction(item)} className="w-full py-1.5 bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded text-xs font-bold flex justify-center items-center gap-1"><ChatBubbleIcon /> แชท</button>
+                                    {isVerifying && (<div className="flex flex-col gap-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded border border-blue-200 dark:border-blue-800"><p className="text-[10px] text-center font-bold text-blue-600 dark:text-blue-300">🔎 ผู้ซื้อส่งสลิปมาแล้ว</p><a href={item.payment_slip_url} onClick={e => e.stopPropagation()} target="_blank" className="block w-full h-20 bg-slate-200 rounded overflow-hidden relative group"><img src={item.payment_slip_url} className="w-full h-full object-cover" /><div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-white text-xs">คลิกดูรูป</div></a><div className="flex gap-1"><button onClick={(e) => onBtnClick(e, () => handleVerifySlip(item, true))} className="flex-1 py-1.5 bg-emerald-500 text-white text-xs rounded hover:bg-emerald-600">ถูก ✅</button><button onClick={(e) => onBtnClick(e, () => handleVerifySlip(item, false))} className="flex-1 py-1.5 bg-red-500 text-white text-xs rounded hover:bg-red-600">ผิด ❌</button></div></div>)}
+                                    {isPendingShip && !item.is_shipped && (<div className="flex flex-col gap-2"><div className="bg-indigo-50 dark:bg-indigo-900/20 p-2 rounded text-center border border-indigo-200 dark:border-indigo-800"><p className="text-[10px] font-bold text-indigo-600 dark:text-indigo-300">📦 สถานะ: รอการจัดส่ง</p><p className="text-[9px] text-slate-500">กรุณาจัดส่งและแจ้งเลขพัสดุ (Tab: สินค้าต้องจัดส่ง)</p></div><button onClick={(e) => onBtnClick(e, () => setShipmentData(item))} className="w-full py-2 bg-blue-600 text-white rounded-lg text-xs font-bold hover:bg-blue-700 shadow flex justify-center items-center gap-1 animate-pulse"><TruckIcon /> แจ้งส่งสินค้า</button></div>)}
+                                    {!isWaitingConfirm && !isVerifying && !isPendingShip && !isCompleted && !isCancelled && item.status === 'active' && (<button onClick={(e) => onBtnClick(e, () => handleCancel(item))} className="w-full py-1.5 bg-red-100 text-red-600 rounded text-xs font-bold">ยกเลิกขาย</button>)}
+                                    <button onClick={(e) => onBtnClick(e, () => setChatAuction(item))} className="w-full py-1.5 bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded text-xs font-bold flex justify-center items-center gap-1"><ChatBubbleIcon /> แชท</button>
                                 </div>
                             </div>
                         </div>
@@ -290,7 +263,6 @@ export default function ManagementDashboard({
                      const isShipped = item.is_shipped;
                      const isCompleted = item.status === 'completed';
                      const isCancelled = item.status === 'cancelled';
-
                      return (
                         <div key={item.id} className="bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-emerald-500/20 rounded-2xl shadow-md hover:shadow-xl transition-all duration-300 flex flex-col overflow-hidden relative group" onClick={() => setChatAuction(item)}>
                             <div className="aspect-[4/5] bg-slate-100 dark:bg-slate-800/50 relative p-4 flex items-center justify-center">
@@ -306,13 +278,13 @@ export default function ManagementDashboard({
                                 <div className="text-center font-mono font-black text-xl text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 rounded py-1">฿{item.current_price.toLocaleString()}</div>
                                 <div onClick={e => e.stopPropagation()} className="mt-auto space-y-2">
                                     {isWaitingSeller && (<div className="bg-amber-100 dark:bg-amber-900/30 p-2 rounded border border-amber-200 dark:border-amber-800 text-[10px] text-amber-800 dark:text-amber-200 text-center leading-tight">⏳ รอผู้ขายยืนยันการขาย<br/>(หากเกิน 24 ชม. ผู้ขายอาจยกเลิกได้)</div>)}
-                                    {(isPendingPay || isRejected) && (<div className="space-y-2">{isRejected && <p className="text-xs text-red-500 font-bold text-center animate-pulse">❌ สลิปไม่ถูกต้อง โปรดส่งใหม่</p>}{item.payment_due_date && (<div className="flex flex-col items-center bg-slate-100 dark:bg-slate-800 p-2 rounded border border-slate-200 dark:border-slate-700"><span className="text-[10px] text-red-500 font-bold mb-1">⏰ ต้องโอนภายใน:</span><TimeLeft endTime={item.payment_due_date} /></div>)}<button onClick={() => fileInputRef.current.click()} className="w-full py-2 bg-blue-600 text-white rounded font-bold text-xs hover:bg-blue-500 shadow flex items-center justify-center gap-1"><UploadIcon /> {isUploading ? "กำลังอัปโหลด..." : "อัปโหลดสลิป"}</button><input type="file" ref={fileInputRef} hidden accept="image/*" onChange={(e) => handleUploadSlip(e, item)} /></div>)}
+                                    {(isPendingPay || isRejected) && (<div className="space-y-2">{isRejected && <p className="text-xs text-red-500 font-bold text-center animate-pulse">❌ สลิปไม่ถูกต้อง โปรดส่งใหม่</p>}{item.payment_due_date && (<div className="flex flex-col items-center bg-slate-100 dark:bg-slate-800 p-2 rounded border border-slate-200 dark:border-slate-700"><span className="text-[10px] text-red-500 font-bold mb-1">⏰ ต้องโอนภายใน:</span><TimeLeft endTime={item.payment_due_date} /></div>)}<button onClick={(e) => onBtnClick(e, () => fileInputRef.current.click())} className="w-full py-2 bg-blue-600 text-white rounded font-bold text-xs hover:bg-blue-500 shadow flex items-center justify-center gap-1"><UploadIcon /> {isUploading ? "กำลังอัปโหลด..." : "อัปโหลดสลิป"}</button><input type="file" ref={fileInputRef} hidden accept="image/*" onChange={(e) => handleUploadSlip(e, item)} /></div>)}
                                     {isVerifying && (<div className="bg-blue-50 dark:bg-blue-900/20 p-2 rounded text-xs text-blue-600 dark:text-blue-300 text-center font-bold">🔎 รอผู้ขายตรวจสอบสลิป...</div>)}
                                     {isPendingShip && !isShipped && (<div className="bg-indigo-50 dark:bg-indigo-900/20 p-2 rounded text-xs text-indigo-600 dark:text-indigo-300 text-center font-bold">📦 ผู้ขายกำลังจัดส่ง...</div>)}
-                                    {isShipped && (<div className="space-y-2"><button onClick={() => setShipmentData(item)} className="w-full py-2 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-lg text-xs font-bold border border-blue-200 dark:border-blue-800 flex items-center justify-center gap-2 hover:bg-blue-100 transition-colors"><TruckIcon /> ดูหลักฐานการส่ง</button>{item.status !== 'completed' && (<button onClick={() => handleConfirmReceipt(item)} className="w-full py-2 bg-emerald-500 text-white rounded font-bold text-xs hover:bg-emerald-600 shadow animate-pulse flex items-center justify-center gap-1"><CheckIcon /> ยืนยันรับสินค้า</button>)}</div>)}
+                                    {isShipped && (<div className="space-y-2"><button onClick={(e) => onBtnClick(e, () => setShipmentData(item))} className="w-full py-2 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-lg text-xs font-bold border border-blue-200 dark:border-blue-800 flex items-center justify-center gap-2 hover:bg-blue-100 transition-colors"><TruckIcon /> ดูหลักฐานการส่ง</button>{item.status !== 'completed' && (<button onClick={(e) => onBtnClick(e, () => handleConfirmReceipt(item))} className="w-full py-2 bg-emerald-500 text-white rounded font-bold text-xs hover:bg-emerald-600 shadow animate-pulse flex items-center justify-center gap-1"><CheckIcon /> ยืนยันรับสินค้า</button>)}</div>)}
                                     {isCompleted && !isShipped && (<button disabled className="w-full py-1.5 bg-slate-400 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1 cursor-not-allowed">✅ ได้รับสินค้าแล้ว</button>)}
                                     {isCancelled && (<button disabled className="w-full py-1.5 bg-red-100 text-red-500 rounded-lg text-xs font-bold cursor-not-allowed">❌ รายการถูกยกเลิก</button>)}
-                                    <button onClick={() => setChatAuction(item)} className="w-full py-1.5 bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded text-xs font-bold flex justify-center items-center gap-1"><ChatBubbleIcon /> แชท</button>
+                                    <button onClick={(e) => onBtnClick(e, () => setChatAuction(item))} className="w-full py-1.5 bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-lg text-xs font-bold flex justify-center items-center gap-1"><ChatBubbleIcon /> แชท</button>
                                 </div>
                             </div>
                         </div>
@@ -340,11 +312,11 @@ export default function ManagementDashboard({
                                     <div className="w-full py-2 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-300 rounded-lg text-sm font-bold border border-blue-200 dark:border-blue-800 flex justify-center items-center gap-2 cursor-default">⏳ รอผู้ซื้อยืนยันรับ</div>
                                 ) : (
                                     <div className="flex flex-col gap-2">
-                                        <button onClick={() => setShipmentData(item)} className="w-full py-2.5 bg-blue-600 text-white rounded-lg text-sm font-bold hover:bg-blue-700 shadow-lg flex justify-center items-center gap-2 transition-transform active:scale-95"><TruckIcon /> แจ้งส่งสินค้า (Shipping)</button>
-                                        <button onClick={() => handlePenaltyCancel(item)} className="w-full py-1 text-[10px] text-red-500 hover:text-red-700 underline text-center">ยกเลิกออเดอร์ (เสียเครดิต)</button>
+                                        <button onClick={(e) => onBtnClick(e, () => setShipmentData(item))} className="w-full py-2.5 bg-blue-600 text-white rounded-lg text-sm font-bold hover:bg-blue-700 shadow-lg flex justify-center items-center gap-2 transition-transform active:scale-95"><TruckIcon /> แจ้งส่งสินค้า (Shipping)</button>
+                                        <button onClick={(e) => onBtnClick(e, () => handlePenaltyCancel(item))} className="w-full py-1 text-[10px] text-red-500 hover:text-red-700 underline text-center">ยกเลิกออเดอร์ (เสียเครดิต)</button>
                                     </div>
                                 )}
-                                <div className="flex gap-2"><button onClick={() => setChatAuction(item)} className="flex-1 py-1.5 bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-lg text-xs font-bold hover:bg-slate-300 flex items-center justify-center gap-1"><ChatBubbleIcon/> แชท</button></div>
+                                <div className="flex gap-2"><button onClick={(e) => onBtnClick(e, () => setChatAuction(item))} className="flex-1 py-1.5 bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-lg text-xs font-bold hover:bg-slate-300 flex items-center justify-center gap-1"><ChatBubbleIcon/> แชท</button></div>
                             </div>
                         </div>
                     </div>

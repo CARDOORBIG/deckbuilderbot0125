@@ -26,7 +26,7 @@ import SettingsDrawer from './components/SettingsDrawer';
 import ProfileSetupModal from './components/ProfileSetupModal';
 import DeckListModal from './components/DeckListModal';
 import { 
-    GavelIcon, ShoppingBagIcon, PackageIcon, HistoryIcon, 
+    GavelIcon, ShoppingBagIcon, PackageIcon, HistoryIcon, CheckIcon
 } from './components/Icons';
 
 const LayoutGridIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>;
@@ -95,10 +95,9 @@ export default function AuctionMarket() {
   const [userProfile, setUserProfile] = useState(() => { try { return JSON.parse(localStorage.getItem("bot-userProfile-v1")); } catch { return null; } });
   const [theme, setThemeState] = useState(() => { try { return JSON.parse(localStorage.getItem("bot-theme")) || 'dark'; } catch { return 'dark'; } });
   
-  // 🟢 State สำหรับ Modal แจ้งเตือนทั่วไป
-  const [modal, setModal] = useState({ isOpen: false, title: '', message: '', onConfirm: null });
-  const closeModal = () => setModal({ isOpen: false, title: '', message: '', onConfirm: null });
-  const showAlert = (title, message) => setModal({ isOpen: true, title, message, onConfirm: null });
+  const [modal, setModal] = useState({ isOpen: false, title: '', message: '', onConfirm: null, type: 'info' });
+  const closeModal = () => setModal({ ...modal, isOpen: false });
+  const showAlert = (title, message, type = 'info') => setModal({ isOpen: true, title, message, onConfirm: null, type });
 
   useEffect(() => {
     if (!userProfile) {
@@ -110,28 +109,14 @@ export default function AuctionMarket() {
       const params = new URLSearchParams(location.search);
       const shareId = params.get('id');
       const shareType = params.get('type');
-
       if (shareId) {
           const fetchSharedItem = async () => {
               const table = shareType === 'market' ? 'market_listings' : 'auctions';
-              const { data, error } = await supabase.from(table).select('*').eq('id', shareId).single();
-              
+              const { data } = await supabase.from(table).select('*').eq('id', shareId).single();
               if (data) {
                   let item = data;
                   if (shareType === 'market') {
-                       item = { 
-                          ...data, 
-                          card_name: data.title, 
-                          current_price: data.price, 
-                          start_price: data.price, 
-                          buy_now_price: data.price, 
-                          min_bid_increment: 0,
-                          proof_image: data.images, 
-                          seller_email: data.seller_email, 
-                          seller_name: data.seller_name, 
-                          status: data.status,
-                          type: 'market'
-                      };
+                       item = { ...data, card_name: data.title, current_price: data.price, start_price: data.price, buy_now_price: data.price, min_bid_increment: 0, proof_image: data.images, seller_email: data.seller_email, seller_name: data.seller_name, status: data.status, type: 'market' };
                   } else {
                       item = { ...data, type: 'auction' };
                   }
@@ -149,12 +134,7 @@ export default function AuctionMarket() {
   const displayUser = useMemo(() => { 
       if (!userProfile) return null; 
       if (!customProfile) return userProfile; 
-      return { 
-          ...userProfile, 
-          ...customProfile, 
-          name: customProfile.displayName || userProfile.name, 
-          picture: customProfile.avatarUrl || userProfile.picture 
-      }; 
+      return { ...userProfile, ...customProfile, name: customProfile.displayName || userProfile.name, picture: customProfile.avatarUrl || userProfile.picture }; 
   }, [userProfile, customProfile]);
 
   useEffect(() => { if (userProfile?.email) { const fetchProfile = async () => { try { const docSnap = await getDoc(doc(db, "users", userProfile.email)); if (docSnap.exists()) setCustomProfile(docSnap.data()); } catch (e) { console.error("Profile fetch error", e); } }; fetchProfile(); } }, [userProfile]);
@@ -166,31 +146,28 @@ export default function AuctionMarket() {
       setUserReputation(map); 
   };
   
-  useEffect(() => { const channel = supabase.channel('market_balance_update').on('postgres_changes', { event: '*', schema: 'public', table: 'user_stats' }, (payload) => { fetchReputations(); }).subscribe(); return () => { supabase.removeChannel(channel); }; }, []);
+  useEffect(() => { const channel = supabase.channel('market_balance_update').on('postgres_changes', { event: '*', schema: 'public', table: 'user_stats' }, () => { fetchReputations(); }).subscribe(); return () => { supabase.removeChannel(channel); }; }, []);
   useEffect(() => { fetchReputations(); }, []);
   useEffect(() => { const openFromNoti = async () => { if (location.state?.openAuctionId) { const auctionId = location.state.openAuctionId; let targetAuction = auctions.find(a => a.id === auctionId) || myAuctions.find(a => a.id === auctionId); if (!targetAuction) { const { data } = await supabase.from('auctions').select('*').eq('id', auctionId).single(); if (data) targetAuction = data; } if (targetAuction) { setChatAuction(targetAuction); window.history.replaceState({}, document.title); } } }; openFromNoti(); }, [location, auctions, myAuctions]);
   
-  // 🟢 🟢 🟢 แก้ไขตรงนี้: เพิ่มการ Subscribe ตาราง market_listings 🟢 🟢 🟢
+  // 🟢 🟢 🟢 แก้ไขตรงนี้: ให้โหลดทั้ง 2 อย่างเสมอ และ Subscribe ตลอดเวลา 🟢 🟢 🟢
   useEffect(() => { 
     const refreshData = () => {
-        if (activeTab === 'management' && userProfile?.email) { 
-            fetchMyAuctions(); 
-        } else { 
-            fetchAuctions(); 
+        fetchAuctions(); // โหลดหน้าตลาดรวม
+        if (userProfile?.email) {
+            fetchMyAuctions(); // โหลดหน้าจัดการ (Notification ใช้ตัวนี้)
         }
     };
     
-    // เรียกครั้งแรก
     refreshData();
 
-    // Subscribe ทั้ง auctions และ market_listings
     const channel = supabase.channel('public:market_updates')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'auctions' }, refreshData)
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'market_listings' }, refreshData) // 🟢 เพิ่มบรรทัดนี้
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'market_listings' }, refreshData) 
         .subscribe(); 
     
     return () => supabase.removeChannel(channel); 
-  }, [activeTab, userProfile]);
+  }, [userProfile]); // เอา activeTab ออก เพื่อให้ทำงานตลอด
   
   async function fetchAuctions() { 
       const now = new Date().toISOString(); 
@@ -218,13 +195,12 @@ export default function AuctionMarket() {
 
   const managementNotiCount = useMemo(() => {
       if (!userProfile || !myAuctions) return 0;
-      // 🟢 นับสถานะที่ต้องจัดการ
       const toAction = myAuctions.filter(i => {
           if (i.seller_email === userProfile.email) {
-              return i.status === 'waiting_seller_confirmation' || i.status === 'verifying_payment' || i.status === 'pending_ship' || (i.status === 'sold' && !i.is_shipped);
+              return ['waiting_seller_confirmation', 'verifying_payment', 'pending_ship', 'sold'].includes(i.status) && !i.is_shipped;
           }
           if (i.winner_email === userProfile.email) {
-              return i.status === 'pending_payment' || i.status === 'payment_rejected' || (i.is_shipped && i.status !== 'completed');
+              return ['pending_payment', 'payment_rejected'].includes(i.status) || (i.is_shipped && i.status !== 'completed');
           }
           return false;
       }).length;
@@ -235,10 +211,8 @@ export default function AuctionMarket() {
       return auctions.filter(item => { 
           const matchName = item.card_name.toLowerCase().includes(searchTerm.toLowerCase()); 
           let matchStatus = true; 
-          
           if (filterStatus === 'escrow') matchStatus = item.is_escrow === true;
           else if (filterStatus === 'direct') matchStatus = item.is_escrow === false;
-
           return matchName && matchStatus; 
       }).sort((a, b) => { 
           if (sortOption === 'price_asc') return a.current_price - b.current_price; 
@@ -253,7 +227,7 @@ export default function AuctionMarket() {
       if (data?.cooldown_until) {
           const banUntil = new Date(data.cooldown_until);
           if (banUntil > new Date()) {
-              alert(`⛔ บัญชีถูกระงับ\nปลดแบน: ${banUntil.toLocaleString('th-TH')}`);
+              showAlert("⛔ บัญชีถูกระงับ", `ปลดแบนวันที่: ${banUntil.toLocaleString('th-TH')}`, 'error');
               return true;
           }
       }
@@ -261,23 +235,23 @@ export default function AuctionMarket() {
   };
 
   async function handleBid(auction) { 
-      if (!userProfile) return alert("กรุณา Login ก่อนครับ"); 
+      if (!userProfile) return showAlert("แจ้งเตือน", "กรุณา Login ก่อนครับ"); 
       if (await checkIsBanned()) return;
-      if (userProfile.email === auction.seller_email) return alert("ห้ามบิดของตัวเองครับ!"); 
+      if (userProfile.email === auction.seller_email) return showAlert("แจ้งเตือน", "ห้ามบิดของตัวเองครับ!", 'error'); 
       setActionModalData({ type: 'bid', auction }); 
   }
 
   async function handleBuyNow(auction) { 
-      if (!userProfile) return alert("กรุณา Login ก่อนครับ"); 
+      if (!userProfile) return showAlert("แจ้งเตือน", "กรุณา Login ก่อนครับ"); 
       if (await checkIsBanned()) return;
-      if (userProfile.email === auction.seller_email) return alert("ซื้อของตัวเองไม่ได้ครับ"); 
+      if (userProfile.email === auction.seller_email) return showAlert("แจ้งเตือน", "ซื้อของตัวเองไม่ได้ครับ", 'error'); 
       setActionModalData({ type: 'buy', auction }); 
   }
 
   async function handleBuyMarketItem(item) { 
-      if (!userProfile) return alert("กรุณา Login ก่อนครับ"); 
+      if (!userProfile) return showAlert("แจ้งเตือน", "กรุณา Login ก่อนครับ"); 
       if (await checkIsBanned()) return;
-      if (userProfile.email === item.seller_email) return alert("ซื้อของตัวเองไม่ได้ครับ"); 
+      if (userProfile.email === item.seller_email) return showAlert("แจ้งเตือน", "ซื้อของตัวเองไม่ได้ครับ", 'error'); 
       setActionModalData({ type: 'buy_market', auction: { ...item, id: item.id, card_name: item.title, buy_now_price: item.price, is_escrow: item.is_escrow } }); 
   }
   
@@ -285,10 +259,10 @@ export default function AuctionMarket() {
     if (await checkIsBanned()) { setActionModalData(null); return; }
     if (!actionModalData) return; 
     const { type, auction } = actionModalData; 
-    
+
     if (type === 'bid') { 
         const { data, error } = await supabase.rpc('place_bid', { p_auction_id: auction.id, p_bidder_email: userProfile.email, p_bidder_name: displayUser.name, p_amount: amount }); 
-        if (error) alert("Error: " + error.message); else if (!data.success) alert(data.message); else return { success: true }; 
+        if (error) showAlert("Error", error.message, 'error'); else if (!data.success) showAlert("แจ้งเตือน", data.message, 'error'); else return { success: true }; 
     } 
     else if (type === 'buy') { 
         const { error } = await supabase.from('auctions').update({
@@ -298,7 +272,7 @@ export default function AuctionMarket() {
             current_price: auction.buy_now_price
         }).eq('id', auction.id);
 
-        if (error) alert("Error: " + error.message); 
+        if (error) showAlert("Error", error.message, 'error'); 
         else { setChatAuction(null); fetchAuctions(); return { success: true }; } 
     } 
     else if (type === 'buy_market') { 
@@ -308,47 +282,46 @@ export default function AuctionMarket() {
             buyer_name: displayUser.name
         }).eq('id', auction.id);
 
-        if (error) alert("Error: " + error.message); 
+        if (error) showAlert("Error", error.message, 'error'); 
         else { fetchMyAuctions(); return { success: true }; } 
     } 
   }
 
-  async function handleCancel(item) { if (item.type === 'market') { if (!confirm("⚠️ ยืนยันการยกเลิกการขาย?")) return; const { error } = await supabase.from('market_listings').delete().eq('id', item.id); if (error) alert("ลบไม่สำเร็จ: " + error.message); else { setMyAuctions(prev => prev.filter(i => i.id !== item.id)); alert("ยกเลิกการขายเรียบร้อย"); } } else { const isAdmin = userProfile?.email === 'koritros619@gmail.com'; const confirmMsg = isAdmin ? "👑 Admin Force Cancel:\nยืนยัน?" : "⚠️ ยืนยันการยกเลิกการประมูล?"; if (!confirm(confirmMsg)) return; const { data, error } = await supabase.rpc('cancel_auction', { p_auction_id: item.id, p_user_email: userProfile.email }); if (error) alert("Error: " + error.message); else if (!data.success) alert(data.message); else { alert(data.message); fetchAuctions(); fetchMyAuctions(); } } }
-  async function handlePenaltyCancel(item) { if (!confirm(`⚠️ คำเตือน: สินค้านี้มีผู้สั่งซื้อแล้ว!\nหากยกเลิก คุณจะถูก "หักเครดิต 2 คะแนน"\nยืนยันยกเลิก?`)) return; const { data, error } = await supabase.rpc('cancel_order_with_penalty', { p_item_id: item.id, p_seller_email: userProfile.email }); if (error) alert("Error: " + error.message); else { alert(data.message); fetchMyAuctions(); } }
-  async function handleDeleteMyAuction(item, e) { if (e && e.stopPropagation) e.stopPropagation(); if (!confirm("⚠️ ยืนยันการลบประวัติรายการนี้ออกจากรายการของคุณ?\n(รายการจะหายไปจากหน้าจอของคุณเท่านั้น)")) return; const isSeller = item.seller_email === userProfile.email; const table = item.type === 'market' ? 'market_listings' : 'auctions'; const field = isSeller ? 'seller_hidden' : (item.type === 'market' ? 'buyer_hidden' : 'winner_hidden'); const { error } = await supabase.from(table).update({ [field]: true }).eq('id', item.id); if (error) { alert("Error: " + error.message); } else { setMyAuctions(prev => prev.filter(i => i.id !== item.id)); } }
+  async function handleCancel(item) { if (item.type === 'market') { showConfirm("ยืนยัน", "⚠️ ยืนยันการยกเลิกการขาย?", async () => { const { error } = await supabase.from('market_listings').delete().eq('id', item.id); if (error) showAlert("Error", "ลบไม่สำเร็จ: " + error.message, 'error'); else { setMyAuctions(prev => prev.filter(i => i.id !== item.id)); showAlert("สำเร็จ", "ยกเลิกการขายเรียบร้อย", 'success'); closeModal(); } }); } else { const isAdmin = userProfile?.email === 'koritros619@gmail.com'; const confirmMsg = isAdmin ? "👑 Admin Force Cancel:\nยืนยัน?" : "⚠️ ยืนยันการยกเลิกการประมูล?"; showConfirm("ยืนยัน", confirmMsg, async () => { const { data, error } = await supabase.rpc('cancel_auction', { p_auction_id: item.id, p_user_email: userProfile.email }); if (error) showAlert("Error", "Error: " + error.message, 'error'); else if (!data.success) showAlert("แจ้งเตือน", data.message, 'error'); else { showAlert("สำเร็จ", data.message, 'success'); fetchAuctions(); fetchMyAuctions(); closeModal(); } }); } }
+  async function handlePenaltyCancel(item) { showConfirm("ยืนยันยกเลิก", `⚠️ คำเตือน: สินค้านี้มีผู้สั่งซื้อแล้ว!\nหากยกเลิก คุณจะถูก "หักเครดิต 2 คะแนน"\nยืนยันยกเลิก?`, async () => { const { data, error } = await supabase.rpc('cancel_order_with_penalty', { p_item_id: item.id, p_seller_email: userProfile.email }); if (error) showAlert("Error", error.message, 'error'); else { showAlert("เรียบร้อย", data.message, 'info'); fetchMyAuctions(); closeModal(); } }); }
+  async function handleDeleteMyAuction(item, e) { if (e && e.stopPropagation) e.stopPropagation(); showConfirm("ลบประวัติ", "⚠️ ยืนยันการลบประวัติรายการนี้ออกจากรายการของคุณ?\n(รายการจะหายไปจากหน้าจอของคุณเท่านั้น)", async () => { const isSeller = item.seller_email === userProfile.email; const table = item.type === 'market' ? 'market_listings' : 'auctions'; const field = isSeller ? 'seller_hidden' : (item.type === 'market' ? 'buyer_hidden' : 'winner_hidden'); const { error } = await supabase.from(table).update({ [field]: true }).eq('id', item.id); if (error) { showAlert("Error", error.message, 'error'); } else { setMyAuctions(prev => prev.filter(i => i.id !== item.id)); closeModal(); } }); }
   
   const handleLogout = () => { googleLogout(); localStorage.removeItem("bot-userProfile-v1"); setUserProfile(null); navigate('/'); };
-  const handleSaveProfile = async (data) => { if (!userProfile) return; try { await setDoc(doc(db, "users", userProfile.email), { displayName: data.displayName, avatarUrl: data.avatarUrl, facebook: data.facebook || "", lineId: data.lineId || "", phone: data.phone || "", isSetup: true, updatedAt: serverTimestamp() }, { merge: true }); setCustomProfile(p => ({ ...p, ...data, isSetup: true })); setIsProfileModalOpen(false); alert("บันทึกข้อมูลเรียบร้อย!"); } catch (e) { console.error(e); alert("บันทึกไม่สำเร็จ"); } };
-  
-  const handleStartAuctionClick = async () => { 
-      if (await checkIsBanned()) return; 
-      setIsBulkModalOpen(true); 
-  };
-  
-  const handleStartMarketListingClick = async () => { 
-      if (await checkIsBanned()) return; 
-      setIsMarketModalOpen(true); 
-  };
-
+  const handleSaveProfile = async (data) => { if (!userProfile) return; try { await setDoc(doc(db, "users", userProfile.email), { displayName: data.displayName, avatarUrl: data.avatarUrl, facebook: data.facebook || "", lineId: data.lineId || "", phone: data.phone || "", isSetup: true, updatedAt: serverTimestamp() }, { merge: true }); setCustomProfile(p => ({ ...p, ...data, isSetup: true })); setIsProfileModalOpen(false); showAlert("Success", "บันทึกข้อมูลเรียบร้อย!", 'success'); } catch (e) { console.error(e); showAlert("Error", "บันทึกไม่สำเร็จ", 'error'); } };
+  const handleStartAuctionClick = async () => { if (await checkIsBanned()) return; setIsBulkModalOpen(true); };
+  const handleStartMarketListingClick = async () => { if (await checkIsBanned()) return; setIsMarketModalOpen(true); };
   const handleSelectType = (type) => { setIsTypeSelectionOpen(false); if (type === 'single') { navigate('/', { state: { showAuctionTutorial: true } }); } else { setIsBulkModalOpen(true); } };
-  const handleConfirmReceipt = (item) => { if (!item.is_shipped) { return alert("ผู้ขายยังไม่ได้กดส่งสินค้าครับ กรุณารอผู้ขายจัดส่งก่อน"); } setConfirmTransaction({ auction: item }); };
-  const handleTopUpClick = async () => { try { const { data, error } = await supabase.from('system_config').select('value').eq('key', 'topup_status').single(); if (error) { setIsTopUpOpen(true); return; } const status = data?.value || 'open'; if (status === 'maintenance') alert("⚠️ ระบบอยู่ในระหว่างการปรับปรุงค่ะ"); else if (status === 'closed') alert("⛔ ปิดระบบเติมเงินชั่วคราว"); else setIsTopUpOpen(true); } catch (e) { setIsTopUpOpen(true); } };
-  const handleOpenForceEndModal = (item) => { if (!item.winner_email) { return alert("⚠️ ยังไม่มีผู้ร่วมประมูล ไม่สามารถกดจบการขายได้"); } setForceEndItem(item); };
-  const handleConfirmForceEnd = async (item) => { setForceEndItem(null); const { data, error } = await supabase.rpc('force_end_auction', { p_auction_id: item.id, p_seller_email: userProfile.email }); if (error) { alert("Error: " + error.message); } else if (!data.success) { alert("แจ้งเตือน: " + data.message); } else { fetchMyAuctions(); } };
+  const handleConfirmReceipt = (item) => { 
+      if (!item.is_shipped) { return showAlert("แจ้งเตือน", "ผู้ขายยังไม่ได้กดส่งสินค้าครับ กรุณารอผู้ขายจัดส่งก่อน"); } 
+      setConfirmTransaction({ auction: item }); 
+  };
+  const handleTopUpClick = async () => { try { const { data, error } = await supabase.from('system_config').select('value').eq('key', 'topup_status').single(); if (error) { setIsTopUpOpen(true); return; } const status = data?.value || 'open'; if (status === 'maintenance') showAlert("แจ้งเตือน", "⚠️ ระบบอยู่ในระหว่างการปรับปรุงค่ะ"); else if (status === 'closed') showAlert("แจ้งเตือน", "⛔ ปิดระบบเติมเงินชั่วคราว"); else setIsTopUpOpen(true); } catch (e) { setIsTopUpOpen(true); } };
+  const handleOpenForceEndModal = (item) => { if (!item.winner_email) { return showAlert("แจ้งเตือน", "⚠️ ยังไม่มีผู้ร่วมประมูล ไม่สามารถกดจบการขายได้"); } setForceEndItem(item); };
+  const handleConfirmForceEnd = async (item) => { setForceEndItem(null); const { data, error } = await supabase.rpc('force_end_auction', { p_auction_id: item.id, p_seller_email: userProfile.email }); if (error) { showAlert("Error", error.message, 'error'); } else if (!data.success) { showAlert("แจ้งเตือน", data.message, 'error'); } else { fetchMyAuctions(); } };
 
-  // 🟢 Helper Component for Modal (Internal)
-  const ModalComponent = ({ isOpen, title, message, children, onClose, onConfirm, confirmText = "Confirm", confirmIcon }) => {
+  // Helper Modal Component
+  const ModalComponent = ({ isOpen, title, message, onClose, onConfirm, confirmText = "ตกลง", confirmIcon, type }) => {
     if (!isOpen) return null;
+    let icon = <div className="text-4xl text-blue-500">ℹ️</div>;
+    let colorClass = "border-slate-300";
+    let btnClass = "bg-slate-800 text-white hover:bg-slate-700";
+    if (type === 'success') { icon = <div className="text-4xl animate-bounce">✅</div>; colorClass = "border-emerald-500"; btnClass = "bg-emerald-600 hover:bg-emerald-500"; }
+    else if (type === 'error') { icon = <div className="text-4xl animate-pulse">❌</div>; colorClass = "border-red-500"; btnClass = "bg-red-600 hover:bg-red-500"; }
+    else if (type === 'confirm') { icon = <div className="text-4xl animate-pulse">⚠️</div>; colorClass = "border-amber-500"; btnClass = "bg-amber-500 hover:bg-amber-600"; }
     return createPortal(
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[1200] p-4">
-            <div className="bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-emerald-500/30 rounded-xl shadow-2xl p-6 w-full max-w-md animate-fade-in relative">
-                <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4">{title}</h2>
-                <div className="text-slate-700 dark:text-gray-300 mb-6">
-                    {children || message}
-                </div>
-                <div className="flex justify-end gap-3">
-                    <button onClick={onClose} className="px-4 py-2 rounded-lg bg-slate-200 dark:bg-slate-700/50 text-slate-600 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-600 font-bold transition-colors">{onConfirm ? "ยกเลิก" : "ปิด"}</button>
-                    {onConfirm && <button onClick={onConfirm} className="px-4 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-500 font-bold flex items-center gap-2 shadow-lg transition-transform active:scale-95">{confirmIcon} {confirmText}</button>}
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[1200] p-4 animate-fade-in" onClick={type !== 'confirm' ? onClose : undefined}>
+            <div className={`bg-white dark:bg-slate-900 border-[3px] ${colorClass} rounded-xl shadow-2xl p-6 w-full max-w-sm flex flex-col items-center text-center`} onClick={e => e.stopPropagation()}>
+                <div className="mb-4">{icon}</div>
+                <h2 className="text-xl font-black text-slate-900 dark:text-white mb-2">{title}</h2>
+                <p className="text-slate-600 dark:text-slate-300 mb-6 text-sm leading-relaxed whitespace-pre-wrap">{message}</p>
+                <div className="flex gap-3 w-full">
+                    {onConfirm && <button onClick={onClose} className="flex-1 py-2.5 bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-lg font-bold hover:bg-slate-300 dark:hover:bg-slate-600">ยกเลิก</button>}
+                    <button onClick={() => { if(onConfirm) onConfirm(); else onClose(); }} className={`flex-1 py-2.5 rounded-lg font-bold shadow-lg transition-transform active:scale-95 ${btnClass} ${!onConfirm ? 'w-full' : ''}`}>{confirmText}</button>
                 </div>
             </div>
         </div>, document.body
@@ -359,38 +332,25 @@ export default function AuctionMarket() {
     <div className="h-screen flex flex-col bg-slate-100 dark:bg-black text-slate-900 dark:text-white transition-colors duration-300 overflow-hidden">
       
       <div className="flex-none z-50 bg-slate-100 dark:bg-black border-b border-slate-200 dark:border-slate-800 shadow-sm relative">
-          <Header 
-            userProfile={userProfile} 
-            displayUser={displayUser} 
-            userReputation={userReputation[userProfile?.email]} 
-            setIsSettingsOpen={setIsSettingsOpen} 
-            setIsAdminOpen={setIsAdminOpen}
-            setIsMyDecksOpen={setIsDeckListModalOpen}
-          />
-          
+          <Header userProfile={userProfile} displayUser={displayUser} userReputation={userReputation[userProfile?.email]} setIsSettingsOpen={setIsSettingsOpen} setIsAdminOpen={setIsAdminOpen} setIsMyDecksOpen={setIsDeckListModalOpen} />
           <div className="flex justify-center pb-2 pt-9 px-2 md:px-4">
             <div className="flex w-full md:w-auto bg-slate-200 dark:bg-slate-800 rounded-full p-1 shadow-inner relative">
                 <button onClick={() => setActiveTab('auction')} className={`flex-1 md:flex-none flex items-center justify-center gap-1 md:gap-2 px-4 py-2 rounded-full font-bold text-xs md:text-sm transition-all whitespace-nowrap ${activeTab === 'auction' ? 'bg-white dark:bg-slate-700 text-amber-600 dark:text-amber-400 shadow-md' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}><GavelIcon /> ลานประมูล</button>
                 <button onClick={() => setActiveTab('market')} className={`flex-1 md:flex-none flex items-center justify-center gap-1 md:gap-2 px-4 py-2 rounded-full font-bold text-xs md:text-sm transition-all whitespace-nowrap ${activeTab === 'market' ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-md' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}><ShoppingBagIcon /> ตลาดซื้อขาย</button>
                 <button onClick={() => setActiveTab('management')} className={`relative flex-1 md:flex-none flex items-center justify-center gap-1 md:gap-2 px-4 py-2 rounded-full font-bold text-xs md:text-sm transition-all whitespace-nowrap ${activeTab === 'management' ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-md' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}>
                     <PackageIcon /> การจัดการ
-                    {managementNotiCount > 0 && (
-                        <span className="absolute -top-2 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] text-white ring-2 ring-white dark:ring-slate-900 shadow-md z-50 animate-bounce">
-                            {managementNotiCount}
-                        </span>
-                    )}
+                    {managementNotiCount > 0 && <span className="absolute -top-2 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] text-white ring-2 ring-white dark:ring-slate-900 shadow-md z-50 animate-bounce">{managementNotiCount}</span>}
                 </button>
             </div>
           </div>
       </div>
 
       <main className="flex-grow overflow-y-auto p-0 md:p-8 w-full pb-40 relative">
-        
         {(activeTab === 'auction' || activeTab === 'market') && <LEDBanner />}
-
+        
         {activeTab === 'auction' && (
             <div className="animate-fade-in w-full md:px-8">
-                {/* ... (Search & Filter UI เดิม) ... */}
+                {/* ... (Search & Filter Logic) ... */}
                 <div className="mb-6 mx-4 md:mx-0 mt-0">
                     <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border border-slate-200 dark:border-slate-800 p-3 rounded-2xl shadow-sm flex flex-col gap-3">
                         <div className="flex gap-2 items-center w-full">
@@ -400,21 +360,14 @@ export default function AuctionMarket() {
                     </div>
                     <button onClick={handleStartAuctionClick} className="md:hidden w-full flex items-center justify-center gap-2 px-4 py-3 bg-emerald-500 text-white rounded-xl text-sm font-bold shadow-lg mt-2 shadow-emerald-500/30"><span className="text-lg leading-none">+</span> ลงประมูลสินค้า</button>
                 </div>
-
                 <div className="mt-4">
-                    <div className={viewMode === 'feed' ? "flex flex-col gap-6 max-w-xl mx-auto" : "grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 md:gap-6"}>
-                        {filteredAuctions.map(item => (
-                            <SingleAuctionCard key={item.id} item={item} onChat={setChatAuction} onBid={handleBid} onBuyNow={handleBuyNow} />
-                        ))}
-                    </div>
+                    <div className={viewMode === 'feed' ? "flex flex-col gap-6 max-w-xl mx-auto" : "grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 md:gap-6"}>{filteredAuctions.map(item => (<SingleAuctionCard key={item.id} item={item} onChat={setChatAuction} onBid={handleBid} onBuyNow={handleBuyNow} />))}</div>
                 </div>
             </div>
         )}
 
         {activeTab === 'market' && (
-            <div className="relative">
-                <FleaMarket userProfile={displayUser} onChat={(item) => setChatAuction(item)} onBuy={handleBuyMarketItem} viewMode={viewMode} setViewMode={setViewMode} onCreate={handleStartMarketListingClick} />
-            </div>
+            <div className="relative"><FleaMarket userProfile={displayUser} onChat={(item) => setChatAuction(item)} onBuy={handleBuyMarketItem} viewMode={viewMode} setViewMode={setViewMode} onCreate={handleStartMarketListingClick} /></div>
         )}
 
         {activeTab === 'management' && (
@@ -430,7 +383,7 @@ export default function AuctionMarket() {
                 setConfirmTransaction={setConfirmTransaction} 
                 setShipmentData={setShipmentData} 
                 handleForceEnd={handleOpenForceEndModal}
-                onRefresh={fetchMyAuctions} // 🟢 1. เพิ่มบรรทัดนี้: ส่งฟังก์ชันรีโหลดไปให้ลูกใช้
+                onRefresh={fetchMyAuctions} // 🟢 ส่งฟังก์ชันไปรีเฟรช
             />
         )}
       </main>
@@ -462,7 +415,7 @@ export default function AuctionMarket() {
       <CreateBulkAuctionModal isOpen={isBulkModalOpen} onClose={() => setIsBulkModalOpen(false)} userProfile={displayUser} />
       <CreateMarketListingModal isOpen={isMarketModalOpen} onClose={() => setIsMarketModalOpen(false)} userProfile={displayUser} />
 
-      <FeedbackModal isOpen={isFeedbackOpen} onClose={() => setIsFeedbackOpen(false)} userProfile={displayUser} showAlert={(title, msg) => alert(`${title}\n${msg}`)} />
+      <FeedbackModal isOpen={isFeedbackOpen} onClose={() => setIsFeedbackOpen(false)} userProfile={displayUser} showAlert={showAlert} />
       {!chatAuction && (<ChatWidget userProfile={displayUser} isMobileMenuOpen={isSettingsOpen} />)}
       <ActionConfirmModal isOpen={!!actionModalData} onClose={() => setActionModalData(null)} actionData={actionModalData} userBalance={userReputation[userProfile?.email]?.wallet_balance || 0} onConfirm={handleFinalSubmit} onTopUp={() => { setActionModalData(null); handleTopUpClick(); }} />
       <TopUpModal isOpen={isTopUpOpen} onClose={() => setIsTopUpOpen(false)} userProfile={displayUser} onSuccess={() => fetchReputations()} />
