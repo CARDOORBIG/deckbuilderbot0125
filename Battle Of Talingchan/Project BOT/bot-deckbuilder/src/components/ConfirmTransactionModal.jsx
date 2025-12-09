@@ -1,12 +1,16 @@
-import React, { useState } from 'react';
+import React, { useState } from 'react'; 
+import { supabase } from '../supabaseClient';
 import { createPortal } from 'react-dom';
-import { supabase } from '../supabaseClient'; 
 
-// Icons
+const WarningIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-16 h-16 text-yellow-400">
+    <path fillRule="evenodd" d="M9.401 3.003c1.155-2 4.043-2 5.197 0l7.355 12.748c1.154 2-.29 4.5-2.599 4.5H4.645c-2.309 0-3.752-2.5-2.598-4.5L9.4 3.003zM12 8.25a.75.75 0 01.75.75v3.75a.75.75 0 01-1.5 0V9a.75.75 0 01.75-.75zm0 8.25a.75.75 0 100-1.5.75.75 0 000 1.5z" clipRule="evenodd" />
+  </svg>
+);
+
 const BigCheckIcon = () => <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-20 h-20 text-emerald-500"><path fillRule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12zm13.36-1.814a.75.75 0 10-1.22-.872l-3.236 4.53L9.53 12.22a.75.75 0 00-1.06 1.06l2.25 2.25a.75.75 0 001.14-.094l3.75-5.25z" clipRule="evenodd" /></svg>;
-const WarningIcon = () => <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-16 h-16 text-yellow-400"><path fillRule="evenodd" d="M9.401 3.003c1.155-2 4.043-2 5.197 0l7.355 12.748c1.154 2-.29 4.5-2.599 4.5H4.645c-2.309 0-3.752-2.5-2.598-4.5L9.4 3.003zM12 8.25a.75.75 0 01.75.75v3.75a.75.75 0 01-1.5 0V9a.75.75 0 01.75-.75zm0 8.25a.75.75 0 100-1.5.75.75 0 000 1.5z" clipRule="evenodd" /></svg>;
 
-export default function ConfirmTransactionModal({ isOpen, onClose, auction, userProfile, fetchReputations }) {
+export default function ConfirmTransactionModal({ isOpen, onClose, auction, userProfile, fetchReputations, onSuccess }) {
     const [action, setAction] = useState('good');
     const [reason, setReason] = useState('transaction_success');
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -14,20 +18,21 @@ export default function ConfirmTransactionModal({ isOpen, onClose, auction, user
     const [isSuccess, setIsSuccess] = useState(false); 
 
     if (!isOpen || !auction || !userProfile) return null;
-    const isSeller = userProfile?.email
- === auction.seller_email;
+    const isSeller = userProfile.email === auction.seller_email;
     const targetEmail = isSeller ? auction.winner_email : auction.seller_email;
     const targetName = isSeller ? auction.winner_name : auction.seller_name;
-    if (auction.end_time > new Date().toISOString() && auction.type !== 'market') return null;
-
+    
     const handlePreSubmit = () => {
         const score = action === 'good' ? 1 : -1;
         if (score === -1) {
-            if (!confirm(`⚠️ ยืนยันหักเครดิตคุณ ${targetName} ใช่หรือไม่? การกระทำนี้ไม่สามารถย้อนกลับได้`)) return;
+            if (!confirm(`⚠️ ยืนยันหักเครดิตคุณ ${targetName} ใช่หรือไม่?`)) return;
             submitReputation();
         } else {
-            if (auction.is_escrow) { setShowFinalConfirm(true); } 
-            else { submitReputation(); }
+            if (auction.is_escrow) { 
+                setShowFinalConfirm(true); 
+            } else { 
+                submitReputation(); 
+            }
         }
     };
 
@@ -35,26 +40,45 @@ export default function ConfirmTransactionModal({ isOpen, onClose, auction, user
         const score = action === 'good' ? 1 : -1;
         setIsSubmitting(true);
         setShowFinalConfirm(false); 
-        const { data, error } = await supabase.rpc('submit_reputation', {
-            p_auction_id: auction.id, p_reporter_email: userProfile?.email
-, p_target_email: targetEmail,
-            p_score_change: score, p_reason_code: reason
-        });
-        if (error) { alert("Error: " + error.message); setIsSubmitting(false); }
-        else { 
+        
+        try {
+            // 🟢 แก้ไข: เรียก RPC อย่างเดียว (ให้ Server จัดการเปลี่ยนสถานะ completed เอง)
+            const { error: rpcError } = await supabase.rpc('submit_reputation', {
+                p_auction_id: auction.id, 
+                p_reporter_email: userProfile.email, 
+                p_target_email: targetEmail,
+                p_score_change: score, 
+                p_reason_code: reason
+            });
+            
+            if (rpcError) throw rpcError;
+
+            // ส่งแจ้งเตือน
             if (targetEmail) {
                  await supabase.from('notifications').insert({
                     user_email: targetEmail, 
                     type: 'transaction_complete',
                     title: '✅ ปิดการขายสำเร็จ!',
-                    message: `ผู้ซื้อยืนยันรับสินค้า "${auction.card_name}" แล้ว\nคุณได้รับเครดิต: ${score > 0 ? '+1' : '-1'}`,
+                    message: `คู่ค้าได้ยืนยันจบงานรายการ "${auction.card_name}" แล้ว\nคุณได้รับเครดิต: ${score > 0 ? '+1' : '-1'}`,
                     auction_id: auction.id,
                     is_read: false
                 });
             }
+
+            // แสดงผลสำเร็จ
             setIsSuccess(true);
-            fetchReputations(); 
-            setTimeout(() => { setIsSuccess(false); onClose(); }, 2500);
+            if(fetchReputations) fetchReputations(); 
+            
+            setTimeout(() => { 
+                setIsSuccess(false); 
+                onClose(); 
+                if(onSuccess) onSuccess(); 
+            }, 2000);
+
+        } catch (error) {
+            console.error(error);
+            alert("Error: " + error.message);
+            setIsSubmitting(false);
         }
     };
 
@@ -65,7 +89,7 @@ export default function ConfirmTransactionModal({ isOpen, onClose, auction, user
                     <div className="flex flex-col items-center justify-center h-72 p-6 text-center animate-fade-in-up">
                         <div className="mb-6 animate-bounce"><BigCheckIcon /></div>
                         <h3 className="text-2xl font-black text-emerald-600 dark:text-emerald-400 mb-2">ขอบคุณครับ!</h3>
-                        <p className="text-slate-500 dark:text-slate-400">คะแนนของคุณช่วยสร้างสังคมให้ดีขึ้น พระอิศวรอวยพรคุณ!!</p>
+                        <p className="text-slate-500 dark:text-slate-400">ธุรกรรมเสร็จสมบูรณ์</p>
                     </div>
                 ) : (
                     <>
@@ -75,8 +99,12 @@ export default function ConfirmTransactionModal({ isOpen, onClose, auction, user
                     </div>
                     <div className="p-5 space-y-5">
                         <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg border border-blue-200 dark:border-blue-800 text-center">
-                            <p className="text-sm text-slate-700 dark:text-slate-200 font-bold mb-1">📢 คำเตือนก่อนให้คะแนน</p>
-                            <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">"โปรดมั่นใจว่าสินค้าที่คุณได้รับนั้นตรงตามที่ผู้ขายโฆษณาไว้จริง<br/>กดเพื่อให้คะแนนเครดิตผู้ขาย เพื่อสังคมเกมการ์ดที่ดีของเราต่อไป"</p>
+                            <p className="text-sm text-slate-700 dark:text-slate-200 font-bold mb-1">📢 ยืนยันการรับสินค้า</p>
+                            <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+                                {auction.is_escrow 
+                                    ? "การยืนยันนี้จะทำการโอนเงินให้กับผู้ขายทันที โปรดตรวจสอบสินค้าให้เรียบร้อย"
+                                    : "การยืนยันนี้เพื่อจบรายการขายและให้เครดิตผู้ขาย (กรุณาโอนเงินกันให้เรียบร้อย)"}
+                            </p>
                         </div>
                         <p className="text-sm text-slate-600 dark:text-slate-300 text-center">ให้เครดิตกับคุณ <span className="font-bold text-slate-900 dark:text-white">{targetName}</span></p>
                         <div className="flex gap-4">
@@ -108,4 +136,4 @@ export default function ConfirmTransactionModal({ isOpen, onClose, auction, user
             )}
         </div>, document.body
     );
-}
+};

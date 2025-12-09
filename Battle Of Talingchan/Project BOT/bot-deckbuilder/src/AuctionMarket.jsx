@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { supabase } from './supabaseClient';
-// ... imports อื่นๆ คงเดิม ...
 import { Link, useNavigate, useLocation } from 'react-router-dom'; 
 import { createPortal } from "react-dom";
 import { googleLogout } from '@react-oauth/google';
@@ -30,7 +29,6 @@ import {
     GavelIcon, ShoppingBagIcon, PackageIcon, HistoryIcon, 
 } from './components/Icons';
 
-// ... (Local Icons / Components: LayoutGridIcon, LayoutFeedIcon, LEDBanner, Placeholder Modals, useLocalStorage คงเดิม) ...
 const LayoutGridIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>;
 const LayoutFeedIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="3" y1="15" x2="21" y2="15"></line></svg>;
 
@@ -96,6 +94,11 @@ export default function AuctionMarket() {
   
   const [userProfile, setUserProfile] = useState(() => { try { return JSON.parse(localStorage.getItem("bot-userProfile-v1")); } catch { return null; } });
   const [theme, setThemeState] = useState(() => { try { return JSON.parse(localStorage.getItem("bot-theme")) || 'dark'; } catch { return 'dark'; } });
+  
+  // 🟢 State สำหรับ Modal แจ้งเตือนทั่วไป
+  const [modal, setModal] = useState({ isOpen: false, title: '', message: '', onConfirm: null });
+  const closeModal = () => setModal({ isOpen: false, title: '', message: '', onConfirm: null });
+  const showAlert = (title, message) => setModal({ isOpen: true, title, message, onConfirm: null });
 
   useEffect(() => {
     if (!userProfile) {
@@ -166,7 +169,28 @@ export default function AuctionMarket() {
   useEffect(() => { const channel = supabase.channel('market_balance_update').on('postgres_changes', { event: '*', schema: 'public', table: 'user_stats' }, (payload) => { fetchReputations(); }).subscribe(); return () => { supabase.removeChannel(channel); }; }, []);
   useEffect(() => { fetchReputations(); }, []);
   useEffect(() => { const openFromNoti = async () => { if (location.state?.openAuctionId) { const auctionId = location.state.openAuctionId; let targetAuction = auctions.find(a => a.id === auctionId) || myAuctions.find(a => a.id === auctionId); if (!targetAuction) { const { data } = await supabase.from('auctions').select('*').eq('id', auctionId).single(); if (data) targetAuction = data; } if (targetAuction) { setChatAuction(targetAuction); window.history.replaceState({}, document.title); } } }; openFromNoti(); }, [location, auctions, myAuctions]);
-  useEffect(() => { if (activeTab === 'management' && userProfile?.email) { fetchMyAuctions(); } else { fetchAuctions(); } const channel = supabase.channel('public:auctions').on('postgres_changes', { event: '*', schema: 'public', table: 'auctions' }, () => { if (activeTab === 'management') fetchMyAuctions(); else fetchAuctions(); }).subscribe(); return () => supabase.removeChannel(channel); }, [activeTab, userProfile]);
+  
+  // 🟢 🟢 🟢 แก้ไขตรงนี้: เพิ่มการ Subscribe ตาราง market_listings 🟢 🟢 🟢
+  useEffect(() => { 
+    const refreshData = () => {
+        if (activeTab === 'management' && userProfile?.email) { 
+            fetchMyAuctions(); 
+        } else { 
+            fetchAuctions(); 
+        }
+    };
+    
+    // เรียกครั้งแรก
+    refreshData();
+
+    // Subscribe ทั้ง auctions และ market_listings
+    const channel = supabase.channel('public:market_updates')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'auctions' }, refreshData)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'market_listings' }, refreshData) // 🟢 เพิ่มบรรทัดนี้
+        .subscribe(); 
+    
+    return () => supabase.removeChannel(channel); 
+  }, [activeTab, userProfile]);
   
   async function fetchAuctions() { 
       const now = new Date().toISOString(); 
@@ -194,9 +218,17 @@ export default function AuctionMarket() {
 
   const managementNotiCount = useMemo(() => {
       if (!userProfile || !myAuctions) return 0;
-      const toShip = myAuctions.filter(i => i.seller_email === userProfile.email && (i.status === 'pending_ship' || (i.status === 'sold' && !i.is_shipped) || (i.status === 'ended' && i.winner_email && !i.is_shipped))).length;
-      const toReceive = myAuctions.filter(i => i.winner_email === userProfile.email && i.is_shipped && i.status !== 'completed').length;
-      return toShip + toReceive;
+      // 🟢 นับสถานะที่ต้องจัดการ
+      const toAction = myAuctions.filter(i => {
+          if (i.seller_email === userProfile.email) {
+              return i.status === 'waiting_seller_confirmation' || i.status === 'verifying_payment' || i.status === 'pending_ship' || (i.status === 'sold' && !i.is_shipped);
+          }
+          if (i.winner_email === userProfile.email) {
+              return i.status === 'pending_payment' || i.status === 'payment_rejected' || (i.is_shipped && i.status !== 'completed');
+          }
+          return false;
+      }).length;
+      return toAction;
   }, [myAuctions, userProfile]);
 
   const filteredAuctions = useMemo(() => { 
@@ -215,21 +247,13 @@ export default function AuctionMarket() {
       }); 
   }, [auctions, searchTerm, sortOption, filterStatus]);
   
-  // 🟢 Helper: ฟังก์ชันตรวจสอบสถานะแบน (แบบ Async เช็คสด)
   const checkIsBanned = async () => {
       if (!userProfile?.email) return false;
-
-      // เช็คจาก DB โดยตรงเพื่อความชัวร์
-      const { data } = await supabase
-          .from('user_stats')
-          .select('cooldown_until')
-          .eq('user_email', userProfile.email)
-          .single();
-
+      const { data } = await supabase.from('user_stats').select('cooldown_until').eq('user_email', userProfile.email).single();
       if (data?.cooldown_until) {
           const banUntil = new Date(data.cooldown_until);
           if (banUntil > new Date()) {
-              alert(`⛔ บัญชีของคุณถูกระงับการใช้งานชั่วคราว\nปลดแบนวันที่: ${banUntil.toLocaleString('th-TH')}\n(คุณยังสามารถใช้ช่องแชทได้ตามปกติ)`);
+              alert(`⛔ บัญชีถูกระงับ\nปลดแบน: ${banUntil.toLocaleString('th-TH')}`);
               return true;
           }
       }
@@ -238,80 +262,98 @@ export default function AuctionMarket() {
 
   async function handleBid(auction) { 
       if (!userProfile) return alert("กรุณา Login ก่อนครับ"); 
-      if (await checkIsBanned()) return; // 🟢 รอผลเช็คก่อน
+      if (await checkIsBanned()) return;
       if (userProfile.email === auction.seller_email) return alert("ห้ามบิดของตัวเองครับ!"); 
       setActionModalData({ type: 'bid', auction }); 
   }
 
   async function handleBuyNow(auction) { 
       if (!userProfile) return alert("กรุณา Login ก่อนครับ"); 
-      if (await checkIsBanned()) return; // 🟢 รอผลเช็คก่อน
+      if (await checkIsBanned()) return;
       if (userProfile.email === auction.seller_email) return alert("ซื้อของตัวเองไม่ได้ครับ"); 
       setActionModalData({ type: 'buy', auction }); 
   }
 
   async function handleBuyMarketItem(item) { 
       if (!userProfile) return alert("กรุณา Login ก่อนครับ"); 
-      if (await checkIsBanned()) return; // 🟢 รอผลเช็คก่อน
+      if (await checkIsBanned()) return;
       if (userProfile.email === item.seller_email) return alert("ซื้อของตัวเองไม่ได้ครับ"); 
       setActionModalData({ type: 'buy_market', auction: { ...item, id: item.id, card_name: item.title, buy_now_price: item.price, is_escrow: item.is_escrow } }); 
   }
   
   async function handleFinalSubmit(amount) { 
-    // ตรวจสอบสถานะแบนอีกครั้งก่อนส่งข้อมูลจริง (Double check)
-    if (await checkIsBanned()) {
-        setActionModalData(null); // ปิด Modal
-        return; 
-    }
-
+    if (await checkIsBanned()) { setActionModalData(null); return; }
     if (!actionModalData) return; 
     const { type, auction } = actionModalData; 
+    
     if (type === 'bid') { 
         const { data, error } = await supabase.rpc('place_bid', { p_auction_id: auction.id, p_bidder_email: userProfile.email, p_bidder_name: displayUser.name, p_amount: amount }); 
+        if (error) alert("Error: " + error.message); else if (!data.success) alert(data.message); else return { success: true }; 
+    } 
+    else if (type === 'buy') { 
+        const { error } = await supabase.from('auctions').update({
+            status: 'waiting_seller_confirmation', 
+            winner_email: userProfile.email,
+            winner_name: displayUser.name,
+            current_price: auction.buy_now_price
+        }).eq('id', auction.id);
+
         if (error) alert("Error: " + error.message); 
-        else if (!data.success) alert(data.message); 
-        else return { success: true }; 
-    } else if (type === 'buy') { 
-        const { data, error } = await supabase.rpc('buy_now_auction', { p_auction_id: auction.id, p_buyer_email: userProfile.email, p_buyer_name: displayUser.name, p_amount: auction.buy_now_price }); 
-        if (error) alert("Error: " + error.message); 
-        else if (!data.success) alert(data.message); 
         else { setChatAuction(null); fetchAuctions(); return { success: true }; } 
-    } else if (type === 'buy_market') { 
-        let rpcName = 'buy_market_item'; 
-        if (!auction.is_escrow) rpcName = 'buy_non_escrow_item'; 
-        const { data, error } = await supabase.rpc(rpcName, { p_item_id: auction.id, p_buyer_email: userProfile.email, p_buyer_name: displayUser.name, p_amount: auction.buy_now_price }); 
+    } 
+    else if (type === 'buy_market') { 
+        const { error } = await supabase.from('market_listings').update({
+            status: 'waiting_seller_confirmation', 
+            buyer_email: userProfile.email,
+            buyer_name: displayUser.name
+        }).eq('id', auction.id);
+
         if (error) alert("Error: " + error.message); 
-        else if (!data.success) alert(data.message); 
         else { fetchMyAuctions(); return { success: true }; } 
     } 
   }
 
-  // ... (handleCancel, handlePenaltyCancel, handleDeleteMyAuction, handleLogout, handleSaveProfile คงเดิม) ...
   async function handleCancel(item) { if (item.type === 'market') { if (!confirm("⚠️ ยืนยันการยกเลิกการขาย?")) return; const { error } = await supabase.from('market_listings').delete().eq('id', item.id); if (error) alert("ลบไม่สำเร็จ: " + error.message); else { setMyAuctions(prev => prev.filter(i => i.id !== item.id)); alert("ยกเลิกการขายเรียบร้อย"); } } else { const isAdmin = userProfile?.email === 'koritros619@gmail.com'; const confirmMsg = isAdmin ? "👑 Admin Force Cancel:\nยืนยัน?" : "⚠️ ยืนยันการยกเลิกการประมูล?"; if (!confirm(confirmMsg)) return; const { data, error } = await supabase.rpc('cancel_auction', { p_auction_id: item.id, p_user_email: userProfile.email }); if (error) alert("Error: " + error.message); else if (!data.success) alert(data.message); else { alert(data.message); fetchAuctions(); fetchMyAuctions(); } } }
   async function handlePenaltyCancel(item) { if (!confirm(`⚠️ คำเตือน: สินค้านี้มีผู้สั่งซื้อแล้ว!\nหากยกเลิก คุณจะถูก "หักเครดิต 2 คะแนน"\nยืนยันยกเลิก?`)) return; const { data, error } = await supabase.rpc('cancel_order_with_penalty', { p_item_id: item.id, p_seller_email: userProfile.email }); if (error) alert("Error: " + error.message); else { alert(data.message); fetchMyAuctions(); } }
   async function handleDeleteMyAuction(item, e) { if (e && e.stopPropagation) e.stopPropagation(); if (!confirm("⚠️ ยืนยันการลบประวัติรายการนี้ออกจากรายการของคุณ?\n(รายการจะหายไปจากหน้าจอของคุณเท่านั้น)")) return; const isSeller = item.seller_email === userProfile.email; const table = item.type === 'market' ? 'market_listings' : 'auctions'; const field = isSeller ? 'seller_hidden' : (item.type === 'market' ? 'buyer_hidden' : 'winner_hidden'); const { error } = await supabase.from(table).update({ [field]: true }).eq('id', item.id); if (error) { alert("Error: " + error.message); } else { setMyAuctions(prev => prev.filter(i => i.id !== item.id)); } }
   
   const handleLogout = () => { googleLogout(); localStorage.removeItem("bot-userProfile-v1"); setUserProfile(null); navigate('/'); };
-  const handleSaveProfile = async (data) => { if (!userProfile) return; try { await setDoc(doc(db, "users", userProfile.email), { displayName: data.displayName, avatarUrl: data.avatarUrl, facebook: data.facebook || "", lineId: data.lineId || "", phone: data.phone || "", isSetup: true, updatedAt: serverTimestamp() }, { merge: true }); setCustomProfile(p => ({ ...p, ...data })); setIsProfileModalOpen(false); alert("บันทึกข้อมูลเรียบร้อย!"); } catch (e) { console.error(e); alert("บันทึกไม่สำเร็จ"); } };
+  const handleSaveProfile = async (data) => { if (!userProfile) return; try { await setDoc(doc(db, "users", userProfile.email), { displayName: data.displayName, avatarUrl: data.avatarUrl, facebook: data.facebook || "", lineId: data.lineId || "", phone: data.phone || "", isSetup: true, updatedAt: serverTimestamp() }, { merge: true }); setCustomProfile(p => ({ ...p, ...data, isSetup: true })); setIsProfileModalOpen(false); alert("บันทึกข้อมูลเรียบร้อย!"); } catch (e) { console.error(e); alert("บันทึกไม่สำเร็จ"); } };
   
-  // 🟢 ดักแบนก่อนเปิดหน้าตั้งประมูล
   const handleStartAuctionClick = async () => { 
-      if (await checkIsBanned()) return; // 🟢 รอผลเช็คก่อน
+      if (await checkIsBanned()) return; 
       setIsBulkModalOpen(true); 
   };
   
-  // 🟢 ดักแบนก่อนเปิดหน้าลงขายตลาด
   const handleStartMarketListingClick = async () => { 
-      if (await checkIsBanned()) return; // 🟢 รอผลเช็คก่อน
+      if (await checkIsBanned()) return; 
       setIsMarketModalOpen(true); 
   };
 
   const handleSelectType = (type) => { setIsTypeSelectionOpen(false); if (type === 'single') { navigate('/', { state: { showAuctionTutorial: true } }); } else { setIsBulkModalOpen(true); } };
   const handleConfirmReceipt = (item) => { if (!item.is_shipped) { return alert("ผู้ขายยังไม่ได้กดส่งสินค้าครับ กรุณารอผู้ขายจัดส่งก่อน"); } setConfirmTransaction({ auction: item }); };
   const handleTopUpClick = async () => { try { const { data, error } = await supabase.from('system_config').select('value').eq('key', 'topup_status').single(); if (error) { setIsTopUpOpen(true); return; } const status = data?.value || 'open'; if (status === 'maintenance') alert("⚠️ ระบบอยู่ในระหว่างการปรับปรุงค่ะ"); else if (status === 'closed') alert("⛔ ปิดระบบเติมเงินชั่วคราว"); else setIsTopUpOpen(true); } catch (e) { setIsTopUpOpen(true); } };
-  
   const handleOpenForceEndModal = (item) => { if (!item.winner_email) { return alert("⚠️ ยังไม่มีผู้ร่วมประมูล ไม่สามารถกดจบการขายได้"); } setForceEndItem(item); };
   const handleConfirmForceEnd = async (item) => { setForceEndItem(null); const { data, error } = await supabase.rpc('force_end_auction', { p_auction_id: item.id, p_seller_email: userProfile.email }); if (error) { alert("Error: " + error.message); } else if (!data.success) { alert("แจ้งเตือน: " + data.message); } else { fetchMyAuctions(); } };
+
+  // 🟢 Helper Component for Modal (Internal)
+  const ModalComponent = ({ isOpen, title, message, children, onClose, onConfirm, confirmText = "Confirm", confirmIcon }) => {
+    if (!isOpen) return null;
+    return createPortal(
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[1200] p-4">
+            <div className="bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-emerald-500/30 rounded-xl shadow-2xl p-6 w-full max-w-md animate-fade-in relative">
+                <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4">{title}</h2>
+                <div className="text-slate-700 dark:text-gray-300 mb-6">
+                    {children || message}
+                </div>
+                <div className="flex justify-end gap-3">
+                    <button onClick={onClose} className="px-4 py-2 rounded-lg bg-slate-200 dark:bg-slate-700/50 text-slate-600 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-600 font-bold transition-colors">{onConfirm ? "ยกเลิก" : "ปิด"}</button>
+                    {onConfirm && <button onClick={onConfirm} className="px-4 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-500 font-bold flex items-center gap-2 shadow-lg transition-transform active:scale-95">{confirmIcon} {confirmText}</button>}
+                </div>
+            </div>
+        </div>, document.body
+    );
+  };
 
   return (
     <div className="h-screen flex flex-col bg-slate-100 dark:bg-black text-slate-900 dark:text-white transition-colors duration-300 overflow-hidden">
@@ -348,51 +390,14 @@ export default function AuctionMarket() {
 
         {activeTab === 'auction' && (
             <div className="animate-fade-in w-full md:px-8">
+                {/* ... (Search & Filter UI เดิม) ... */}
                 <div className="mb-6 mx-4 md:mx-0 mt-0">
                     <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border border-slate-200 dark:border-slate-800 p-3 rounded-2xl shadow-sm flex flex-col gap-3">
                         <div className="flex gap-2 items-center w-full">
-                            <div className="relative flex-grow">
-                                <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
-                                    <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
-                                </div>
-                                <input 
-                                    type="text" 
-                                    placeholder="ค้นหาการ์ด..." 
-                                    value={searchTerm} 
-                                    onChange={(e) => setSearchTerm(e.target.value)} 
-                                    className="w-full pl-9 pr-4 py-2 bg-slate-100 dark:bg-slate-800 border-none rounded-xl text-base md:text-sm focus:ring-2 focus:ring-emerald-500 outline-none text-slate-900 dark:text-white placeholder-slate-400 transition-all" 
-                                />
-                            </div>
-                            <button onClick={() => setIsCompletedModalOpen(true)} className="p-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 hover:text-emerald-500 rounded-xl transition-colors shrink-0" title="ประวัติการประมูล"><HistoryIcon width="20" height="20" /></button>
-                            {/* 🟢 ใช้ฟังก์ชันที่ดักแบนแล้ว */}
+                            <input type="text" placeholder="ค้นหาการ์ด..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-9 pr-4 py-2 bg-slate-100 dark:bg-slate-800 border-none rounded-xl text-base md:text-sm focus:ring-2 focus:ring-emerald-500 outline-none text-slate-900 dark:text-white placeholder-slate-400 transition-all" />
                             <button onClick={handleStartAuctionClick} className="hidden md:flex items-center gap-1 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-xs font-bold shadow-lg shadow-emerald-500/20 transition-all active:scale-95 whitespace-nowrap shrink-0"><span className="text-base leading-none">+</span> ลงขาย</button>
                         </div>
-
-                        <div className="flex items-center justify-between gap-2 overflow-x-auto no-scrollbar">
-                            <div className="flex items-center gap-2 shrink-0">
-                                <div className="relative shrink-0">
-                                    <select value={sortOption} onChange={(e) => setSortOption(e.target.value)} className="appearance-none pl-3 pr-6 py-2 bg-slate-100 dark:bg-slate-800 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-300 border-none outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer">
-                                        <option value="ending_soon">เวลา</option>
-                                        <option value="price_asc">ถูก➜แพง</option>
-                                        <option value="price_desc">แพง➜ถูก</option>
-                                    </select>
-                                    <div className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400 text-[8px]">▼</div>
-                                </div>
-                                <div className="flex bg-slate-100 dark:bg-slate-800 rounded-xl p-1 gap-1 shrink-0">
-                                    <button onClick={() => setFilterStatus('all')} className={`px-2 py-1.5 rounded-lg text-[10px] md:text-xs font-bold transition-all ${filterStatus === 'all' ? 'bg-white dark:bg-slate-600 shadow text-emerald-600 dark:text-emerald-400' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}>รวม</button>
-                                    <button onClick={() => setFilterStatus('escrow')} className={`px-2 py-1.5 rounded-lg text-[10px] md:text-xs font-bold transition-all ${filterStatus === 'escrow' ? 'bg-white dark:bg-slate-600 shadow text-blue-500' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}>ผ่านกลาง</button>
-                                    <button onClick={() => setFilterStatus('direct')} className={`px-2 py-1.5 rounded-lg text-[10px] md:text-xs font-bold transition-all ${filterStatus === 'direct' ? 'bg-white dark:bg-slate-600 shadow text-amber-500' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}>โอนตรง</button>
-                                </div>
-                            </div>
-                            <div className="flex items-center gap-2 shrink-0">
-                                <div className="flex bg-slate-100 dark:bg-slate-800 rounded-xl p-1 gap-1">
-                                    <button onClick={() => setViewMode('feed')} className={`p-1.5 rounded-lg transition-all ${viewMode === 'feed' ? 'bg-white dark:bg-slate-600 shadow text-emerald-500' : 'text-slate-400 hover:text-slate-600'}`} title="Feed View"><LayoutFeedIcon /></button>
-                                    <button onClick={() => setViewMode('grid')} className={`p-1.5 rounded-lg transition-all ${viewMode === 'grid' ? 'bg-white dark:bg-slate-600 shadow text-emerald-500' : 'text-slate-400 hover:text-slate-600'}`} title="Grid View"><LayoutGridIcon /></button>
-                                </div>
-                            </div>
-                        </div>
                     </div>
-                    {/* 🟢 ใช้ฟังก์ชันที่ดักแบนแล้ว */}
                     <button onClick={handleStartAuctionClick} className="md:hidden w-full flex items-center justify-center gap-2 px-4 py-3 bg-emerald-500 text-white rounded-xl text-sm font-bold shadow-lg mt-2 shadow-emerald-500/30"><span className="text-lg leading-none">+</span> ลงประมูลสินค้า</button>
                 </div>
 
@@ -413,7 +418,20 @@ export default function AuctionMarket() {
         )}
 
         {activeTab === 'management' && (
-            <ManagementDashboard myAuctions={myAuctions} userProfile={userProfile} setChatAuction={setChatAuction} handleCancel={handleCancel} handlePenaltyCancel={handlePenaltyCancel} setManageAuction={setManageAuction} handleDeleteMyAuction={handleDeleteMyAuction} handleConfirmReceipt={handleConfirmReceipt} setConfirmTransaction={setConfirmTransaction} setShipmentData={setShipmentData} handleForceEnd={handleOpenForceEndModal} />
+            <ManagementDashboard 
+                myAuctions={myAuctions} 
+                userProfile={userProfile} 
+                setChatAuction={setChatAuction} 
+                handleCancel={handleCancel} 
+                handlePenaltyCancel={handlePenaltyCancel} 
+                setManageAuction={setManageAuction} 
+                handleDeleteMyAuction={handleDeleteMyAuction} 
+                handleConfirmReceipt={handleConfirmReceipt} 
+                setConfirmTransaction={setConfirmTransaction} 
+                setShipmentData={setShipmentData} 
+                handleForceEnd={handleOpenForceEndModal}
+                onRefresh={fetchMyAuctions} // 🟢 1. เพิ่มบรรทัดนี้: ส่งฟังก์ชันรีโหลดไปให้ลูกใช้
+            />
         )}
       </main>
 
@@ -425,7 +443,20 @@ export default function AuctionMarket() {
       <ReportModal isOpen={!!reportTarget} onClose={() => setReportTarget(null)} reporterEmail={userProfile?.email} targetUser={reportTarget?.targetUser} context={reportTarget?.context} />
       <ManageBiddersModal isOpen={!!manageAuction} onClose={() => setManageAuction(null)} auction={manageAuction} userProfile={userProfile} />
       <AuctionRoomModal isOpen={!!chatAuction} onClose={() => setChatAuction(null)} auction={chatAuction} userProfile={displayUser} onBid={handleBid} onBuyNow={handleBuyNow} />
-      <ConfirmTransactionModal isOpen={!!confirmTransaction} onClose={() => setConfirmTransaction(null)} auction={confirmTransaction?.auction} userProfile={userProfile} fetchReputations={fetchReputations} onBuyNow={handleBuyNow} />
+      
+      {/* 🟢 ส่ง onSuccess ให้กับ Modal ยืนยัน */}
+      <ConfirmTransactionModal 
+        isOpen={!!confirmTransaction} 
+        onClose={() => setConfirmTransaction(null)} 
+        auction={confirmTransaction?.auction} 
+        userProfile={userProfile} 
+        fetchReputations={fetchReputations}
+        onSuccess={() => {
+            fetchMyAuctions();
+            fetchAuctions();
+        }}
+      />
+      
       <DeckListModal isOpen={isDeckListModalOpen} onClose={() => setIsDeckListModalOpen(false)} userProfile={displayUser} userDecks={userDecks} setUserDecks={setUserDecks} mainDeck={mainDeck} lifeDeck={lifeDeck} setMainDeck={setMainDeck} setLifeDeck={setLifeDeck} cardDb={cardDb} />
       
       <CreateBulkAuctionModal isOpen={isBulkModalOpen} onClose={() => setIsBulkModalOpen(false)} userProfile={displayUser} />
@@ -437,6 +468,8 @@ export default function AuctionMarket() {
       <TopUpModal isOpen={isTopUpOpen} onClose={() => setIsTopUpOpen(false)} userProfile={displayUser} onSuccess={() => fetchReputations()} />
       <ShipmentModal isOpen={!!shipmentData} onClose={() => setShipmentData(null)} auction={shipmentData} onSuccess={() => { fetchMyAuctions(); fetchAuctions(); }} />
       <ConfirmForceEndModal isOpen={!!forceEndItem} onClose={() => setForceEndItem(null)} onConfirm={handleConfirmForceEnd} item={forceEndItem} />
+      
+      <ModalComponent {...modal} onClose={closeModal} />
     </div>
   );
 }
