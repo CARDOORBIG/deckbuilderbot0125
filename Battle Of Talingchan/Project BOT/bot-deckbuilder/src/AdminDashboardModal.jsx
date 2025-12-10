@@ -2,8 +2,15 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { supabase } from './supabaseClient';
 import { db } from './firebase'; 
 import { collection, getDocs, orderBy, query, limit, updateDoc, doc, writeBatch } from 'firebase/firestore';
+import { MenuIcon, SearchIcon, TrashIcon, SettingsIcon, SendIcon, MessageIcon } from './components/Icons'; 
 
+// 🟢 Icon เฉพาะกิจ
+const DefaultUserIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>;
+
+// ==========================================
 // 🟢 Helper Components
+// ==========================================
+
 const StatusBadge = ({ status, winner, endTime }) => {
     const isEnded = new Date(endTime) < new Date();
     
@@ -18,6 +25,25 @@ const StatusBadge = ({ status, winner, endTime }) => {
         return <span className="px-2 py-0.5 bg-slate-200 text-slate-500 rounded text-[10px] font-bold border border-slate-300">💨 จบ/ไร้คนบิด</span>;
     }
     return <span className="px-2 py-0.5 bg-amber-100 text-amber-600 rounded text-[10px] font-bold border border-amber-200">⏳ กำลังประมูล</span>;
+};
+
+// 🟢 Chat Bubble สำหรับ Admin ตอบ Ticket
+const AdminChatBubble = ({ msg, adminEmail }) => {
+    const isAdminMsg = msg.is_admin; 
+    return (
+        <div className={`flex flex-col ${isAdminMsg ? 'items-end' : 'items-start'} mb-2`}>
+            <div className={`max-w-[80%] px-3 py-2 rounded-xl text-sm shadow-sm break-words ${
+                isAdminMsg 
+                ? 'bg-blue-600 text-white rounded-tr-none' 
+                : 'bg-slate-700 text-slate-200 rounded-tl-none border border-slate-600'
+            }`}>
+                {msg.message}
+            </div>
+            <span className="text-[9px] text-slate-500 mt-1">
+                {new Date(msg.created_at).toLocaleString('th-TH', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' })}
+            </span>
+        </div>
+    );
 };
 
 // 🟢 Modal ย่อย: สำหรับดูรายละเอียดเจาะลึก (Transaction Inspector)
@@ -47,148 +73,40 @@ const TransactionInspectorModal = ({ isOpen, onClose, auction }) => {
     return (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-[1100] p-4 animate-fade-in" onClick={onClose}>
             <div className="bg-slate-900 border-2 border-blue-500 rounded-xl shadow-2xl w-full max-w-4xl h-[85vh] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
-                
-                {/* Header */}
                 <div className="p-4 bg-slate-800 border-b border-slate-700 flex justify-between items-center shrink-0">
-                    <h3 className="text-lg font-bold text-blue-400 flex items-center gap-2">
-                        🕵️‍♂️ ตรวจสอบธุรกรรม: {auction.card_name}
-                    </h3>
+                    <h3 className="text-lg font-bold text-blue-400 flex items-center gap-2">🕵️‍♂️ ตรวจสอบธุรกรรม: {auction.card_name}</h3>
                     <button onClick={onClose} className="text-slate-400 hover:text-white bg-slate-700 w-8 h-8 rounded-full">✕</button>
                 </div>
-
                 <div className="flex-grow flex flex-col md:flex-row overflow-hidden">
-                    
-                    {/* Left: Transaction Info */}
                     <div className="w-full md:w-1/2 p-6 overflow-y-auto border-r border-slate-700 space-y-6">
-                        
-                        {/* 1. Status Tracker */}
                         <div className="bg-slate-800/50 p-4 rounded-xl border border-slate-700">
-                            <h4 className="text-slate-300 font-bold mb-3 border-b border-slate-600 pb-2">📌 สถานะปัจจุบัน</h4>
-                            <div className="grid grid-cols-2 gap-4 text-sm">
-                                <div>
-                                    <p className="text-slate-500">Status:</p>
-                                    <p className="text-white font-bold">{auction.status || 'Active'}</p>
-                                </div>
-                                <div>
-                                    <p className="text-slate-500">Transaction State:</p>
-                                    <p className={`font-bold ${auction.transaction_status === 'completed' ? 'text-emerald-400' : 'text-amber-400'}`}>
-                                        {auction.transaction_status || '-'}
-                                    </p>
-                                </div>
-                                <div>
-                                    <p className="text-slate-500">ระบบ Escrow:</p>
-                                    <p className={auction.is_escrow ? "text-blue-400 font-bold" : "text-slate-400"}>
-                                        {auction.is_escrow ? "✅ เปิดใช้งาน" : "❌ ไม่ใช้ (โอนตรง)"}
-                                    </p>
-                                </div>
-                                <div>
-                                    <p className="text-slate-500">ราคาจบ:</p>
-                                    <p className="text-emerald-400 font-mono font-bold text-lg">฿{auction.current_price?.toLocaleString()}</p>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* 2. Participants */}
-                        <div className="bg-slate-800/50 p-4 rounded-xl border border-slate-700">
-                            <h4 className="text-slate-300 font-bold mb-3 border-b border-slate-600 pb-2">👥 คู่กรณี</h4>
-                            <div className="space-y-3">
-                                <div className="flex justify-between items-center">
-                                    <span className="text-xs bg-red-900/50 text-red-300 px-2 py-1 rounded">ผู้ขาย (Seller)</span>
-                                    <div className="text-right">
-                                        <p className="text-white font-bold text-sm">{auction.seller_name}</p>
-                                        <p className="text-slate-500 text-xs">{auction.seller_email}</p>
-                                    </div>
-                                </div>
-                                <div className="flex justify-between items-center">
-                                    <span className="text-xs bg-emerald-900/50 text-emerald-300 px-2 py-1 rounded">ผู้ซื้อ (Buyer)</span>
-                                    <div className="text-right">
-                                        <p className="text-white font-bold text-sm">{auction.winner_name || '-'}</p>
-                                        <p className="text-slate-500 text-xs">{auction.winner_email || '-'}</p>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* 3. Shipping Info */}
-                        <div className="bg-slate-800/50 p-4 rounded-xl border border-slate-700">
-                            <h4 className="text-slate-300 font-bold mb-3 border-b border-slate-600 pb-2">🚚 การจัดส่ง</h4>
-                            {auction.is_shipped ? (
-                                <div className="space-y-3">
-                                    <div className="grid grid-cols-2 gap-2 text-sm">
-                                        <div><p className="text-slate-500">ขนส่ง:</p><p className="text-white">{auction.courier_name}</p></div>
-                                        <div><p className="text-slate-500">Tracking:</p><p className="text-white font-mono select-all">{auction.tracking_number}</p></div>
-                                        <div><p className="text-slate-500">วันที่ส่ง:</p><p className="text-white">{new Date(auction.shipping_date).toLocaleDateString('th-TH')}</p></div>
-                                    </div>
-                                    {auction.shipping_proof && (
-                                        <div className="mt-2">
-                                            <p className="text-slate-500 text-xs mb-1">รูปหลักฐาน:</p>
-                                            <a href={auction.shipping_proof} target="_blank" rel="noreferrer" className="block relative h-32 rounded-lg overflow-hidden border border-slate-600 group">
-                                                <img src={auction.shipping_proof} className="w-full h-full object-cover transition-transform group-hover:scale-110" />
-                                                <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                                                    <span className="text-white text-xs">คลิกดูรูปใหญ่</span>
-                                                </div>
-                                            </a>
-                                        </div>
-                                    )}
-                                </div>
-                            ) : (
-                                <p className="text-slate-500 text-center py-4 italic">ยังไม่มีข้อมูลการจัดส่ง</p>
-                            )}
-                        </div>
-
-                    </div>
-
-                    {/* Right: Chat Logs */}
-                    <div className="w-full md:w-1/2 flex flex-col bg-slate-950 border-l border-slate-700">
-                        <div className="p-3 bg-slate-800 border-b border-slate-700">
-                            <h4 className="text-slate-300 font-bold flex items-center gap-2">💬 ประวัติแชท ({chatLogs.length})</h4>
-                        </div>
-                        <div className="flex-grow overflow-y-auto p-4 space-y-3 scrollbar-thin scrollbar-thumb-slate-700">
-                            {loading ? (
-                                <p className="text-slate-500 text-center mt-10">กำลังโหลดแชท...</p>
-                            ) : chatLogs.length === 0 ? (
-                                <p className="text-slate-600 text-center mt-10">ไม่มีประวัติการสนทนา</p>
-                            ) : (
-                                chatLogs.map((msg) => {
-                                    const isSystem = msg.user_email === 'SYSTEM';
-                                    const isSeller = msg.user_email === auction.seller_email;
-                                    
-                                    return (
-                                        <div key={msg.id} className={`flex flex-col ${isSystem ? 'items-center' : (isSeller ? 'items-start' : 'items-end')}`}>
-                                            {isSystem ? (
-                                                <span className="text-[10px] bg-slate-800 text-slate-400 px-2 py-1 rounded-full mb-1 border border-slate-700">🔔 {msg.message}</span>
-                                            ) : (
-                                                <div className={`max-w-[85%] p-3 rounded-xl text-sm border ${isSeller ? 'bg-slate-800 border-slate-700 text-slate-200 rounded-tl-none' : 'bg-blue-900/30 border-blue-800 text-blue-100 rounded-tr-none'}`}>
-                                                    <p className="text-[10px] font-bold opacity-50 mb-1">{msg.user_name} ({isSeller ? 'Seller' : 'Buyer'})</p>
-                                                    <p>{msg.message}</p>
-                                                    <p className="text-[9px] opacity-30 text-right mt-1">{new Date(msg.created_at).toLocaleString('th-TH')}</p>
-                                                </div>
-                                            )}
-                                        </div>
-                                    );
-                                })
-                            )}
+                            <h4 className="text-slate-300 font-bold mb-3 border-b border-slate-600 pb-2">📌 ข้อมูล</h4>
+                            <p className="text-slate-400 text-sm">Status: <span className="text-white">{auction.status}</span></p>
+                            <p className="text-slate-400 text-sm">Seller: <span className="text-white">{auction.seller_email}</span></p>
+                            <p className="text-slate-400 text-sm">Winner: <span className="text-white">{auction.winner_email || '-'}</span></p>
+                            <p className="text-slate-400 text-sm">Price: <span className="text-emerald-400 font-mono">฿{auction.current_price?.toLocaleString()}</span></p>
                         </div>
                     </div>
-
+                    <div className="w-full md:w-1/2 flex flex-col bg-slate-950">
+                        <div className="p-3 bg-slate-800 border-b border-slate-700"><h4 className="text-slate-300 font-bold">💬 ประวัติแชท</h4></div>
+                        <div className="flex-grow overflow-y-auto p-4 space-y-3">
+                            {loading ? <p className="text-slate-500 text-center">Loading...</p> : chatLogs.length === 0 ? <p className="text-slate-600 text-center">ไม่มีข้อความ</p> : chatLogs.map(msg => (
+                                <div key={msg.id} className={`flex flex-col ${msg.user_email === auction.seller_email ? 'items-start' : 'items-end'}`}>
+                                    <div className={`p-2 rounded-lg text-xs ${msg.user_email === 'SYSTEM' ? 'bg-slate-800 text-slate-400' : 'bg-blue-900/40 text-blue-100 border border-blue-800'}`}>{msg.message}</div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
     );
 };
 
-// 🟢 ไอคอนต่างๆ
-const DefaultUserIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>;
-const SearchIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>;
-const TrashIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>;
-const SettingsIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>;
-// 🟢 เพิ่ม MenuIcon สำหรับปุ่มกดดูรายละเอียด
-const MenuIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>;
-
 export default function AdminDashboardModal({ isOpen, onClose, adminEmail }) {
   const [activeTab, setActiveTab] = useState('transactions');
   
-  // State เดิม
+  // General States
   const [title, setTitle] = useState('');
   const [message, setMessage] = useState('');
   const [isBroadcasting, setIsBroadcasting] = useState(false);
@@ -197,115 +115,46 @@ export default function AdminDashboardModal({ isOpen, onClose, adminEmail }) {
   const [auctionId, setAuctionId] = useState('');
   const [wipeEmail, setWipeEmail] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
-
-  // 🟢 State ใหม่สำหรับ Transaction Inspector
   const [inspectAuction, setInspectAuction] = useState(null);
-
-  // State Warning & Config
   const [warningMsg, setWarningMsg] = useState('');
   const [topupStatus, setTopupStatus] = useState('open'); 
-
-  // Data States
   const [allUsers, setAllUsers] = useState([]);
-  const [feedbacks, setFeedbacks] = useState([]);
   const [transactions, setTransactions] = useState([]); 
   const [isLoadingData, setIsLoadingData] = useState(false);
 
-  // Summary & Filter State
-  const [startDate, setStartDate] = useState(() => {
-      const d = new Date();
-      d.setDate(d.getDate() - 30);
-      return d.toISOString().split('T')[0];
-  });
+  // 🟢 Ticket States
+  const [tickets, setTickets] = useState([]);
+  const [selectedTicket, setSelectedTicket] = useState(null);
+  const [ticketMessages, setTicketMessages] = useState([]);
+  const [adminReply, setAdminReply] = useState("");
+  const chatEndRef = useRef(null);
+
+  // 🟢 Feedback States
+  const [feedbacks, setFeedbacks] = useState([]); 
+  const [feedbackView, setFeedbackView] = useState('inbox'); 
+
+  // Filter States
+  const [startDate, setStartDate] = useState(() => { const d = new Date(); d.setDate(d.getDate() - 30); return d.toISOString().split('T')[0]; });
   const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 50;
-
   const [userSearchTerm, setUserSearchTerm] = useState('');
 
-  const callAdminRpc = async (rpcName, params) => {
-    setIsProcessing(true);
-    const { data, error } = await supabase.rpc(rpcName, params);
-    setIsProcessing(false);
-    if(error) alert("Error: " + error.message);
-    else alert(data.message);
-  };
+  // --- Functions ---
+  const callAdminRpc = async (rpcName, params) => { setIsProcessing(true); const { data, error } = await supabase.rpc(rpcName, params); setIsProcessing(false); if(error) alert("Error: " + error.message); else alert(data.message); };
+  
+  const handleSendWarning = async () => { if (!targetEmail.trim() || !warningMsg.trim()) return alert("ระบุข้อมูลให้ครบ"); if (!confirm(`ยืนยันส่ง?`)) return; setIsProcessing(true); try { const userRef = doc(db, "users", targetEmail); await updateDoc(userRef, { warningMessage: warningMsg }); alert("✅ ส่งสำเร็จ!"); setWarningMsg(""); } catch (error) { alert("Error: " + error.message); } finally { setIsProcessing(false); } };
+  
+  const handleSendGlobalWarning = async () => { if (!warningMsg.trim()) return; if (!confirm(`⚠️ ส่งหาทุกคน?`)) return; setIsProcessing(true); try { const usersSnap = await getDocs(collection(db, "users")); const chunks = []; let batch = writeBatch(db); let i = 0; usersSnap.docs.forEach((docSnap) => { batch.update(docSnap.ref, { warningMessage: warningMsg }); i++; if (i >= 499) { chunks.push(batch.commit()); batch = writeBatch(db); i = 0; } }); if (i > 0) chunks.push(batch.commit()); await Promise.all(chunks); alert("✅ ส่ง Global สำเร็จ!"); setWarningMsg(""); } catch (e) { alert("Error: " + e.message); } finally { setIsProcessing(false); } };
 
-  const handleSendWarning = async () => {
-      if (!targetEmail.trim() || !warningMsg.trim()) return alert("กรุณาระบุ Email และข้อความเตือน");
-      if (!confirm(`ยืนยันส่งข้อความเตือนไปยัง "${targetEmail}" ?\nข้อความ: ${warningMsg}`)) return;
+  const fetchSystemConfig = async () => { try { const { data } = await supabase.from('system_config').select('value').eq('key', 'topup_status').single(); if (data) setTopupStatus(data.value); } catch (e) {} };
+  const updateTopupStatus = async (status) => { if (!confirm(`เปลี่ยนสถานะเป็น ${status}?`)) return; setIsProcessing(true); try { await supabase.from('system_config').upsert({ key: 'topup_status', value: status }); setTopupStatus(status); alert("✅ เรียบร้อย"); } catch (e) { alert("Error"); } finally { setIsProcessing(false); } };
 
-      setIsProcessing(true);
-      try {
-          const userRef = doc(db, "users", targetEmail);
-          await updateDoc(userRef, { warningMessage: warningMsg });
-          alert("✅ ส่งข้อความเตือนสำเร็จ!");
-          setWarningMsg("");
-      } catch (error) {
-          alert("❌ ไม่สามารถส่งข้อความได้: " + error.message);
-      } finally {
-          setIsProcessing(false);
-      }
-  };
+  const fetchAllUsers = async () => { setIsLoadingData(true); try { const s = await getDocs(collection(db, "users")); setAllUsers(s.docs.map(d => ({ id: d.id, ...d.data() }))); } catch (e) {} finally { setIsLoadingData(false); } };
 
-  const handleSendGlobalWarning = async () => {
-      if (!warningMsg.trim()) return alert("กรุณาระบุข้อความเตือนก่อนกดส่ง Global");
-      if (!confirm(`⚠️⚠️⚠️ ยืนยันส่งข้อความเตือนหา "ทุกคนในระบบ" ??\n(ผู้ใช้ทุกคนจะเห็น Popup นี้ทันที)\n\nข้อความ: ${warningMsg}`)) return;
+  const fetchTransactions = async () => { setIsLoadingData(true); const start = new Date(startDate); const end = new Date(endDate); end.setHours(23, 59, 59, 999); const { data } = await supabase.from('auctions').select('*').gte('end_time', start.toISOString()).lte('end_time', end.toISOString()).order('end_time', { ascending: false }); if (data) setTransactions(data); setIsLoadingData(false); };
 
-      setIsProcessing(true);
-      try {
-          const usersSnap = await getDocs(collection(db, "users"));
-          const chunks = [];
-          let currentBatch = writeBatch(db);
-          let counter = 0;
-
-          usersSnap.docs.forEach((docSnap) => {
-              currentBatch.update(docSnap.ref, { warningMessage: warningMsg });
-              counter++;
-              if (counter >= 499) {
-                  chunks.push(currentBatch.commit());
-                  currentBatch = writeBatch(db);
-                  counter = 0;
-              }
-          });
-          if (counter > 0) chunks.push(currentBatch.commit());
-          await Promise.all(chunks);
-
-          alert(`✅ ส่ง Global Warning สำเร็จ! (${usersSnap.size} คน)`);
-          setWarningMsg("");
-      } catch (error) {
-          console.error("Global warning error:", error);
-          alert("❌ เกิดข้อผิดพลาด: " + error.message);
-      } finally {
-          setIsProcessing(false);
-      }
-  };
-
-  const fetchSystemConfig = async () => {
-      try {
-          const { data } = await supabase.from('system_config').select('value').eq('key', 'topup_status').single();
-          if (data) setTopupStatus(data.value);
-      } catch (e) { console.error(e); }
-  };
-
-  const updateTopupStatus = async (status) => {
-      if (!confirm(`ยืนยันเปลี่ยนสถานะระบบเติมเงินเป็น "${status.toUpperCase()}" ?`)) return;
-      setIsProcessing(true);
-      try {
-          await supabase.from('system_config').upsert({ key: 'topup_status', value: status });
-          setTopupStatus(status);
-          alert("✅ อัปเดตสถานะเรียบร้อย!");
-      } catch (e) { alert("❌ Error: " + e.message); } finally { setIsProcessing(false); }
-  };
-
-  const fetchAllUsers = async () => {
-    setIsLoadingData(true);
-    try {
-      const querySnapshot = await getDocs(collection(db, "users"));
-      setAllUsers(querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    } catch (error) { console.error(error); } finally { setIsLoadingData(false); }
-  };
-
+  // 🟢 Feedback Functions (Firestore)
   const fetchFeedbacks = async () => {
     setIsLoadingData(true);
     try {
@@ -315,54 +164,105 @@ export default function AdminDashboardModal({ isOpen, onClose, adminEmail }) {
     } catch (error) { console.error(error); } finally { setIsLoadingData(false); }
   };
 
-  const fetchTransactions = async () => {
-      setIsLoadingData(true);
-      const start = new Date(startDate);
-      const end = new Date(endDate);
-      end.setHours(23, 59, 59, 999);
-
-      const { data, error } = await supabase
-          .from('auctions')
-          .select('*')
-          .gte('end_time', start.toISOString())
-          .lte('end_time', end.toISOString())
-          .order('end_time', { ascending: false });
-
-      if (error) console.error("Error fetching transactions:", error);
-      else setTransactions(data);
-      setIsLoadingData(false);
+  // 🟢 Ticket Functions (Supabase)
+  const fetchTickets = async () => {
+    const { data } = await supabase.from('support_tickets').select('*').order('last_updated', { ascending: false });
+    if (data) setTickets(data);
   };
 
-  const stats = useMemo(() => {
-      const now = new Date();
-      let completedCount = 0;
-      let cancelledCount = 0;
-      let expiredCount = 0;
-      let totalValue = 0;
+  const handleOpenTicketFromFeedback = async (fb) => {
+      if (!fb.user || !fb.user.email) return alert("ไม่สามารถตอบกลับ Anonymous ได้");
+      
+      if(!confirm(`เปิด Ticket ใหม่เพื่อคุยกับคุณ ${fb.user.name}?`)) return;
 
-      transactions.forEach(tx => {
-          const isEnded = new Date(tx.end_time) < now;
-          if (tx.status === 'cancelled') {
-              cancelledCount++;
-          } else if (isEnded) {
-              if (tx.winner_email) {
-                  completedCount++;
-                  totalValue += tx.current_price;
-              } else {
-                  expiredCount++;
-              }
-          }
+      setIsProcessing(true);
+      try {
+          const { data: ticket, error: tErr } = await supabase.from('support_tickets').insert({
+              user_email: fb.user.email,
+              user_name: fb.user.name,
+              user_avatar: fb.user.picture || null,
+              subject: `[${fb.type.toUpperCase()}] ${fb.text.substring(0, 30)}...`,
+              status: 'open',
+              last_message: 'Admin Opened Ticket'
+          }).select().single();
+
+          if (tErr) throw tErr;
+
+          await supabase.from('support_messages').insert([
+              { ticket_id: ticket.id, sender_email: fb.user.email, message: `(จาก Feedback): ${fb.text}`, is_admin: false },
+              { ticket_id: ticket.id, sender_email: adminEmail, message: "สวัสดีครับ แอดมินรับเรื่องแล้วครับ มีอะไรให้ช่วยเหลือเพิ่มเติมไหมครับ?", is_admin: true }
+          ]);
+
+          setFeedbackView('chat');
+          fetchTickets();
+          loadTicketChat(ticket);
+
+      } catch (err) {
+          alert("Error: " + err.message);
+      } finally {
+          setIsProcessing(false);
+      }
+  };
+
+  const loadTicketChat = async (ticket) => {
+    setSelectedTicket(ticket);
+    const { data } = await supabase.from('support_messages').select('*').eq('ticket_id', ticket.id).order('created_at', { ascending: true });
+    setTicketMessages(data || []);
+    setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
+  };
+
+  const handleAdminReply = async () => {
+      if (!adminReply.trim()) return;
+      const text = adminReply;
+      setAdminReply(""); 
+      
+      await supabase.from('support_messages').insert({
+          ticket_id: selectedTicket.id,
+          sender_email: adminEmail,
+          message: text,
+          is_admin: true
       });
+      await supabase.from('support_tickets').update({ status: 'open', last_updated: new Date() }).eq('id', selectedTicket.id);
+  };
 
-      return { completedCount, cancelledCount, expiredCount, totalValue };
+  const handleCloseTicket = async () => {
+      if(!confirm("ปิดงานเคสนี้?")) return;
+      await supabase.from('support_tickets').update({ status: 'closed' }).eq('id', selectedTicket.id);
+      setSelectedTicket(prev => ({ ...prev, status: 'closed' }));
+      fetchTickets();
+  };
+
+  useEffect(() => {
+    if (selectedTicket) {
+        const channel = supabase.channel(`admin_ticket:${selectedTicket.id}`)
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'support_messages', filter: `ticket_id=eq.${selectedTicket.id}` }, (payload) => {
+                setTicketMessages(prev => [...prev, payload.new]);
+                setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
+            })
+            .subscribe();
+        return () => supabase.removeChannel(channel);
+    }
+  }, [selectedTicket]);
+
+  useEffect(() => {
+    if (isOpen) {
+        if (activeTab === 'users' || activeTab === 'manage') fetchAllUsers();
+        if (activeTab === 'feedback') { fetchFeedbacks(); fetchTickets(); } 
+        if (activeTab === 'transactions') fetchTransactions();
+        if (activeTab === 'config') fetchSystemConfig();
+    }
+  }, [activeTab, isOpen]);
+
+  const stats = useMemo(() => {
+      let c=0, x=0, e=0, v=0;
+      transactions.forEach(t => { if(t.status==='cancelled') x++; else if(new Date(t.end_time)<new Date()) { if(t.winner_email) { c++; v+=t.current_price; } else e++; } });
+      return { completedCount: c, cancelledCount: x, expiredCount: e, totalValue: v };
   }, [transactions]);
+  
+  const paginatedTransactions = useMemo(() => transactions.slice((currentPage-1)*ITEMS_PER_PAGE, currentPage*ITEMS_PER_PAGE), [transactions, currentPage]);
+  const totalPages = Math.ceil(transactions.length / ITEMS_PER_PAGE); // 🟢 เพิ่มบรรทัดนี้กลับมาครับ
 
-  const paginatedTransactions = useMemo(() => {
-      const startIdx = (currentPage - 1) * ITEMS_PER_PAGE;
-      return transactions.slice(startIdx, startIdx + ITEMS_PER_PAGE);
-  }, [transactions, currentPage]);
-
-  const totalPages = Math.ceil(transactions.length / ITEMS_PER_PAGE);
+  const filteredUsers = allUsers.filter(u => (u.displayName||'').toLowerCase().includes(userSearchTerm.toLowerCase()) || (u.id||'').toLowerCase().includes(userSearchTerm.toLowerCase()));
 
   const handleDeleteTransaction = async (id, cardName) => {
       if (!confirm(`⚠️ ยืนยันลบรายการประมูล "${cardName}" ถาวร?\n(ข้อมูลจะไม่สามารถกู้คืนได้)`)) return;
@@ -376,22 +276,6 @@ export default function AdminDashboardModal({ isOpen, onClose, adminEmail }) {
       if (error) alert("Error: " + error.message);
       else setTransactions(prev => prev.filter(tx => tx.id !== id));
   };
-
-  useEffect(() => {
-    if (isOpen) {
-        if (activeTab === 'users' || activeTab === 'manage') fetchAllUsers();
-        if (activeTab === 'feedback') fetchFeedbacks();
-        if (activeTab === 'transactions') fetchTransactions();
-        if (activeTab === 'config') fetchSystemConfig();
-    }
-  }, [activeTab, isOpen]);
-
-  useEffect(() => { setCurrentPage(1); }, [startDate, endDate]);
-
-  const filteredUsers = allUsers.filter(user => {
-    const searchLower = userSearchTerm.toLowerCase();
-    return (user.displayName || '').toLowerCase().includes(searchLower) || (user.id || '').toLowerCase().includes(searchLower);
-  });
 
   if (!isOpen || adminEmail !== 'koritros619@gmail.com') return null;
 
@@ -409,37 +293,110 @@ export default function AdminDashboardModal({ isOpen, onClose, adminEmail }) {
         <div className="flex border-b border-slate-700 shrink-0 overflow-x-auto">
             {['transactions', 'config', 'announce', 'manage', 'cleanup', 'users', 'feedback'].map(tab => (
                 <button key={tab} onClick={()=>setActiveTab(tab)} className={`flex-1 py-3 px-4 font-bold whitespace-nowrap transition-colors uppercase text-xs md:text-sm ${activeTab===tab ? 'bg-red-600 text-white' : 'text-slate-400 hover:bg-slate-800'}`}>
-                    {tab === 'transactions' && '💰 สรุปซื้อขาย'}
-                    {tab === 'config' && '⚙️ ตั้งค่าระบบ'}
-                    {tab === 'announce' && '📢 ประกาศ'}
-                    {tab === 'manage' && '🔨 จัดการคน'}
-                    {tab === 'cleanup' && '💀 ล้างข้อมูล'}
-                    {tab === 'users' && '👥 Users'}
-                    {tab === 'feedback' && '💬 Feedback'}
+                    {tab === 'feedback' ? '💬 Feedback & Tickets' : tab.toUpperCase()}
                 </button>
             ))}
         </div>
 
         {/* Content */}
-        <div className="p-6 space-y-6 overflow-y-auto bg-slate-900/50">
+        <div className="p-6 space-y-6 overflow-y-auto bg-slate-900/50 flex-grow">
             
+            {/* 🟢 Tab: Feedback & Support Ticket System */}
+            {activeTab === 'feedback' && (
+                <div className="flex flex-col h-full min-h-[500px]">
+                    <div className="flex gap-4 mb-4 border-b border-slate-700 pb-2">
+                        <button onClick={() => setFeedbackView('inbox')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors ${feedbackView === 'inbox' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:bg-slate-800'}`}>📥 Feedback Inbox ({feedbacks.length})</button>
+                        <button onClick={() => { setFeedbackView('chat'); fetchTickets(); }} className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors ${feedbackView === 'chat' ? 'bg-emerald-600 text-white' : 'text-slate-400 hover:bg-slate-800'}`}>💬 Active Tickets ({tickets.filter(t => t.status === 'open').length})</button>
+                    </div>
+
+                    {feedbackView === 'inbox' && (
+                        <div className="space-y-3 overflow-y-auto max-h-[60vh]">
+                            <div className="flex justify-between items-center mb-2">
+                                <span className="text-slate-400 text-xs">รายการแจ้งปัญหาจากผู้ใช้ (Firestore)</span>
+                                <button onClick={fetchFeedbacks} className="text-blue-400 text-xs hover:underline">Refresh</button>
+                            </div>
+                            
+                            {isLoadingData ? <p className="text-slate-500 text-center">Loading...</p> : 
+                             feedbacks.length === 0 ? <p className="text-center text-slate-500 py-10">ไม่มีรายการแจ้งเข้ามา</p> : 
+                             feedbacks.map(fb => (
+                                <div key={fb.id} className="p-4 bg-slate-800 rounded-lg border border-slate-700 flex flex-col md:flex-row justify-between items-start gap-4 hover:border-slate-600 transition-colors">
+                                    <div className="flex-1 w-full">
+                                        <div className="flex items-center gap-2 mb-2">
+                                            <span className={`text-[10px] px-2 py-0.5 rounded border uppercase ${fb.type === 'bug' ? 'bg-red-900/30 text-red-400 border-red-800' : 'bg-blue-900/30 text-blue-400 border-blue-800'}`}>{fb.type}</span>
+                                            <span className="text-emerald-400 font-bold text-sm">{fb.user?.name || 'Anonymous'}</span>
+                                            <span className="text-slate-500 text-xs">({fb.user?.email})</span>
+                                        </div>
+                                        <p className="text-slate-300 text-sm whitespace-pre-wrap bg-slate-900/50 p-3 rounded-lg border border-slate-700/50">{fb.text}</p>
+                                        <p className="text-[10px] text-slate-500 mt-2 text-right">{fb.createdAt ? new Date(fb.createdAt.seconds * 1000).toLocaleString('th-TH') : '-'}</p>
+                                    </div>
+                                    {fb.user?.email && (
+                                        <button onClick={() => handleOpenTicketFromFeedback(fb)} className="w-full md:w-auto px-4 py-3 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-lg shadow-lg shrink-0 flex flex-row md:flex-col items-center justify-center gap-2 transition-transform active:scale-95">
+                                            <MessageIcon className="w-5 h-5"/> <span>เปิด Ticket<br/>ตอบกลับ</span>
+                                        </button>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
+                    {feedbackView === 'chat' && (
+                        <div className="flex h-full gap-4 border-t border-slate-700 pt-4 overflow-hidden">
+                            <div className="w-1/3 border-r border-slate-700 pr-2 overflow-y-auto max-h-[60vh]">
+                                <div className="space-y-2">
+                                    {tickets.length === 0 ? <p className="text-slate-500 text-center py-4">ยังไม่มีเคสที่เปิดอยู่</p> : 
+                                     tickets.map(ticket => (
+                                        <div key={ticket.id} onClick={() => loadTicketChat(ticket)} className={`p-3 rounded-lg cursor-pointer border transition-all ${selectedTicket?.id === ticket.id ? 'bg-blue-900/40 border-blue-500' : 'bg-slate-800 border-slate-700 hover:border-slate-500'}`}>
+                                            <div className="flex justify-between items-start mb-1">
+                                                <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${ticket.status === 'open' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-600/20 text-slate-400'}`}>{ticket.status.toUpperCase()}</span>
+                                                <span className="text-[10px] text-slate-500">{new Date(ticket.last_updated).toLocaleDateString('th-TH')}</span>
+                                            </div>
+                                            <p className="text-white font-bold text-sm truncate">{ticket.subject}</p>
+                                            <p className="text-xs text-slate-400 truncate">{ticket.user_name}</p>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                            <div className="w-2/3 flex flex-col bg-slate-800/50 rounded-xl border border-slate-700 overflow-hidden h-[60vh]">
+                                {selectedTicket ? (
+                                    <>
+                                        <div className="p-3 border-b border-slate-700 bg-slate-800 flex justify-between items-center shrink-0">
+                                            <div><h4 className="text-white font-bold text-sm">{selectedTicket.subject}</h4><p className="text-xs text-slate-400">User: {selectedTicket.user_name} ({selectedTicket.user_email})</p></div>
+                                            {selectedTicket.status === 'open' && (<button onClick={handleCloseTicket} className="px-3 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-500 font-bold shadow-sm">✅ จบเคส (Close)</button>)}
+                                        </div>
+                                        <div className="flex-grow p-4 overflow-y-auto space-y-2 bg-slate-900/50">
+                                            {ticketMessages.map(msg => (<AdminChatBubble key={msg.id} msg={msg} isAdmin={msg.is_admin} adminEmail={adminEmail} />))}
+                                            {selectedTicket.status === 'closed' && (<div className="text-center py-4 text-xs text-slate-500 bg-slate-800/50 rounded mt-4">⛔ เคสนี้ถูกปิดแล้ว</div>)}
+                                            <div ref={chatEndRef} />
+                                        </div>
+                                        {selectedTicket.status === 'open' && (
+                                            <div className="p-3 border-t border-slate-700 bg-slate-800 flex gap-2 shrink-0">
+                                                <input className="flex-grow bg-slate-900 border border-slate-600 rounded-full px-4 py-2 text-white text-sm outline-none focus:border-blue-500" placeholder="พิมพ์ตอบกลับผู้ใช้..." value={adminReply} onChange={e => setAdminReply(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleAdminReply()} />
+                                                <button onClick={handleAdminReply} className="p-2 bg-blue-600 text-white rounded-full hover:bg-blue-500 shadow-lg"><SendIcon /></button>
+                                            </div>
+                                        )}
+                                    </>
+                                ) : (
+                                    <div className="flex flex-col items-center justify-center h-full text-slate-500 gap-2"><span className="text-4xl opacity-50">💬</span><p>เลือกรายการทางซ้ายเพื่อเริ่มแชท</p></div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )}
+
             {/* Tab: System Config */}
             {activeTab === 'config' && (
                 <div className="space-y-6">
                     <div className="bg-slate-800 p-6 rounded-xl border border-slate-700">
-                        <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-                            <SettingsIcon /> สถานะระบบเติมเงิน (Top Up System)
-                        </h3>
+                        <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2"><SettingsIcon /> ระบบเติมเงิน</h3>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div className="md:col-span-3 bg-slate-900 p-4 rounded-lg text-center border border-slate-600 mb-2">
                                 <p className="text-slate-400 text-sm mb-1">สถานะปัจจุบัน</p>
-                                <p className={`text-3xl font-black uppercase ${topupStatus === 'open' ? 'text-emerald-500' : topupStatus === 'maintenance' ? 'text-amber-500' : 'text-red-500'}`}>
-                                    {topupStatus === 'open' ? '🟢 เปิดใช้งาน (OPEN)' : topupStatus === 'maintenance' ? '⚠️ ปรับปรุง (MAINTENANCE)' : '⛔ ปิดใช้งาน (CLOSED)'}
-                                </p>
+                                <p className={`text-3xl font-black uppercase ${topupStatus === 'open' ? 'text-emerald-500' : topupStatus === 'maintenance' ? 'text-amber-500' : 'text-red-500'}`}>{topupStatus.toUpperCase()}</p>
                             </div>
-                            <button onClick={() => updateTopupStatus('open')} disabled={isProcessing || topupStatus === 'open'} className={`py-4 rounded-xl font-bold text-white transition-all transform active:scale-95 ${topupStatus === 'open' ? 'bg-emerald-900/50 text-emerald-500 border border-emerald-800 cursor-default' : 'bg-emerald-600 hover:bg-emerald-500 shadow-lg'}`}>✅ เปิดระบบ (Open)</button>
-                            <button onClick={() => updateTopupStatus('maintenance')} disabled={isProcessing || topupStatus === 'maintenance'} className={`py-4 rounded-xl font-bold text-white transition-all transform active:scale-95 ${topupStatus === 'maintenance' ? 'bg-amber-900/50 text-amber-500 border border-amber-800 cursor-default' : 'bg-amber-600 hover:bg-amber-500 shadow-lg'}`}>⚠️ ปรับปรุง (Maintenance)</button>
-                            <button onClick={() => updateTopupStatus('closed')} disabled={isProcessing || topupStatus === 'closed'} className={`py-4 rounded-xl font-bold text-white transition-all transform active:scale-95 ${topupStatus === 'closed' ? 'bg-red-900/50 text-red-500 border border-red-800 cursor-default' : 'bg-red-600 hover:bg-red-500 shadow-lg'}`}>⛔ ปิดระบบ (Close)</button>
+                            <button onClick={() => updateTopupStatus('open')} className="py-4 rounded-xl font-bold text-white bg-emerald-600 hover:bg-emerald-500">✅ OPEN</button>
+                            <button onClick={() => updateTopupStatus('maintenance')} className="py-4 rounded-xl font-bold text-white bg-amber-600 hover:bg-amber-500">⚠️ MAINTENANCE</button>
+                            <button onClick={() => updateTopupStatus('closed')} className="py-4 rounded-xl font-bold text-white bg-red-600 hover:bg-red-500">⛔ CLOSED</button>
                         </div>
                     </div>
                 </div>
@@ -447,17 +404,17 @@ export default function AdminDashboardModal({ isOpen, onClose, adminEmail }) {
 
             {/* Tab: Transactions */}
             {activeTab === 'transactions' && (
-                <div className="space-y-6">
+                 <div className="space-y-6">
                     <div className="flex flex-wrap gap-4 items-end bg-slate-800/50 p-4 rounded-xl border border-slate-700">
                         <div><label className="block text-xs text-slate-400 mb-1">จากวันที่</label><input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="bg-slate-900 border border-slate-600 text-white text-sm rounded px-3 py-2 outline-none focus:border-emerald-500" /></div>
                         <div><label className="block text-xs text-slate-400 mb-1">ถึงวันที่</label><input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="bg-slate-900 border border-slate-600 text-white text-sm rounded px-3 py-2 outline-none focus:border-emerald-500" /></div>
-                        <button onClick={fetchTransactions} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-bold rounded flex items-center gap-2 transition-colors h-[38px]"><SearchIcon /> ค้นหา</button>
+                        <button onClick={fetchTransactions} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-bold rounded flex items-center gap-2 h-[38px]"><SearchIcon /> ค้นหา</button>
                     </div>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        <div className="bg-gradient-to-br from-emerald-900/40 to-slate-900 p-4 rounded-xl border border-emerald-500/30"><p className="text-xs text-emerald-400 font-bold uppercase mb-1">✅ สำเร็จ (มีผู้ซื้อ)</p><p className="text-2xl font-black text-white">{stats.completedCount}</p></div>
-                        <div className="bg-gradient-to-br from-amber-900/40 to-slate-900 p-4 rounded-xl border border-amber-500/30"><p className="text-xs text-amber-400 font-bold uppercase mb-1">💰 มูลค่ารวม</p><p className="text-2xl font-black text-white">฿{stats.totalValue.toLocaleString()}</p></div>
-                        <div className="bg-gradient-to-br from-slate-800 to-slate-900 p-4 rounded-xl border border-slate-600/30"><p className="text-xs text-slate-400 font-bold uppercase mb-1">💨 หมดเวลา (ไร้คนบิด)</p><p className="text-2xl font-black text-white">{stats.expiredCount}</p></div>
-                        <div className="bg-gradient-to-br from-red-900/40 to-slate-900 p-4 rounded-xl border border-red-500/30"><p className="text-xs text-red-400 font-bold uppercase mb-1">❌ ยกเลิก</p><p className="text-2xl font-black text-white">{stats.cancelledCount}</p></div>
+                        <div className="bg-emerald-900/40 p-4 rounded-xl border border-emerald-500/30"><p className="text-xs text-emerald-400 font-bold uppercase mb-1">สำเร็จ</p><p className="text-2xl font-black text-white">{stats.completedCount}</p></div>
+                        <div className="bg-amber-900/40 p-4 rounded-xl border border-amber-500/30"><p className="text-xs text-amber-400 font-bold uppercase mb-1">ยอดเงินรวม</p><p className="text-2xl font-black text-white">฿{stats.totalValue.toLocaleString()}</p></div>
+                        <div className="bg-slate-800 p-4 rounded-xl border border-slate-600/30"><p className="text-xs text-slate-400 font-bold uppercase mb-1">หมดเวลา</p><p className="text-2xl font-black text-white">{stats.expiredCount}</p></div>
+                        <div className="bg-red-900/40 p-4 rounded-xl border border-red-500/30"><p className="text-xs text-red-400 font-bold uppercase mb-1">ยกเลิก</p><p className="text-2xl font-black text-white">{stats.cancelledCount}</p></div>
                     </div>
                     {isLoadingData ? (<p className="text-slate-500 text-center py-10">กำลังโหลดข้อมูล...</p>) : (
                         <div>
@@ -486,14 +443,8 @@ export default function AdminDashboardModal({ isOpen, onClose, adminEmail }) {
                                                 <td className="p-3"><div className="flex flex-col"><span className="text-slate-300 text-xs">{tx.seller_name}</span><span className="text-slate-500 text-[10px]">{tx.seller_email}</span></div></td>
                                                 <td className="p-3 text-right text-slate-400 text-xs">{new Date(tx.end_time).toLocaleString('th-TH')}</td>
                                                 <td className="p-3 text-center flex items-center justify-center gap-2">
-                                                    {/* 🟢 ปุ่มดูรายละเอียด */}
-                                                    <button onClick={() => setInspectAuction(tx)} className="p-1.5 bg-blue-900/20 text-blue-400 rounded hover:bg-blue-600 hover:text-white transition-colors" title="ดูรายละเอียด">
-                                                        <MenuIcon />
-                                                    </button>
-                                                    {/* ปุ่มลบ */}
-                                                    <button onClick={() => handleDeleteTransaction(tx.id, tx.card_name)} className="p-1.5 bg-red-900/20 text-red-500 rounded hover:bg-red-600 hover:text-white transition-colors opacity-50 group-hover:opacity-100" title="ลบรายการ">
-                                                        <TrashIcon />
-                                                    </button>
+                                                    <button onClick={() => setInspectAuction(tx)} className="p-1.5 bg-blue-900/20 text-blue-400 rounded hover:bg-blue-600 hover:text-white transition-colors" title="ดูรายละเอียด"><MenuIcon /></button>
+                                                    <button onClick={() => handleDeleteTransaction(tx.id, tx.card_name)} className="p-1.5 bg-red-900/20 text-red-500 rounded hover:bg-red-600 hover:text-white transition-colors opacity-50 group-hover:opacity-100" title="ลบรายการ"><TrashIcon /></button>
                                                 </td>
                                             </tr>
                                         ))}
@@ -561,26 +512,11 @@ export default function AdminDashboardModal({ isOpen, onClose, adminEmail }) {
                 </div>
             )}
 
-            {/* Tab: Feedback */}
-            {activeTab === 'feedback' && (
-                <div className="space-y-4">
-                     <div className="flex justify-between items-center"><h3 className="text-white font-bold">Feedback ({feedbacks.length})</h3><button onClick={fetchFeedbacks} className="text-xs text-blue-400 hover:underline">Refresh</button></div>
-                    {isLoadingData ? <p className="text-slate-500 text-center">กำลังโหลด...</p> : feedbacks.length === 0 ? <p className="text-slate-500 text-center">ไม่มี Feedback</p> : (
-                        <div className="space-y-3">
-                            {feedbacks.map((fb) => (
-                                <div key={fb.id} className="p-4 bg-slate-800 rounded-lg border border-slate-700"><div className="flex justify-between items-start mb-2"><div className="flex items-center gap-2"><div className="w-6 h-6 rounded-full bg-slate-700 flex items-center justify-center overflow-hidden shrink-0 border border-slate-600">{(fb.user && fb.user.picture) ? <img src={fb.user.picture} className="w-full h-full object-cover" onError={(e) => { e.currentTarget.style.display = 'none'; e.currentTarget.nextSibling.style.display = 'flex'; }} /> : null}<div className={`w-full h-full items-center justify-center text-slate-400 text-[10px] ${(fb.user && fb.user.picture) ? 'hidden' : 'flex'}`}>?</div></div><span className="text-sm font-bold text-emerald-400">{fb.user?.name || 'Anonymous'}</span><span className="text-[10px] text-slate-500">({fb.user?.email || 'No Email'})</span></div><span className={`text-[10px] px-2 py-0.5 rounded border ${fb.type === 'bug' ? 'bg-red-900/30 text-red-400 border-red-800' : 'bg-blue-900/30 text-blue-400 border-blue-800'}`}>{fb.type.toUpperCase()}</span></div><p className="text-slate-300 text-sm whitespace-pre-wrap">{fb.text}</p><p className="text-[10px] text-slate-600 mt-2 text-right">{fb.createdAt ? new Date(fb.createdAt.seconds * 1000).toLocaleString('th-TH') : 'Unknown'}</p></div>
-                            ))}
-                        </div>
-                    )}
-                </div>
-            )}
-
         </div>
       </div>
-
-      {/* Render Inspector Modal */}
+      
+      {/* Inspector Modal */}
       <TransactionInspectorModal isOpen={!!inspectAuction} onClose={() => setInspectAuction(null)} auction={inspectAuction} />
-
     </div>
   );
 }

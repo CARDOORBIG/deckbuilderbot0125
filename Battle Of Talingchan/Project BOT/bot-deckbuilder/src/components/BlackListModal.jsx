@@ -7,11 +7,11 @@ import { CloseIcon, SearchIcon, ShieldBanIcon } from './Icons';
 import RatingBadge from './RatingBadge';
 import UserProfilePopup from './UserProfilePopup';
 
-// 🟢 Icons สำหรับปุ่ม Vote
+// Icons สำหรับปุ่ม Vote
 const ThumbsUp = ({ filled }) => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill={filled ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"></path></svg>;
 const ThumbsDown = ({ filled }) => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill={filled ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zm7-13h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17"></path></svg>;
 
-export default function BlackListModal({ isOpen, onClose, userProfile }) { // 🟢 รับ userProfile
+export default function BlackListModal({ isOpen, onClose, userProfile }) {
     const [allUsersData, setAllUsersData] = useState([]);
     const [displayUsers, setDisplayUsers] = useState([]);
     const [loading, setLoading] = useState(false);
@@ -20,9 +20,7 @@ export default function BlackListModal({ isOpen, onClose, userProfile }) { // �
     const [selectedUser, setSelectedUser] = useState(null);
     const [filterType, setFilterType] = useState('all');
 
-    // 🟢 เก็บประวัติการโหวตของฉัน { targetEmail: 1 (Like) หรือ -1 (Dislike) }
     const [myVotes, setMyVotes] = useState({});
-
     const ITEMS_PER_PAGE = 50;
 
     useEffect(() => {
@@ -32,7 +30,6 @@ export default function BlackListModal({ isOpen, onClose, userProfile }) { // �
         }
     }, [isOpen, userProfile]);
 
-    // 🟢 ดึงข้อมูลโหวตของฉัน
     const fetchMyVotes = async () => {
         if (!userProfile) return;
         const { data } = await supabase.from('user_votes').select('target_email, vote_value').eq('voter_email', userProfile.email);
@@ -43,7 +40,6 @@ export default function BlackListModal({ isOpen, onClose, userProfile }) { // �
         }
     };
 
-    // 🟢 Realtime Subscription: ฟังคะแนนเปลี่ยน (เพื่อให้เห็นผลทันทีเมื่อคนอื่นกด)
     useEffect(() => {
         if (!isOpen) return;
         const channel = supabase
@@ -60,7 +56,6 @@ export default function BlackListModal({ isOpen, onClose, userProfile }) { // �
         return () => supabase.removeChannel(channel);
     }, [isOpen]);
 
-    // ดึงข้อมูลทั้งหมด (เหมือนเดิมที่คุณแก้แล้ว)
     const fetchAllData = async () => {
         setLoading(true);
         try {
@@ -78,7 +73,6 @@ export default function BlackListModal({ isOpen, onClose, userProfile }) { // �
                 return { user_email: user.email, profile: user.profile, ...stats };
             });
 
-            // Default Sort: คนโดนแบน > คนมีคดี > ปกติ
             mergedList.sort((a, b) => b.penalty_level - a.penalty_level);
             setAllUsersData(mergedList);
         } catch (e) {
@@ -88,7 +82,6 @@ export default function BlackListModal({ isOpen, onClose, userProfile }) { // �
         }
     };
 
-    // Filter Logic
     useEffect(() => {
         let filtered = allUsersData;
 
@@ -114,7 +107,7 @@ export default function BlackListModal({ isOpen, onClose, userProfile }) { // �
 
     }, [allUsersData, searchTerm, page, filterType]);
 
-    // 🟢 ฟังก์ชัน Vote (1 คน 1 เสียง)
+    // 🟢 แก้ไขตรงนี้: ส่งพารามิเตอร์ให้ตรงกับ SQL ใหม่ (p_...)
     const handleVote = async (e, targetEmail, type) => {
         e.stopPropagation();
         if (!userProfile) return alert('กรุณา Login ก่อนให้คะแนนครับ');
@@ -127,35 +120,32 @@ export default function BlackListModal({ isOpen, onClose, userProfile }) { // �
         let scoreDiff = 0;
 
         if (currentVote === scoreChange) {
-            // กดซ้ำ = ยกเลิก (Toggle Off)
             newVoteStatus = 0;
             scoreDiff = -scoreChange;
         } else if (currentVote === 0) {
-            // โหวตใหม่
             newVoteStatus = scoreChange;
             scoreDiff = scoreChange;
         } else {
-            // เปลี่ยนใจ (เช่น +1 เป็น -1)
             newVoteStatus = scoreChange;
             scoreDiff = scoreChange * 2; 
         }
 
-        // Optimistic Update (อัปเดตหน้าจอทันที)
         setMyVotes(prev => ({ ...prev, [targetEmail]: newVoteStatus }));
         setAllUsersData(prev => prev.map(u => 
             u.user_email === targetEmail ? { ...u, total_score: (u.total_score || 0) + scoreDiff } : u
         ));
 
-        // ส่งไป Server
+        // 🟢 ส่งค่าแบบใหม่ (มี p_ นำหน้า)
         const { error } = await supabase.rpc('vote_user', { 
-            target_email: targetEmail, 
-            score_change: scoreChange,
-            voter_email: userProfile.email 
+            p_target_email: targetEmail, 
+            p_score_change: scoreChange,
+            p_voter_email: userProfile.email 
         });
         
         if (error) {
             console.error("Vote error:", error);
-            // Revert changes if needed (optional)
+            // Revert changes if needed
+            alert("บันทึกไม่สำเร็จ: " + error.message);
         }
     };
 
@@ -181,7 +171,6 @@ export default function BlackListModal({ isOpen, onClose, userProfile }) { // �
         <div className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center z-[50000] p-0 md:p-4 animate-fade-in" onClick={onClose}>
             <div className="bg-slate-900 border-0 md:border border-slate-700 w-full md:max-w-7xl h-full md:h-[90vh] md:rounded-2xl shadow-2xl flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
                 
-                {/* Header */}
                 <div className="p-4 bg-slate-800 border-b border-slate-700 flex justify-between items-center shrink-0 shadow-md z-20">
                     <div>
                         <h2 className="text-lg md:text-2xl font-bold text-white flex items-center gap-2">
@@ -193,10 +182,7 @@ export default function BlackListModal({ isOpen, onClose, userProfile }) { // �
                     <button onClick={onClose} className="bg-slate-700 hover:bg-red-600 text-white p-2 rounded-full transition-colors shadow-lg"><CloseIcon /></button>
                 </div>
 
-                {/* Controls (Search & Filters) */}
                 <div className="bg-slate-800/80 border-b border-slate-700 backdrop-blur-sm z-10 flex flex-col md:flex-row gap-3 p-3">
-                    
-                    {/* Search */}
                     <div className="relative flex-grow">
                         <input 
                             type="text" 
@@ -207,35 +193,22 @@ export default function BlackListModal({ isOpen, onClose, userProfile }) { // �
                         />
                         <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500"><SearchIcon /></div>
                     </div>
-
-                    {/* 🟢 Filters Buttons */}
                     <div className="flex gap-2 overflow-x-auto pb-1 md:pb-0 no-scrollbar">
-                        <button onClick={() => setFilterType('all')} className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-colors border ${filterType==='all' ? 'bg-blue-600 border-blue-500 text-white' : 'bg-slate-700 border-slate-600 text-slate-300 hover:bg-slate-600'}`}>
-                            ทั้งหมด
-                        </button>
-                        <button onClick={() => setFilterType('banned')} className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-colors border ${filterType==='banned' ? 'bg-red-600 border-red-500 text-white' : 'bg-slate-700 border-slate-600 text-slate-300 hover:bg-slate-600'}`}>
-                            🚫 ถูกแบน
-                        </button>
-                        <button onClick={() => setFilterType('watchlist')} className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-colors border ${filterType==='watchlist' ? 'bg-amber-600 border-amber-500 text-white' : 'bg-slate-700 border-slate-600 text-slate-300 hover:bg-slate-600'}`}>
-                            ⚠️ เฝ้าระวัง
-                        </button>
-                        <button onClick={() => setFilterType('no_history')} className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-colors border ${filterType==='no_history' ? 'bg-slate-500 border-slate-400 text-white' : 'bg-slate-700 border-slate-600 text-slate-300 hover:bg-slate-600'}`}>
-                            ⚪ ไม่มีประวัติ
-                        </button>
+                        <button onClick={() => setFilterType('all')} className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-colors border ${filterType==='all' ? 'bg-blue-600 border-blue-500 text-white' : 'bg-slate-700 border-slate-600 text-slate-300 hover:bg-slate-600'}`}>ทั้งหมด</button>
+                        <button onClick={() => setFilterType('banned')} className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-colors border ${filterType==='banned' ? 'bg-red-600 border-red-500 text-white' : 'bg-slate-700 border-slate-600 text-slate-300 hover:bg-slate-600'}`}>🚫 ถูกแบน</button>
+                        <button onClick={() => setFilterType('watchlist')} className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-colors border ${filterType==='watchlist' ? 'bg-amber-600 border-amber-500 text-white' : 'bg-slate-700 border-slate-600 text-slate-300 hover:bg-slate-600'}`}>⚠️ เฝ้าระวัง</button>
+                        <button onClick={() => setFilterType('no_history')} className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-colors border ${filterType==='no_history' ? 'bg-slate-500 border-slate-400 text-white' : 'bg-slate-700 border-slate-600 text-slate-300 hover:bg-slate-600'}`}>⚪ ไม่มีประวัติ</button>
                     </div>
                 </div>
 
-                {/* Content Area */}
                 <div className="flex-grow overflow-y-auto bg-[#0b1120] scrollbar-thin scrollbar-thumb-slate-700">
-                    
-                    {/* Desktop Table View */}
                     <table className="w-full text-left border-collapse hidden md:table">
                         <thead className="bg-slate-800/90 backdrop-blur sticky top-0 z-10 shadow-sm">
                             <tr className="text-slate-400 text-xs uppercase tracking-wider font-bold">
                                 <th className="p-4 border-b border-slate-700 text-center w-12">#</th>
                                 <th className="p-4 border-b border-slate-700">ผู้ใช้งาน</th>
                                 <th className="p-4 border-b border-slate-700 text-center">สถานะ</th>
-                                <th className="p-4 border-b border-slate-700 text-center">Give Credit</th> {/* 🟢 ปุ่มโหวต */}
+                                <th className="p-4 border-b border-slate-700 text-center">Give Credit</th>
                                 <th className="p-4 border-b border-slate-700 text-center">Score</th>
                                 <th className="p-4 border-b border-slate-700 text-center text-slate-300">ลงขาย</th>
                                 <th className="p-4 border-b border-slate-700 text-center text-emerald-400"> สำเร็จ</th>
@@ -248,8 +221,7 @@ export default function BlackListModal({ isOpen, onClose, userProfile }) { // �
                              displayUsers.length === 0 ? <tr><td colSpan="9" className="p-10 text-center text-slate-500">ไม่พบข้อมูล</td></tr> :
                              displayUsers.map((u, i) => {
                                 const reliability = calculateReliability(u.completed_sales, u.cancelled_sales);
-                                const myVote = myVotes[u.user_email] || 0; // 🟢 สถานะโหวตของฉัน
-                                
+                                const myVote = myVotes[u.user_email] || 0;
                                 return (
                                     <tr key={u.user_email} onClick={() => setSelectedUser(u.user_email)} className="hover:bg-slate-800/40 cursor-pointer transition-colors group">
                                         <td className="p-4 text-center text-slate-600 font-mono">{(page * ITEMS_PER_PAGE) + i + 1}</td>
@@ -263,15 +235,12 @@ export default function BlackListModal({ isOpen, onClose, userProfile }) { // �
                                             </div>
                                         </td>
                                         <td className="p-4 text-center">{renderStatus(u)}</td>
-                                        
-                                        {/* 🟢 ปุ่ม Vote (Desktop) */}
                                         <td className="p-4 text-center">
                                             <div className="flex items-center justify-center gap-2">
                                                 <button onClick={(e) => handleVote(e, u.user_email, 'like')} className={`p-1.5 rounded-lg transition-all active:scale-95 border ${myVote === 1 ? 'bg-emerald-600 text-white border-emerald-500 shadow-md shadow-emerald-500/30' : 'bg-slate-700 text-slate-400 border-slate-600 hover:text-emerald-500'}`}><ThumbsUp filled={myVote === 1} /></button>
                                                 <button onClick={(e) => handleVote(e, u.user_email, 'dislike')} className={`p-1.5 rounded-lg transition-all active:scale-95 border ${myVote === -1 ? 'bg-red-600 text-white border-red-500 shadow-md shadow-red-500/30' : 'bg-slate-700 text-slate-400 border-slate-600 hover:text-red-500'}`}><ThumbsDown filled={myVote === -1} /></button>
                                             </div>
                                         </td>
-
                                         <td className="p-4 text-center"><div className="flex justify-center scale-90"><RatingBadge score={u.total_score} /></div></td>
                                         <td className="p-4 text-center font-mono font-bold text-slate-400">{u.total_listings}</td>
                                         <td className="p-4 text-center font-mono font-bold text-emerald-500">{u.completed_sales}</td>
@@ -288,7 +257,6 @@ export default function BlackListModal({ isOpen, onClose, userProfile }) { // �
                         </tbody>
                     </table>
 
-                    {/* Mobile Card View */}
                     <div className="md:hidden p-3 space-y-3 pb-20">
                         {displayUsers.map((u, i) => {
                             const reliability = calculateReliability(u.completed_sales, u.cancelled_sales);
@@ -306,7 +274,6 @@ export default function BlackListModal({ isOpen, onClose, userProfile }) { // �
                                                 </div>
                                             </div>
                                         </div>
-                                        {/* 🟢 ปุ่ม Vote แบบ Mobile */}
                                         <div className="flex gap-1">
                                             <button onClick={(e) => handleVote(e, u.user_email, 'like')} className={`p-2 rounded-lg border transition-all ${myVote === 1 ? 'bg-emerald-600 text-white border-emerald-500' : 'bg-slate-800 text-slate-500 border-slate-700'}`}><ThumbsUp filled={myVote === 1} /></button>
                                             <button onClick={(e) => handleVote(e, u.user_email, 'dislike')} className={`p-2 rounded-lg border transition-all ${myVote === -1 ? 'bg-red-600 text-white border-red-500' : 'bg-slate-800 text-slate-500 border-slate-700'}`}><ThumbsDown filled={myVote === -1} /></button>
@@ -323,7 +290,6 @@ export default function BlackListModal({ isOpen, onClose, userProfile }) { // �
                     </div>
                 </div>
 
-                {/* Footer Pagination */}
                 <div className="p-4 border-t border-slate-700 bg-slate-800 flex justify-between items-center z-30 relative">
                     <p className="text-slate-400 text-xs">หน้า {page + 1}</p>
                     <div className="flex gap-3">

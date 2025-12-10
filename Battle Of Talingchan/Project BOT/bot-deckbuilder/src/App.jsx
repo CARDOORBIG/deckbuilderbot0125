@@ -143,7 +143,7 @@ const FeedbackModal = ({ isOpen, onClose, userProfile, showAlert }) => {
         user: userProfile ? { name: userProfile.name, email: userProfile.email, uid: userProfile.email } : "Anonymous",
         createdAt: serverTimestamp(), status: "new", version: "1.0"
       });
-      showAlert("ขอบคุณค่ะ! ", "เราได้รับข้อมูลของท่านแล้ว ทีมงานจะนำไปปรับปรุงให้ดียิ่งขึ้น");
+      showAlert("ขอบคุณครับ! ", "เราได้รับข้อมูลของท่านแล้ว ทีมงานจะติดต่อกลับไปที่ช่องแชทสีเขียวขวาล่างครับ");
       setText(""); onClose();
     } catch (e) { console.error("Feedback error: ", e); showAlert("เกิดข้อผิดพลาด", "ไม่สามารถส่งข้อมูลได้ โปรดลองใหม่ภายหลัง"); } finally { setIsSubmitting(false); }
   };
