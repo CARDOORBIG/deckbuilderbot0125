@@ -1,5 +1,5 @@
 import React, { useState } from 'react'; 
-import { supabase } from '../supabaseClient'; // ✅ Import Supabase
+import { supabase } from '../supabaseClient'; 
 import TopUpModal from './TopUpModal'; 
 import { 
     UserCogIcon, CloseIcon, CrownIcon, DeckIcon, 
@@ -13,6 +13,13 @@ const Button = ({ className = "", children, ...props }) => (
     </button>
 );
 
+// 🟢 รายชื่อ Admin
+const ADMIN_EMAILS = [
+  'koritros619@gmail.com',
+  'sarun.psx@gmail.com',
+  'srirujinanon.k@gmail.com'
+];
+
 const SettingsDrawer = ({
   isOpen, onClose, userProfile, onEditProfile, onLogout, 
   theme, setTheme, onOpenFeedback, onOpenAdmin, onOpenMyDecks, 
@@ -20,7 +27,6 @@ const SettingsDrawer = ({
 }) => {
   const [isTopUpOpen, setIsTopUpOpen] = useState(false);
 
-  // ✅ ฟังก์ชันตรวจสอบสถานะระบบก่อนเปิดเติมเงิน
   const handleTopUpClick = async () => {
       try {
           const { data, error } = await supabase
@@ -31,25 +37,23 @@ const SettingsDrawer = ({
 
           if (error && error.code !== 'PGRST116') {
               console.error(error);
-              // ถ้าหาไม่เจอ (Error) ให้เปิดไปก่อน (กันระบบล่ม)
               setIsTopUpOpen(true);
               return;
           }
 
-          const status = data?.value || 'open'; // Default open
+          const status = data?.value || 'open'; 
 
           if (status === 'maintenance') {
               alert("⚠️ ระบบอยู่ในระหว่างการปรับปรุงค่ะ ขออภัยในความไม่สะดวก");
           } else if (status === 'closed') {
               alert("⛔ ปิดระบบเติมเงินชั่วคราว");
           } else {
-              // สถานะ Open
               setIsTopUpOpen(true);
           }
 
       } catch (e) {
           console.error(e);
-          setIsTopUpOpen(true); // Fallback
+          setIsTopUpOpen(true); 
       }
   };
 
@@ -68,7 +72,8 @@ const SettingsDrawer = ({
 
         <div className="flex-1 overflow-y-auto p-6 flex flex-col items-center gap-6">
           
-          {userProfile?.email === 'koritros619@gmail.com' && (
+          {/* 🟢 ตรวจสอบสิทธิ์ Admin */}
+          {ADMIN_EMAILS.includes(userProfile?.email) && (
             <button onClick={() => { onOpenAdmin(); onClose(); }} className="w-full py-3 bg-gradient-to-r from-red-600 to-orange-600 text-white font-bold rounded-xl shadow-lg shadow-red-500/20 hover:scale-105 transition-transform flex items-center justify-center gap-2 animate-pulse">
               <CrownIcon /> ADMIN DASHBOARD
             </button>
@@ -93,7 +98,6 @@ const SettingsDrawer = ({
                       ฿{parseFloat(userStats?.wallet_balance || 0).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </p>
               </div>
-              {/* ✅ ใช้ handleTopUpClick แทนการเปิดตรงๆ */}
               <button 
                   onClick={handleTopUpClick} 
                   className="px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-600 text-white text-xs font-bold rounded-lg shadow hover:shadow-emerald-500/30 hover:scale-105 transition-all active:scale-95"

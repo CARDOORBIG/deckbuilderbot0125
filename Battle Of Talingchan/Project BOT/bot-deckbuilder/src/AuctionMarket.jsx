@@ -287,8 +287,39 @@ export default function AuctionMarket() {
     } 
   }
 
-  async function handleCancel(item) { if (item.type === 'market') { showConfirm("ยืนยัน", "⚠️ ยืนยันการยกเลิกการขาย?", async () => { const { error } = await supabase.from('market_listings').delete().eq('id', item.id); if (error) showAlert("Error", "ลบไม่สำเร็จ: " + error.message, 'error'); else { setMyAuctions(prev => prev.filter(i => i.id !== item.id)); showAlert("สำเร็จ", "ยกเลิกการขายเรียบร้อย", 'success'); closeModal(); } }); } else { const isAdmin = userProfile?.email === 'koritros619@gmail.com'; const confirmMsg = isAdmin ? "👑 Admin Force Cancel:\nยืนยัน?" : "⚠️ ยืนยันการยกเลิกการประมูล?"; showConfirm("ยืนยัน", confirmMsg, async () => { const { data, error } = await supabase.rpc('cancel_auction', { p_auction_id: item.id, p_user_email: userProfile.email }); if (error) showAlert("Error", "Error: " + error.message, 'error'); else if (!data.success) showAlert("แจ้งเตือน", data.message, 'error'); else { showAlert("สำเร็จ", data.message, 'success'); fetchAuctions(); fetchMyAuctions(); closeModal(); } }); } }
-  async function handlePenaltyCancel(item) { showConfirm("ยืนยันยกเลิก", `⚠️ คำเตือน: สินค้านี้มีผู้สั่งซื้อแล้ว!\nหากยกเลิก คุณจะถูก "หักเครดิต 2 คะแนน"\nยืนยันยกเลิก?`, async () => { const { data, error } = await supabase.rpc('cancel_order_with_penalty', { p_item_id: item.id, p_seller_email: userProfile.email }); if (error) showAlert("Error", error.message, 'error'); else { showAlert("เรียบร้อย", data.message, 'info'); fetchMyAuctions(); closeModal(); } }); }
+  async function handleCancel(item) { 
+    // ตรวจสอบว่า User ปัจจุบันเป็น 1 ใน Admin หรือไม่
+    const ADMIN_EMAILS = ['koritros619@gmail.com', 'sarun.psx@gmail.com', 'srirujinanon.k@gmail.com'];
+    const isAdmin = ADMIN_EMAILS.includes(userProfile?.email);
+
+    if (item.type === 'market') { 
+        showConfirm("ยืนยัน", "⚠️ ยืนยันการยกเลิกการขาย?", async () => { 
+            const { error } = await supabase.from('market_listings').delete().eq('id', item.id); 
+            if (error) showAlert("Error", "ลบไม่สำเร็จ: " + error.message, 'error'); 
+            else { 
+                setMyAuctions(prev => prev.filter(i => i.id !== item.id)); 
+                showAlert("สำเร็จ", "ยกเลิกการขายเรียบร้อย", 'success'); 
+                closeModal(); 
+            } 
+        }); 
+    } else { 
+        const confirmMsg = isAdmin ? "👑 Admin Force Cancel:\nยืนยัน?" : "⚠️ ยืนยันการยกเลิกการประมูล?"; 
+        showConfirm("ยืนยัน", confirmMsg, async () => { 
+            const { data, error } = await supabase.rpc('cancel_auction', { 
+                p_auction_id: item.id, 
+                p_user_email: userProfile.email 
+            }); 
+            if (error) showAlert("Error", "Error: " + error.message, 'error'); 
+            else if (!data.success) showAlert("แจ้งเตือน", data.message, 'error'); 
+            else { 
+                showAlert("สำเร็จ", data.message, 'success'); 
+                fetchAuctions(); 
+                fetchMyAuctions(); 
+                closeModal(); 
+            } 
+        }); 
+    } 
+}async function handlePenaltyCancel(item) { showConfirm("ยืนยันยกเลิก", `⚠️ คำเตือน: สินค้านี้มีผู้สั่งซื้อแล้ว!\nหากยกเลิก คุณจะถูก "หักเครดิต 2 คะแนน"\nยืนยันยกเลิก?`, async () => { const { data, error } = await supabase.rpc('cancel_order_with_penalty', { p_item_id: item.id, p_seller_email: userProfile.email }); if (error) showAlert("Error", error.message, 'error'); else { showAlert("เรียบร้อย", data.message, 'info'); fetchMyAuctions(); closeModal(); } }); }
   async function handleDeleteMyAuction(item, e) { if (e && e.stopPropagation) e.stopPropagation(); showConfirm("ลบประวัติ", "⚠️ ยืนยันการลบประวัติรายการนี้ออกจากรายการของคุณ?\n(รายการจะหายไปจากหน้าจอของคุณเท่านั้น)", async () => { const isSeller = item.seller_email === userProfile.email; const table = item.type === 'market' ? 'market_listings' : 'auctions'; const field = isSeller ? 'seller_hidden' : (item.type === 'market' ? 'buyer_hidden' : 'winner_hidden'); const { error } = await supabase.from(table).update({ [field]: true }).eq('id', item.id); if (error) { showAlert("Error", error.message, 'error'); } else { setMyAuctions(prev => prev.filter(i => i.id !== item.id)); closeModal(); } }); }
   
   const handleLogout = () => { googleLogout(); localStorage.removeItem("bot-userProfile-v1"); setUserProfile(null); navigate('/'); };

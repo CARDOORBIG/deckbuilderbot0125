@@ -8,7 +8,7 @@ import {
 } from './Icons';
 import CreditCheckModal from './CreditCheckModal'; 
 import BlackListModal from './BlackListModal'; 
-import RulesModal from './RulesModal'; // 🟢 1. Import RulesModal
+import RulesModal from './RulesModal'; 
 
 const ChevronDownIcon = ({ className }) => <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polyline points="6 9 12 15 18 9"></polyline></svg>;
 
@@ -17,6 +17,13 @@ const HeaderButton = ({ className = "", children, ...props }) => (
     {children}
   </button>
 );
+
+// 🟢 เพิ่มรายชื่อ Admin ที่นี่
+const ADMIN_EMAILS = [
+  'koritros619@gmail.com',
+  'sarun.psx@gmail.com',
+  'srirujinanon.k@gmail.com'
+];
 
 export default function Header({ 
   userProfile, 
@@ -31,7 +38,7 @@ export default function Header({
   const [isPanelOpen, setIsPanelOpen] = useState(false);
   const [isCreditModalOpen, setIsCreditModalOpen] = useState(false); 
   const [isBlackListOpen, setIsBlackListOpen] = useState(false);
-  const [isRulesOpen, setIsRulesOpen] = useState(false); // 🟢 2. เพิ่ม State สำหรับ Rules
+  const [isRulesOpen, setIsRulesOpen] = useState(false);
 
   const isActive = (path) => location.pathname === path;
 
@@ -50,14 +57,12 @@ export default function Header({
       setIsPanelOpen(false);
   };
 
-  // 🟢 3. เพิ่มฟังก์ชันกดปุ่ม Rules
   const handleRulesClick = () => {
       setIsRulesOpen(true);
       setIsPanelOpen(false);
   };
 
   const comingSoonItems = [
-    // ❌ ลบ Blacklist และ กฏการใช้งาน ออกจากตรงนี้
     { icon: <MessageCircleIcon />, label: "พูดคุยสาธารณะ" },
     { icon: <AlertIcon />, label: "แจ้งปัญหา" },
     { icon: <SettingsIcon />, label: "การตั้งค่า" }
@@ -75,7 +80,8 @@ export default function Header({
                 <div className="scale-75 md:scale-90"><MenuIcon /></div>
             </button>
             
-            {userProfile?.email === 'koritros619@gmail.com' && (
+            {/* 🟢 ตรวจสอบสิทธิ์ Admin จาก List */}
+            {ADMIN_EMAILS.includes(userProfile?.email) && (
                 <button onClick={() => setIsAdminOpen(true)} className="flex items-center gap-1 px-1.5 md:px-2 py-1 bg-red-600 hover:bg-red-500 text-white rounded-full shadow-lg shadow-red-500/20 transition-all animate-pulse font-bold text-[9px] md:text-xs shrink-0">
                     <div className="scale-75"><CrownIcon /></div> <span className="hidden md:inline">ADMIN</span>
                 </button>
@@ -160,7 +166,6 @@ export default function Header({
                       <span className="text-[10px] font-bold text-slate-600 dark:text-slate-300">ตรวจสอบประวัติ</span>
                   </button>
 
-                  {/* 🟢 4. เพิ่มปุ่ม "กฏการใช้งาน" (ใช้งานได้จริง) */}
                   <button onClick={handleRulesClick} className="flex flex-col items-center gap-1 group w-full">
                       <div className="w-10 h-10 rounded-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center text-amber-500 group-hover:text-amber-600 group-hover:border-amber-500 transition-all shadow-sm">
                           <BookOpenIcon />
@@ -199,8 +204,6 @@ export default function Header({
       {/* Render Modals */}
       <CreditCheckModal isOpen={isCreditModalOpen} onClose={() => setIsCreditModalOpen(false)} />
       <BlackListModal isOpen={isBlackListOpen} onClose={() => setIsBlackListOpen(false)} userProfile={userProfile} />
-      
-      {/* 🟢 5. แสดงผล Rules Modal */}
       <RulesModal isOpen={isRulesOpen} onClose={() => setIsRulesOpen(false)} />
 
     </header>

@@ -103,6 +103,13 @@ const TransactionInspectorModal = ({ isOpen, onClose, auction }) => {
     );
 };
 
+// 🟢 รายชื่อ Admin (ต้องตรงกันกับไฟล์ Header.jsx และ SettingsDrawer.jsx)
+const ADMIN_EMAILS = [
+  'koritros619@gmail.com',
+  'sarun.psx@gmail.com',
+  'srirujinanon.k@gmail.com'
+];
+
 export default function AdminDashboardModal({ isOpen, onClose, adminEmail }) {
   const [activeTab, setActiveTab] = useState('transactions');
   
@@ -139,6 +146,9 @@ export default function AdminDashboardModal({ isOpen, onClose, adminEmail }) {
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 50;
   const [userSearchTerm, setUserSearchTerm] = useState('');
+
+  // ❌ [แก้ไข] ลบบรรทัดตรวจสอบสิทธิ์ที่อยู่ตรงนี้ออก (เพราะมันขัดขวาง Hooks ด้านล่าง)
+  // if (!isOpen || !ADMIN_EMAILS.includes(adminEmail)) return null;
 
   // --- Functions ---
   const callAdminRpc = async (rpcName, params) => { setIsProcessing(true); const { data, error } = await supabase.rpc(rpcName, params); setIsProcessing(false); if(error) alert("Error: " + error.message); else alert(data.message); };
@@ -260,7 +270,7 @@ export default function AdminDashboardModal({ isOpen, onClose, adminEmail }) {
   }, [transactions]);
   
   const paginatedTransactions = useMemo(() => transactions.slice((currentPage-1)*ITEMS_PER_PAGE, currentPage*ITEMS_PER_PAGE), [transactions, currentPage]);
-  const totalPages = Math.ceil(transactions.length / ITEMS_PER_PAGE); // 🟢 เพิ่มบรรทัดนี้กลับมาครับ
+  const totalPages = Math.ceil(transactions.length / ITEMS_PER_PAGE);
 
   const filteredUsers = allUsers.filter(u => (u.displayName||'').toLowerCase().includes(userSearchTerm.toLowerCase()) || (u.id||'').toLowerCase().includes(userSearchTerm.toLowerCase()));
 
@@ -277,7 +287,8 @@ export default function AdminDashboardModal({ isOpen, onClose, adminEmail }) {
       else setTransactions(prev => prev.filter(tx => tx.id !== id));
   };
 
-  if (!isOpen || adminEmail !== 'koritros619@gmail.com') return null;
+  // ✅ [แก้ไข] ย้ายการตรวจสอบสิทธิ์มาไว้ตรงนี้ (หลัง Hooks ทั้งหมด)
+  if (!isOpen || !ADMIN_EMAILS.includes(adminEmail)) return null;
 
   return (
     <div className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center z-[999] p-4" onClick={onClose}>
@@ -301,7 +312,7 @@ export default function AdminDashboardModal({ isOpen, onClose, adminEmail }) {
         {/* Content */}
         <div className="p-6 space-y-6 overflow-y-auto bg-slate-900/50 flex-grow">
             
-            {/* 🟢 Tab: Feedback & Support Ticket System */}
+            {/* Feedback Tab */}
             {activeTab === 'feedback' && (
                 <div className="flex flex-col h-full min-h-[500px]">
                     <div className="flex gap-4 mb-4 border-b border-slate-700 pb-2">
@@ -365,7 +376,7 @@ export default function AdminDashboardModal({ isOpen, onClose, adminEmail }) {
                                         </div>
                                         <div className="flex-grow p-4 overflow-y-auto space-y-2 bg-slate-900/50">
                                             {ticketMessages.map(msg => (<AdminChatBubble key={msg.id} msg={msg} isAdmin={msg.is_admin} adminEmail={adminEmail} />))}
-                                            {selectedTicket.status === 'closed' && (<div className="text-center py-4 text-xs text-slate-500 bg-slate-800/50 rounded mt-4">⛔ เคสนี้ถูกปิดแล้ว</div>)}
+                                            {selectedTicket.status === 'closed' && (<div className="text-center py-4 text-xs text-slate-500 bg-slate-100 dark:bg-slate-800/50 rounded-lg">⛔ เคสนี้ถูกปิดแล้ว</div>)}
                                             <div ref={chatEndRef} />
                                         </div>
                                         {selectedTicket.status === 'open' && (
@@ -384,7 +395,7 @@ export default function AdminDashboardModal({ isOpen, onClose, adminEmail }) {
                 </div>
             )}
 
-            {/* Tab: System Config */}
+            {/* Config Tab */}
             {activeTab === 'config' && (
                 <div className="space-y-6">
                     <div className="bg-slate-800 p-6 rounded-xl border border-slate-700">
@@ -402,7 +413,7 @@ export default function AdminDashboardModal({ isOpen, onClose, adminEmail }) {
                 </div>
             )}
 
-            {/* Tab: Transactions */}
+            {/* Transactions Tab */}
             {activeTab === 'transactions' && (
                  <div className="space-y-6">
                     <div className="flex flex-wrap gap-4 items-end bg-slate-800/50 p-4 rounded-xl border border-slate-700">
@@ -457,7 +468,7 @@ export default function AdminDashboardModal({ isOpen, onClose, adminEmail }) {
                 </div>
             )}
 
-            {/* Tab: Broadcast */}
+            {/* Broadcast Tab */}
             {activeTab === 'announce' && (
                 <div className="space-y-4">
                     <div><label className="text-xs font-bold text-slate-400 uppercase mb-1 block">หัวข้อประกาศ</label><input value={title} onChange={e=>setTitle(e.target.value)} className="w-full bg-slate-800 border border-slate-600 rounded-lg p-3 text-white focus:border-red-500 outline-none" placeholder="แจ้งข่าว..." /></div>
@@ -466,7 +477,7 @@ export default function AdminDashboardModal({ isOpen, onClose, adminEmail }) {
                 </div>
             )}
 
-            {/* Tab: Manage Users */}
+            {/* Manage Users Tab */}
             {activeTab === 'manage' && (
                 <div className="space-y-6">
                     <div>
@@ -489,7 +500,7 @@ export default function AdminDashboardModal({ isOpen, onClose, adminEmail }) {
                 </div>
             )}
 
-            {/* Tab: Cleanup */}
+            {/* Cleanup Tab */}
             {activeTab === 'cleanup' && (
                 <div className="space-y-6">
                     <div className="p-4 bg-slate-800/50 rounded-xl border border-slate-700 space-y-3"><h4 className="text-white font-bold flex items-center gap-2">🗑️ ลบการประมูล (รายตัว)</h4><input value={auctionId} onChange={e=>setAuctionId(e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded p-2 text-sm text-white" placeholder="Auction ID (UUID)" /><button onClick={() => { if(confirm("ยืนยันลบ?")) callAdminRpc('admin_force_delete', { p_admin_email: adminEmail, p_target_input: auctionId, p_action_type: 'delete_auction' }); }} className="w-full py-2 bg-slate-700 hover:bg-red-600 text-white text-sm rounded transition-colors">ลบการประมูลนี้</button></div>
@@ -498,7 +509,7 @@ export default function AdminDashboardModal({ isOpen, onClose, adminEmail }) {
                 </div>
             )}
 
-            {/* Tab: Users */}
+            {/* Users Tab */}
             {activeTab === 'users' && (
                 <div className="space-y-4">
                     <div className="flex flex-col md:flex-row justify-between items-center gap-2"><h3 className="text-white font-bold whitespace-nowrap">รายชื่อผู้ใช้ ({allUsers.length})</h3><div className="relative w-full md:w-64"><input type="text" value={userSearchTerm} onChange={(e) => setUserSearchTerm(e.target.value)} placeholder="ค้นหาชื่อ หรือ Email..." className="w-full pl-9 pr-3 py-1.5 bg-slate-800 border border-slate-600 rounded-lg text-sm text-white outline-none" /><div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"><SearchIcon /></div></div><button onClick={fetchAllUsers} className="text-xs text-blue-400 hover:underline shrink-0">Refresh</button></div>
