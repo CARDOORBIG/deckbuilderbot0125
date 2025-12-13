@@ -28,7 +28,7 @@ const Button = ({ className = "", children, ...props }) => (
     <button className={`flex items-center justify-center gap-2 px-4 py-2 rounded-lg shadow-lg border border-amber-300/20 dark:border-amber-400/20 bg-amber-200/20 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 hover:bg-amber-200/50 dark:hover:bg-amber-700/50 hover:border-amber-400/60 transition-all disabled:opacity-40 ${className}`} {...props}>{children}</button>
 );
 
-// 🟢 แก้ไข Modal: เพิ่ม z-index สูงๆ (1200) และรองรับการแสดง message
+// Modal Component
 const Modal = ({ isOpen, title, message, children, onClose, onConfirm, confirmText = "Confirm", confirmIcon }) => {
     if (!isOpen) return null;
     return createPortal(
@@ -36,7 +36,6 @@ const Modal = ({ isOpen, title, message, children, onClose, onConfirm, confirmTe
             <div className="bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-emerald-500/30 rounded-xl shadow-2xl p-6 w-full max-w-md animate-fade-in relative">
                 <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4">{title}</h2>
                 <div className="text-slate-700 dark:text-gray-300 mb-6">
-                    {/* ✅ ให้แสดง children (ถ้ามี) หรือแสดง message (สำหรับปุ่มลบ/แชร์) */}
                     {children || message}
                 </div>
                 <div className="flex justify-end gap-3">
@@ -51,15 +50,14 @@ const Modal = ({ isOpen, title, message, children, onClose, onConfirm, confirmTe
 export default function DeckListModal({ 
     isOpen, onClose, userProfile, userDecks, setUserDecks, 
     mainDeck, lifeDeck, setMainDeck, setLifeDeck, 
-    cardDb = [], onShowCards 
+    cardDb = [], onShowCards, onSelectDeck 
 }) {
     const [importingSlot, setImportingSlot] = useState(null);
     const [importCode, setImportCode] = useState('');
     const [modal, setModal] = useState({ isOpen: false });
 
     if (!isOpen || !userProfile) return null;
-    const email = userProfile?.email
-;
+    const email = userProfile?.email;
 
     const getUserSlots = () => {
         const defaultSlots = [{ name: "Slot 1", main: [], life: [] }, { name: "Slot 2", main: [], life: [] }];
@@ -145,7 +143,6 @@ export default function DeckListModal({
         }
     };
 
-    // 🟢 ฟังก์ชันลบเด็ค (แก้ไขให้ทำงานและแสดงผลถูกต้อง)
     const handleClearSlot = (index) => { 
         setModal({ 
             isOpen: true, 
@@ -153,10 +150,10 @@ export default function DeckListModal({
             message: `คุณต้องการล้างข้อมูลใน "${slots[index].name}" ใช่หรือไม่?`, 
             onConfirm: () => { 
                 const s = [...slots]; 
-                s[index] = { ...s[index], main:[], life:[] }; // ล้างข้อมูล
-                updateSlots(s); // อัปเดต state
-                closeModal(); // ปิด Modal ยืนยัน
-                setTimeout(() => showAlert("Slot Cleared", "ล้างข้อมูลเรียบร้อยแล้ว"), 100); // แจ้งเตือนว่าลบแล้ว
+                s[index] = { ...s[index], main:[], life:[] };
+                updateSlots(s);
+                closeModal();
+                setTimeout(() => showAlert("Slot Cleared", "ล้างข้อมูลเรียบร้อยแล้ว"), 100);
             }, 
             confirmText: "ล้างข้อมูล", 
             confirmIcon: <TrashIcon /> 
@@ -210,7 +207,7 @@ export default function DeckListModal({
         <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-[900] p-4">
             <div className="bg-slate-100 dark:bg-slate-900/90 border border-slate-300 dark:border-emerald-500/30 rounded-xl shadow-2xl w-full max-w-4xl max-h-[85vh] flex flex-col animate-fade-in">
                 <header className="flex items-center justify-between p-4 border-b border-slate-300 dark:border-emerald-500/20 shrink-0">
-                    <h2 className="text-2xl font-bold text-slate-900 dark:text-white">My Decks (เลือก Slot เพื่อบันทึก/โหลด)</h2>
+                    <h2 className="text-2xl font-bold text-slate-900 dark:text-white">{onSelectDeck ? "Select a Deck to Play" : "My Decks (เลือก Slot เพื่อบันทึก/โหลด)"}</h2>
                     <Button onClick={onClose} className="px-3 py-1 text-sm">Close</Button>
                 </header>
                 <div className="flex-grow overflow-y-auto p-4">
@@ -218,7 +215,9 @@ export default function DeckListModal({
                         {slots.map((slot, index) => {
                             const deckSize = slot.main.length + slot.life.length;
                             const only1 = slot.main.find(c => c.onlyRank === 1);
+                            // คำนวณ path รูปปก
                             const cover = only1 ? `/cards/${encodePath(only1.imagePath)}/${encodeURIComponent(only1.id.replace(' - Only#1', ''))}.png` : null;
+                            
                             return (
                                 <div key={index} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-3 shadow-sm hover:shadow-md transition-shadow">
                                     <div className="flex gap-3 h-full">
@@ -228,20 +227,41 @@ export default function DeckListModal({
                                         </div>
                                         <div className="flex-grow flex flex-col justify-between min-w-0">
                                             <input type="text" value={slot.name} onChange={e => handleNameChange(index, e.target.value)} className="w-full bg-transparent border-b border-slate-300 dark:border-slate-600 font-bold text-lg outline-none py-1 text-slate-900 dark:text-white" placeholder="ตั้งชื่อเด็ค..." />
-                                            <div className="flex flex-col gap-2">
-                                                <div className="flex gap-2">
-                                                    <Button onClick={() => handleLoad(index)} className="flex-1 py-1 text-xs bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800">Load</Button>
-                                                    <Button onClick={() => handleSave(index)} className="flex-1 py-1 text-xs bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800 font-bold">Save</Button>
+                                            
+                                            {onSelectDeck ? (
+                                                <div className="flex flex-col gap-2 mt-2">
+                                                    {/* ✅ แก้ไข: ส่ง coverImage กลับไปด้วย */}
+                                                    <Button 
+                                                        onClick={() => onSelectDeck({ ...slot, id: index, coverImage: cover })} 
+                                                        disabled={deckSize === 0}
+                                                        className="w-full py-2 bg-emerald-600 text-white hover:bg-emerald-500 border-none shadow-md"
+                                                    >
+                                                        Select
+                                                    </Button>
+                                                    <Button 
+                                                        onClick={() => handleLoad(index)} 
+                                                        className="w-full py-1.5 bg-slate-200 text-slate-700 hover:bg-slate-300 dark:bg-slate-700 dark:text-slate-300 border-none"
+                                                    >
+                                                        Edit
+                                                    </Button>
                                                 </div>
-                                                <div className="flex items-center justify-between gap-1">
-                                                    {onShowCards && <button onClick={() => onShowCards({main: slot.main, life: slot.life})} disabled={!deckSize} className="p-2 rounded text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-slate-700" title="ดูการ์ดในเด็ค"><EyeIcon /></button>}
-                                                    <button onClick={() => { setImportingSlot(index); setImportCode(''); }} className="p-2 rounded text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-700" title="Import"><ImportIcon /></button>
-                                                    <button onClick={() => handleExport(index)} disabled={!deckSize} className="p-2 rounded text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-700 disabled:opacity-30" title="Export Code"><ExportIcon /></button>
-                                                    <button onClick={() => handleShareDeck(index)} disabled={!deckSize} className="p-2 rounded text-purple-600 hover:bg-purple-50 dark:text-purple-400 dark:hover:bg-slate-700 disabled:opacity-30" title="Share Public"><UploadIcon /></button>
-                                                    <div className="w-px h-4 bg-slate-300 dark:bg-slate-600 mx-1"></div>
-                                                    <button onClick={() => handleClearSlot(index)} className="p-2 rounded text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-slate-700" title="Clear"><TrashIcon /></button>
+                                            ) : (
+                                                // (ส่วนแสดงผลปุ่มโหมดปกติ ... เหมือนเดิม)
+                                                <div className="flex flex-col gap-2">
+                                                    <div className="flex gap-2">
+                                                        <Button onClick={() => handleLoad(index)} className="flex-1 py-1 text-xs bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800">Load</Button>
+                                                        <Button onClick={() => handleSave(index)} className="flex-1 py-1 text-xs bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800 font-bold">Save</Button>
+                                                    </div>
+                                                    <div className="flex items-center justify-between gap-1">
+                                                        {onShowCards && <button onClick={() => onShowCards({main: slot.main, life: slot.life})} disabled={!deckSize} className="p-2 rounded text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-slate-700" title="ดูการ์ดในเด็ค"><EyeIcon /></button>}
+                                                        <button onClick={() => { setImportingSlot(index); setImportCode(''); }} className="p-2 rounded text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-700" title="Import"><ImportIcon /></button>
+                                                        <button onClick={() => handleExport(index)} disabled={!deckSize} className="p-2 rounded text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-700 disabled:opacity-30" title="Export Code"><ExportIcon /></button>
+                                                        <button onClick={() => handleShareDeck(index)} disabled={!deckSize} className="p-2 rounded text-purple-600 hover:bg-purple-50 dark:text-purple-400 dark:hover:bg-slate-700 disabled:opacity-30" title="Share Public"><UploadIcon /></button>
+                                                        <div className="w-px h-4 bg-slate-300 dark:bg-slate-600 mx-1"></div>
+                                                        <button onClick={() => handleClearSlot(index)} className="p-2 rounded text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-slate-700" title="Clear"><TrashIcon /></button>
+                                                    </div>
                                                 </div>
-                                            </div>
+                                            )}
                                         </div>
                                     </div>
                                 </div>
@@ -263,7 +283,6 @@ export default function DeckListModal({
                 </div>
             </div>
         )}
-        {/* แสดง Modal โดยใช้ props ที่ส่งเข้ามา (รวมถึง message ที่เพิ่มไปใหม่) */}
         <Modal {...modal} onClose={closeModal} />
         </>, document.body
     );

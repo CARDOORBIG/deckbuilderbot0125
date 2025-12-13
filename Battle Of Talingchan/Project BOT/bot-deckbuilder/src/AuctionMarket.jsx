@@ -98,6 +98,7 @@ export default function AuctionMarket() {
   const [modal, setModal] = useState({ isOpen: false, title: '', message: '', onConfirm: null, type: 'info' });
   const closeModal = () => setModal({ ...modal, isOpen: false });
   const showAlert = (title, message, type = 'info') => setModal({ isOpen: true, title, message, onConfirm: null, type });
+  const showConfirm = (title, message, onConfirm) => setModal({ isOpen: true, title, message, onConfirm, type: 'confirm' });
 
   useEffect(() => {
     if (!userProfile) {
@@ -150,12 +151,11 @@ export default function AuctionMarket() {
   useEffect(() => { fetchReputations(); }, []);
   useEffect(() => { const openFromNoti = async () => { if (location.state?.openAuctionId) { const auctionId = location.state.openAuctionId; let targetAuction = auctions.find(a => a.id === auctionId) || myAuctions.find(a => a.id === auctionId); if (!targetAuction) { const { data } = await supabase.from('auctions').select('*').eq('id', auctionId).single(); if (data) targetAuction = data; } if (targetAuction) { setChatAuction(targetAuction); window.history.replaceState({}, document.title); } } }; openFromNoti(); }, [location, auctions, myAuctions]);
   
-  // 🟢 🟢 🟢 แก้ไขตรงนี้: ให้โหลดทั้ง 2 อย่างเสมอ และ Subscribe ตลอดเวลา 🟢 🟢 🟢
   useEffect(() => { 
     const refreshData = () => {
-        fetchAuctions(); // โหลดหน้าตลาดรวม
+        fetchAuctions(); 
         if (userProfile?.email) {
-            fetchMyAuctions(); // โหลดหน้าจัดการ (Notification ใช้ตัวนี้)
+            fetchMyAuctions(); 
         }
     };
     
@@ -167,7 +167,7 @@ export default function AuctionMarket() {
         .subscribe(); 
     
     return () => supabase.removeChannel(channel); 
-  }, [userProfile]); // เอา activeTab ออก เพื่อให้ทำงานตลอด
+  }, [userProfile]); 
   
   async function fetchAuctions() { 
       const now = new Date().toISOString(); 
@@ -288,7 +288,7 @@ export default function AuctionMarket() {
   }
 
   async function handleCancel(item) { 
-    // ตรวจสอบว่า User ปัจจุบันเป็น 1 ใน Admin หรือไม่
+    // ตรวจสอบว่าเป็น 1 ใน Admin หรือไม่
     const ADMIN_EMAILS = ['koritros619@gmail.com', 'sarun.psx@gmail.com', 'srirujinanon.k@gmail.com'];
     const isAdmin = ADMIN_EMAILS.includes(userProfile?.email);
 
@@ -305,10 +305,7 @@ export default function AuctionMarket() {
     } else { 
         const confirmMsg = isAdmin ? "👑 Admin Force Cancel:\nยืนยัน?" : "⚠️ ยืนยันการยกเลิกการประมูล?"; 
         showConfirm("ยืนยัน", confirmMsg, async () => { 
-            const { data, error } = await supabase.rpc('cancel_auction', { 
-                p_auction_id: item.id, 
-                p_user_email: userProfile.email 
-            }); 
+            const { data, error } = await supabase.rpc('cancel_auction', { p_auction_id: item.id, p_user_email: userProfile.email }); 
             if (error) showAlert("Error", "Error: " + error.message, 'error'); 
             else if (!data.success) showAlert("แจ้งเตือน", data.message, 'error'); 
             else { 
@@ -319,7 +316,20 @@ export default function AuctionMarket() {
             } 
         }); 
     } 
-}async function handlePenaltyCancel(item) { showConfirm("ยืนยันยกเลิก", `⚠️ คำเตือน: สินค้านี้มีผู้สั่งซื้อแล้ว!\nหากยกเลิก คุณจะถูก "หักเครดิต 2 คะแนน"\nยืนยันยกเลิก?`, async () => { const { data, error } = await supabase.rpc('cancel_order_with_penalty', { p_item_id: item.id, p_seller_email: userProfile.email }); if (error) showAlert("Error", error.message, 'error'); else { showAlert("เรียบร้อย", data.message, 'info'); fetchMyAuctions(); closeModal(); } }); }
+  }
+
+  async function handlePenaltyCancel(item) { 
+    showConfirm("ยืนยันยกเลิก", `⚠️ คำเตือน: สินค้านี้มีผู้สั่งซื้อแล้ว!\nหากยกเลิก คุณจะถูก "หักเครดิต 2 คะแนน"\nยืนยันยกเลิก?`, async () => { 
+        const { data, error } = await supabase.rpc('cancel_order_with_penalty', { p_item_id: item.id, p_seller_email: userProfile.email }); 
+        if (error) showAlert("Error", error.message, 'error'); 
+        else { 
+            showAlert("เรียบร้อย", data.message, 'info'); 
+            fetchMyAuctions(); 
+            closeModal(); 
+        } 
+    }); 
+  }
+
   async function handleDeleteMyAuction(item, e) { if (e && e.stopPropagation) e.stopPropagation(); showConfirm("ลบประวัติ", "⚠️ ยืนยันการลบประวัติรายการนี้ออกจากรายการของคุณ?\n(รายการจะหายไปจากหน้าจอของคุณเท่านั้น)", async () => { const isSeller = item.seller_email === userProfile.email; const table = item.type === 'market' ? 'market_listings' : 'auctions'; const field = isSeller ? 'seller_hidden' : (item.type === 'market' ? 'buyer_hidden' : 'winner_hidden'); const { error } = await supabase.from(table).update({ [field]: true }).eq('id', item.id); if (error) { showAlert("Error", error.message, 'error'); } else { setMyAuctions(prev => prev.filter(i => i.id !== item.id)); closeModal(); } }); }
   
   const handleLogout = () => { googleLogout(); localStorage.removeItem("bot-userProfile-v1"); setUserProfile(null); navigate('/'); };
@@ -365,7 +375,7 @@ export default function AuctionMarket() {
       <div className="flex-none z-50 bg-slate-100 dark:bg-black border-b border-slate-200 dark:border-slate-800 shadow-sm relative">
           <Header userProfile={userProfile} displayUser={displayUser} userReputation={userReputation[userProfile?.email]} setIsSettingsOpen={setIsSettingsOpen} setIsAdminOpen={setIsAdminOpen} setIsMyDecksOpen={setIsDeckListModalOpen} />
           <div className="flex justify-center pb-2 pt-9 px-2 md:px-4">
-            <div className="flex w-full md:w-auto bg-slate-200 dark:bg-slate-800 rounded-full p-1 shadow-inner relative">
+            <div className="flex w-full md:w-auto bg-slate-200 dark:bg-slate-800 rounded-full p-1 shadow-inner relative overflow-x-auto no-scrollbar">
                 <button onClick={() => setActiveTab('auction')} className={`flex-1 md:flex-none flex items-center justify-center gap-1 md:gap-2 px-4 py-2 rounded-full font-bold text-xs md:text-sm transition-all whitespace-nowrap ${activeTab === 'auction' ? 'bg-white dark:bg-slate-700 text-amber-600 dark:text-amber-400 shadow-md' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}><GavelIcon /> ลานประมูล</button>
                 <button onClick={() => setActiveTab('market')} className={`flex-1 md:flex-none flex items-center justify-center gap-1 md:gap-2 px-4 py-2 rounded-full font-bold text-xs md:text-sm transition-all whitespace-nowrap ${activeTab === 'market' ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-md' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}><ShoppingBagIcon /> ตลาดซื้อขาย</button>
                 <button onClick={() => setActiveTab('management')} className={`relative flex-1 md:flex-none flex items-center justify-center gap-1 md:gap-2 px-4 py-2 rounded-full font-bold text-xs md:text-sm transition-all whitespace-nowrap ${activeTab === 'management' ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-md' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}>
@@ -414,7 +424,7 @@ export default function AuctionMarket() {
                 setConfirmTransaction={setConfirmTransaction} 
                 setShipmentData={setShipmentData} 
                 handleForceEnd={handleOpenForceEndModal}
-                onRefresh={fetchMyAuctions} // 🟢 ส่งฟังก์ชันไปรีเฟรช
+                onRefresh={fetchMyAuctions} 
             />
         )}
       </main>
@@ -428,7 +438,6 @@ export default function AuctionMarket() {
       <ManageBiddersModal isOpen={!!manageAuction} onClose={() => setManageAuction(null)} auction={manageAuction} userProfile={userProfile} />
       <AuctionRoomModal isOpen={!!chatAuction} onClose={() => setChatAuction(null)} auction={chatAuction} userProfile={displayUser} onBid={handleBid} onBuyNow={handleBuyNow} />
       
-      {/* 🟢 ส่ง onSuccess ให้กับ Modal ยืนยัน */}
       <ConfirmTransactionModal 
         isOpen={!!confirmTransaction} 
         onClose={() => setConfirmTransaction(null)} 

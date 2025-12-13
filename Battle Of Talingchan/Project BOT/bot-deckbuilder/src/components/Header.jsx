@@ -4,7 +4,7 @@ import NotificationCenter from '../NotificationCenter';
 import { 
   MenuIcon, StoreIcon, HomeIcon, UsersIcon, CrownIcon,
   ShieldBanIcon, BookOpenIcon, MedalIcon, MessageCircleIcon,
-  TrophyIcon, AlertIcon, LayersIcon, SettingsIcon
+  TrophyIcon, AlertIcon, LayersIcon, SettingsIcon, GamepadIcon 
 } from './Icons';
 import CreditCheckModal from './CreditCheckModal'; 
 import BlackListModal from './BlackListModal'; 
@@ -18,7 +18,7 @@ const HeaderButton = ({ className = "", children, ...props }) => (
   </button>
 );
 
-// 🟢 เพิ่มรายชื่อ Admin ที่นี่
+// 🟢 รายชื่อ Admin
 const ADMIN_EMAILS = [
   'koritros619@gmail.com',
   'sarun.psx@gmail.com',
@@ -109,6 +109,13 @@ export default function Header({
             <Link to="/auction">
                 <HeaderButton className={isActive('/auction') ? "bg-gradient-to-r from-emerald-500 to-teal-600 text-white border-transparent shadow-md shadow-emerald-500/30" : "text-emerald-600 dark:text-emerald-400 bg-transparent border-transparent hover:bg-emerald-50 dark:hover:bg-emerald-900/20"}>
                     <div className="scale-90 md:scale-100"><StoreIcon /></div> <span className="hidden lg:inline ml-1">Market</span>
+                </HeaderButton>
+            </Link>
+
+            {/* 🟢 ปุ่ม PlayGround ใหม่ */}
+            <Link to="/playground">
+                <HeaderButton className={isActive('/playground') ? "bg-gradient-to-r from-purple-500 to-indigo-600 text-white border-transparent shadow-md shadow-purple-500/30" : "text-purple-600 dark:text-purple-400 bg-transparent border-transparent hover:bg-purple-50 dark:hover:bg-purple-900/20"}>
+                    <div className="scale-90 md:scale-100"><GamepadIcon /></div> <span className="hidden lg:inline ml-1">PlayGround</span>
                 </HeaderButton>
             </Link>
 

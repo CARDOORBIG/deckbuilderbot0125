@@ -1,0 +1,291 @@
+@import url('https://fonts.googleapis.com/css2?family=Kanit:wght@400;700&display=swap');
+
+:root {
+    /* --- SCALING --- */
+    --card-h: clamp(85px, 14vh, 160px);
+    --card-w: calc(var(--card-h) * 0.714);
+    
+    --hand-h: calc(var(--card-h) * 1.1);
+    --hand-w: calc(var(--hand-h) * 0.714);
+
+    /* Colors */
+    --bg-board: #020202;
+    --bg-zone: rgba(20, 25, 30, 0.6);
+    --border-zone: rgba(255, 255, 255, 0.2);
+    
+    /* Glows */
+    --glow-avatar: #00E5FF;
+    --glow-deck: #76FF03;
+    --glow-grave: #D500F9;
+    --glow-magic: #FFD600;
+    --glow-construct: #FF3D00;
+    --glow-field: #2979FF;
+}
+
+.game-board-wrapper {
+    width: 100%;
+    height: 100%;
+    background-color: var(--bg-board);
+    background-image: 
+        radial-gradient(circle at 50% 50%, rgba(10, 20, 40, 0.7) 0%, transparent 100%),
+        linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+    background-size: 100% 100%, 30px 30px, 30px 30px;
+    overflow: hidden;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    font-family: 'Kanit', sans-serif;
+    user-select: none;
+}
+
+/* --- BOARD AREA --- */
+.game-board-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 4px;
+    padding: 0 1vw;
+    perspective: 1000px;
+}
+
+.player-side {
+    position: relative;
+    flex: 1;
+    display: flex;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.01);
+    border: 1px solid rgba(255, 255, 255, 0.03);
+    max-height: 42%; 
+}
+
+.player-side.opponent {
+    transform: rotate(180deg);
+    margin-bottom: 2px;
+}
+
+/* Un-rotate Labels for Opponent */
+.player-side.opponent .zone-slot::after, 
+.player-side.opponent .life-label,
+.player-side.opponent .zone-count-badge {
+    transform: rotate(180deg);
+}
+
+.player-side.me {
+    margin-top: 2px;
+}
+
+/* --- COLUMNS --- */
+.zones-col {
+    display: flex;
+    flex-direction: column;
+    padding: 0.5vh;
+    height: 100%;
+}
+
+.zones-col.left { width: 20%; align-items: flex-start; justify-content: space-between; padding-left: 1vw; }
+.zones-col.center { width: 60%; align-items: center; justify-content: flex-start; padding-top: 1.5vh; gap: 1.5vh; }
+.zones-col.right { width: 20%; align-items: flex-end; justify-content: space-between; padding-right: 1vw; }
+
+/* --- ZONES --- */
+.zone-slot {
+    width: var(--card-w);
+    height: var(--card-h);
+    background: var(--bg-zone);
+    border: 1px solid var(--border-zone);
+    border-radius: 6px;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+}
+
+.zone-slot::after {
+    content: attr(data-label);
+    position: absolute;
+    bottom: 2px;
+    font-size: 0.55rem;
+    font-weight: 900;
+    color: rgba(255,255,255,0.25);
+    pointer-events: none;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    text-shadow: 0 1px 2px black;
+}
+
+.zone-slot:hover {
+    border-color: rgba(255,255,255,0.6);
+    box-shadow: 0 0 15px rgba(255,255,255,0.15);
+}
+
+.zone-slot.field { width: 90%; height: calc(var(--card-h) * 0.7); border-style: dashed; border-color: var(--glow-field); }
+.zone-slot.construct { border-style: dashed; border-color: var(--glow-construct); }
+.zone-slot.magic { 
+    width: calc((var(--card-w) * 4) + 3vw); 
+    height: calc(var(--card-h) * 0.85); 
+    border-style: dashed; 
+    border-color: var(--glow-magic); 
+}
+.avatar-row { display: flex; justify-content: center; gap: 1vw; width: 100%; }
+.zone-slot.avatar { border-color: var(--glow-avatar); box-shadow: 0 0 5px rgba(0, 229, 255, 0.15); }
+
+/* --- DECK & GRAVE (เท่ากันเป๊ะ) --- */
+.deck-grave-group {
+    display: flex;
+    gap: 1vw;
+    align-items: flex-end;
+}
+.zone-slot.deck, .zone-slot.grave {
+    width: calc(var(--card-w) * 1.15); 
+    height: calc(var(--card-h) * 1.15);
+    flex-shrink: 0;
+}
+.zone-slot.deck { border-color: var(--glow-deck); cursor: pointer; }
+.zone-slot.grave { border-color: var(--glow-grave); }
+
+/* Deck Stack Visual */
+.deck-stack-visual {
+    width: 100%;
+    height: 100%;
+    background-image: url('/assets/Backcard.png') !important;
+    background-size: 100% 100% !important;
+    background-repeat: no-repeat;
+    border-radius: 6px;
+    position: absolute;
+    top: 0; left: 0;
+    box-shadow: 2px 2px 0 #333, 4px 4px 0 #111;
+    border: 1px solid #555;
+}
+
+/* --- LIFE DECK (Horizontal Stack - Absolute Positioning) --- */
+.life-zone-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin-bottom: 2vh;
+    padding-left: 0.5vw;
+    position: relative;
+    /* จองพื้นที่ให้พอดีกับการ์ด */
+    width: calc(var(--card-w) * 2.5); 
+    height: var(--card-h);
+}
+
+.life-label {
+    position: absolute;
+    top: -15px;
+    left: 0;
+    font-size: 0.6rem;
+    color: #aaa;
+    font-weight: bold;
+    text-transform: uppercase;
+}
+
+.life-stack {
+    position: relative;
+    width: 100%;
+    height: 100%;
+}
+
+.card-life {
+    width: calc(var(--card-w) * 0.9);
+    height: calc(var(--card-h) * 0.9);
+    
+    background-image: url('/assets/Backcard.png') !important;
+    background-size: 100% 100% !important;
+    background-repeat: no-repeat;
+    background-color: #1a1a1a;
+    
+    border-radius: 5px;
+    border: 1px solid #777;
+    box-shadow: -2px 1px 4px rgba(0,0,0,0.5);
+    
+    /* 🟢 Absolute Position เพื่อซ้อนกันแบบควบคุมได้ */
+    position: absolute;
+    top: 0;
+    
+    transition: transform 0.2s ease;
+    cursor: pointer;
+}
+
+/* Hover เบาๆ */
+.card-life:hover {
+    transform: translateY(-8px) !important;
+    z-index: 100 !important;
+    border-color: #fff;
+    box-shadow: 0 0 10px rgba(255,255,255,0.4);
+}
+
+/* --- VISUALS --- */
+.zone-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 6px;
+}
+.card-back-img {
+    width: 100%;
+    height: 100%;
+    background-image: url('/assets/Backcard.png') !important;
+    background-size: 100% 100% !important;
+    background-repeat: no-repeat;
+    border-radius: 6px;
+    border: 1px solid #444;
+}
+
+/* --- HAND ZONE --- */
+.hand-container {
+    position: absolute;
+    left: 0; right: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: var(--hand-h);
+    z-index: 50;
+    pointer-events: none;
+}
+
+.hand-container.player { bottom: -2%; }
+.hand-container.opponent { top: -15%; }
+
+/* Opponent Rotate */
+.hand-container.opponent .card-in-hand {
+    transform: rotate(180deg);
+    margin-left: calc(var(--hand-w) * -0.5);
+}
+
+.card-in-hand {
+    width: var(--hand-w);
+    height: var(--hand-h);
+    background: #1a1a1a;
+    border: 1px solid #555;
+    border-radius: 8px;
+    box-shadow: -3px 2px 10px rgba(0,0,0,0.6);
+    margin-left: calc(var(--hand-w) * -0.45);
+    transition: transform 0.15s ease-out, margin 0.15s ease-out;
+    transform-origin: bottom center;
+    position: relative;
+    pointer-events: auto;
+    cursor: pointer;
+}
+
+/* Hover Effect Soften */
+.card-in-hand:hover {
+    transform: translateY(-8%) scale(1.05) !important;
+    z-index: 1000 !important;
+    margin: 0 5px;
+    box-shadow: 0 0 15px rgba(0, 229, 255, 0.4);
+    border-color: #fff;
+}
+
+.hand-container.opponent .card-in-hand:hover {
+    transform: rotate(180deg) translateY(-8%) scale(1.05) !important;
+}
+
+.card-face-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 7px;
+}
