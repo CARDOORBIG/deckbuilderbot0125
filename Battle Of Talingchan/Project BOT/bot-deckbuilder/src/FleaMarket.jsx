@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from './supabaseClient';
-import { ShoppingBagIcon, ChatBubbleIcon, ShieldCheckIcon, HistoryIcon } from './components/Icons';
-import UserBadge from './components/UserBadge'; // 🟢 Import
+import { ShoppingBagIcon, ChatBubbleIcon, ShieldCheckIcon, HistoryIcon, ShareIcon } from './components/Icons';
+import UserBadge from './components/UserBadge'; 
 
 const LayoutGridIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>;
 const LayoutFeedIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="3" y1="15" x2="21" y2="15"></line></svg>;
@@ -58,6 +58,14 @@ export default function FleaMarket({ userProfile, onChat, onBuy, viewMode = 'gri
         onChat(mappedItem);
     };
 
+    // 🟢 ฟังก์ชันสำหรับ Copy Link
+    const handleCopyLink = (item) => {
+        const link = `${window.location.origin}/auction?id=${item.id}&type=market`;
+        navigator.clipboard.writeText(link)
+            .then(() => alert(`✅ คัดลอกลิงก์เรียบร้อย!`))
+            .catch(() => alert(`❌ คัดลอกไม่สำเร็จ`));
+    };
+
     return (
         <div className="animate-fade-in w-full md:px-8">
             <div className="mb-6 mx-4 md:mx-0 mt-4">
@@ -101,11 +109,20 @@ export default function FleaMarket({ userProfile, onChat, onBuy, viewMode = 'gri
                     >
                         <div className="aspect-[5/7] w-full rounded mb-2 overflow-hidden bg-slate-200 dark:bg-slate-800 relative shadow-inner">
                             <img src={getThumbnail(item)} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" loading="lazy" alt={item.title} />
+                            
+                            {/* 🟢 ปุ่ม Share (ย้ายมาตรงนี้เพื่อให้เหมือน AuctionCard) */}
+                            <button 
+                                onClick={(e) => { e.stopPropagation(); handleCopyLink(item); }}
+                                className="absolute top-2 left-2 p-1.5 bg-black/50 text-white rounded-full backdrop-blur-md hover:bg-emerald-500 transition-colors z-20"
+                                title="แชร์ลิงก์"
+                            >
+                                <ShareIcon />
+                            </button>
+
                             {item.is_escrow && (<div className="absolute top-2 right-2 bg-gradient-to-br from-blue-500 to-blue-700 text-white p-2 rounded-full shadow-lg shadow-blue-500/40 border-[1.5px] border-white/50 z-10 transform scale-125" title="Escrow Protected"><ShieldCheckIcon width="20" height="20" className="drop-shadow-md" /></div>)}
                         </div>
                         <h3 className="text-xs md:text-sm font-bold text-slate-900 dark:text-white mb-2 line-clamp-1 leading-tight">{item.title}</h3>
                         
-                        {/* 🟢 แก้ไขส่วนแสดงผู้ขาย */}
                         <div className="flex justify-between items-end mb-4">
                             <div className="flex-1 overflow-hidden">
                                 {item.seller_name && (
@@ -130,7 +147,14 @@ export default function FleaMarket({ userProfile, onChat, onBuy, viewMode = 'gri
                                     <ShoppingBagIcon className="w-4 h-4 md:w-5 md:h-5 drop-shadow-sm" /><span>BUY NOW</span>
                                 </button>
                             )}
-                            <button onClick={(e) => { e.stopPropagation(); handleChatClick(item); }} className="p-2 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"><ChatBubbleIcon /></button>
+                            
+                            <button 
+                                onClick={(e) => { e.stopPropagation(); handleChatClick(item); }} 
+                                className="p-2 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors w-full"
+                                title="Chat"
+                            >
+                                <ChatBubbleIcon />
+                            </button>
                         </div>
                     </div>
                 ))}

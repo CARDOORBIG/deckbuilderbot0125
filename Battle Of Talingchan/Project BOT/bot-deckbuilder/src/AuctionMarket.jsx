@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from './supabaseClient';
 import { Link, useNavigate, useLocation } from 'react-router-dom'; 
 import { createPortal } from "react-dom";
@@ -32,16 +32,37 @@ import {
 const LayoutGridIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>;
 const LayoutFeedIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="3" y1="15" x2="21" y2="15"></line></svg>;
 
+// 🟢 แก้ไข Component ป้ายไฟ (ฝัง CSS ในตัว)
 const LEDBanner = () => {
   const message = "🚨 หากผู้ซืื้อได้ทำการประมูลชนะหรือกดซื้อไปแล้ว ให้ทำการติดต่อส่วนตัวกับผู้ขาย หากตรวจสอบพบเห็นว่าเงียบหายจะถือว่าก่อกวน จะทำการเตือนก่อนที่จะลงโทษตามกฏของเว็ปนะครับ 🚨";
   const gapClass = "mr-32 md:mr-48"; 
+
   return (
-    <div className="w-full bg-black border-y-2 border-red-600/50 overflow-hidden relative py-2 shadow-[0_0_15px_rgba(220,38,38,0.3)] mb-4 mx-0 md:mx-4 md:w-auto md:rounded-xl mt-4 flex">
-      <div className="animate-marquee flex items-center">
-        <span className={`text-red-500 font-led font-bold text-base md:text-lg tracking-wider whitespace-nowrap ${gapClass}`}>{message}</span>
-        <span className={`text-red-500 font-led font-bold text-base md:text-lg tracking-wider whitespace-nowrap ${gapClass}`}>{message}</span>
+    <>
+      {/* ฝัง CSS Animation ไว้ตรงนี้เลย เพื่อความชัวร์ */}
+      <style>{`
+        @keyframes marquee-infinite {
+          0% { transform: translateX(0); }
+          100% { transform: translateX(-50%); }
+        }
+        .animate-marquee-custom {
+          display: flex;
+          width: max-content; /* สำคัญ: ให้กว้างเท่าเนื้อหาข้างใน */
+          animation: marquee-infinite 25s linear infinite;
+        }
+        .animate-marquee-custom:hover {
+          animation-play-state: paused;
+        }
+      `}</style>
+
+      <div className="w-full bg-black border-y-2 border-red-600/50 overflow-hidden relative py-2 shadow-[0_0_15px_rgba(220,38,38,0.3)] mb-4 mx-0 md:mx-4 md:w-auto md:rounded-xl mt-4 flex">
+        {/* ใช้ Class ใหม่ animate-marquee-custom */}
+        <div className="animate-marquee-custom flex items-center whitespace-nowrap">
+          <span className={`text-white-500 font-led font-bold text-base md:text-lg tracking-wider whitespace-nowrap ${gapClass}`}>{message}</span>
+          <span className={`text-white-500 font-led font-bold text-base md:text-lg tracking-wider whitespace-nowrap ${gapClass}`}>{message}</span>
+        </div>
       </div>
-    </div>
+    </>
   );
 };
 
@@ -288,7 +309,6 @@ export default function AuctionMarket() {
   }
 
   async function handleCancel(item) { 
-    // ตรวจสอบว่าเป็น 1 ใน Admin หรือไม่
     const ADMIN_EMAILS = ['koritros619@gmail.com', 'sarun.psx@gmail.com', 'srirujinanon.k@gmail.com'];
     const isAdmin = ADMIN_EMAILS.includes(userProfile?.email);
 

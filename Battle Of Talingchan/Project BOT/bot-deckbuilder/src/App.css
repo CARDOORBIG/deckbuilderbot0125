@@ -1,6 +1,7 @@
-/* --- 1. ส่วนที่คุณส่งมา (จัดหน้าจอ + Logo) --- */
+/* --- 0. Imports (ต้องอยู่บนสุดเสมอ) --- */
+@import url('https://fonts.googleapis.com/css2?family=VT323&display=swap');
 
-/* สั่งให้ Root ขยายเต็มจอ ไม่มีการบีบตรงกลาง */
+/* --- 1. ส่วนจัดหน้าจอ + Logo --- */
 #root {
   width: 100%;
   max-width: 100%;
@@ -9,7 +10,6 @@
   text-align: left;
 }
 
-/* โค้ด Logo เดิม */
 .logo {
   height: 6em;
   padding: 1.5em;
@@ -43,8 +43,6 @@
 }
 
 /* --- 2. ส่วนดีไซน์ปุ่มใหม่ (Glossy Button) --- */
-
-/* เอฟเฟกต์ปุ่มแวววาว (Glossy Effect) */
 .btn-glossy {
   position: relative;
   overflow: hidden;
@@ -52,7 +50,6 @@
   z-index: 1;
 }
 
-/* แสงสะท้อนวิ่งผ่าน */
 .btn-glossy::after {
   content: '';
   position: absolute;
@@ -63,34 +60,31 @@
   background: linear-gradient(
     to right,
     transparent 0%,
-    rgba(255, 255, 255, 0.1) 30%, /* แสงขาวจาง */
-    rgba(255, 255, 255, 0.5) 50%, /* แสงขาวจ้าตรงกลาง */
+    rgba(255, 255, 255, 0.1) 30%,
+    rgba(255, 255, 255, 0.5) 50%,
     rgba(255, 255, 255, 0.1) 70%,
     transparent 100%
   );
-  transform: skewX(-25deg); /* เอียงแสง */
+  transform: skewX(-25deg);
   transition: all 0.75s ease;
   z-index: -1;
-  pointer-events: none; /* ป้องกันไม่ให้แสงบังการคลิก */
+  pointer-events: none;
 }
 
-/* เมื่อเอาเมาส์ชี้ แสงจะวิ่งผ่าน */
 .btn-glossy:hover::after {
   left: 150%;
 }
 
-/* เอฟเฟกต์เด้งเมื่อชี้ */
 .btn-glossy:hover {
   transform: translateY(-2px) scale(1.02);
   filter: brightness(1.1);
 }
 
-/* เอฟเฟกต์ยุบเมื่อกด */
 .btn-glossy:active {
   transform: translateY(1px) scale(0.98);
 }
 
-/* --- 3. Animation เสริมอื่นๆ (ถ้ามีใช้) --- */
+/* --- 3. Animation เสริมอื่นๆ --- */
 @keyframes fade-in {
   from { opacity: 0; }
   to { opacity: 1; }
@@ -105,4 +99,30 @@
 }
 .animate-fade-in-up {
   animation: fade-in-up 0.4s ease-out forwards;
+}
+
+/* --- 4. ส่วนสำหรับป้ายไฟวิ่ง (Marquee) --- */
+
+/* Keyframes สั่งให้เลื่อนจากขวาไปซ้าย */
+@keyframes marquee-scroll {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); } /* เลื่อนไป 50% (จบข้อความชุดแรก) แล้ววนกลับทันที */
+}
+
+/* Class เรียกใช้ Animation */
+.animate-marquee {
+  display: flex;
+  width: max-content; /* สำคัญ! ให้ความกว้างยืดตามข้อความจริง */
+  animation: marquee-scroll 25s linear infinite; /* ปรับความเร็วตรงนี้ (ค่ายิ่งมากยิ่งช้า) */
+}
+
+/* หยุดวิ่งเมื่อเอาเมาส์ชี้ */
+.animate-marquee:hover {
+  animation-play-state: paused;
+}
+
+/* ฟอนต์แบบป้ายไฟ LED */
+.font-led {
+  font-family: 'VT323', monospace, sans-serif;
+  text-shadow: 0 0 5px rgba(255, 0, 0, 0.8), 0 0 10px rgba(255, 0, 0, 0.4); /* แสงฟุ้ง */
 }
