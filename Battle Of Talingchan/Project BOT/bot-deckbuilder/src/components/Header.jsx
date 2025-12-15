@@ -41,6 +41,7 @@ export default function Header({
   const [isRulesOpen, setIsRulesOpen] = useState(false);
 
   const isActive = (path) => location.pathname === path;
+  const isAdmin = ADMIN_EMAILS.includes(userProfile?.email);
 
   const handleMyDecksClick = () => {
     if (setIsMyDecksOpen) setIsMyDecksOpen(true);
@@ -62,8 +63,8 @@ export default function Header({
       setIsPanelOpen(false);
   };
 
+  // 🟢 เอา "พูดคุยสาธารณะ" ออกจาก Coming Soon แล้ว
   const comingSoonItems = [
-    { icon: <MessageCircleIcon />, label: "พูดคุยสาธารณะ" },
     { icon: <AlertIcon />, label: "แจ้งปัญหา" },
     { icon: <SettingsIcon />, label: "การตั้งค่า" }
   ];
@@ -80,8 +81,7 @@ export default function Header({
                 <div className="scale-75 md:scale-90"><MenuIcon /></div>
             </button>
             
-            {/* 🟢 ตรวจสอบสิทธิ์ Admin จาก List */}
-            {ADMIN_EMAILS.includes(userProfile?.email) && (
+            {isAdmin && (
                 <button onClick={() => setIsAdminOpen(true)} className="flex items-center gap-1 px-1.5 md:px-2 py-1 bg-red-600 hover:bg-red-500 text-white rounded-full shadow-lg shadow-red-500/20 transition-all animate-pulse font-bold text-[9px] md:text-xs shrink-0">
                     <div className="scale-75"><CrownIcon /></div> <span className="hidden md:inline">ADMIN</span>
                 </button>
@@ -112,19 +112,24 @@ export default function Header({
                 </HeaderButton>
             </Link>
 
-            {/* 🟢 ปุ่ม PlayGround ใหม่ */}
-            <Link to="/playground">
-                <HeaderButton className={isActive('/playground') ? "bg-gradient-to-r from-purple-500 to-indigo-600 text-white border-transparent shadow-md shadow-purple-500/30" : "text-purple-600 dark:text-purple-400 bg-transparent border-transparent hover:bg-purple-50 dark:hover:bg-purple-900/20"}>
-                    <div className="scale-90 md:scale-100"><GamepadIcon /></div> <span className="hidden lg:inline ml-1">PlayGround</span>
-                </HeaderButton>
-            </Link>
+            {isAdmin && (
+                <Link to="/playground">
+                    <HeaderButton className={isActive('/playground') ? "bg-gradient-to-r from-purple-500 to-indigo-600 text-white border-transparent shadow-md shadow-purple-500/30" : "text-purple-600 dark:text-purple-400 bg-transparent border-transparent hover:bg-purple-50 dark:hover:bg-purple-900/20"}>
+                        <div className="scale-90 md:scale-100"><GamepadIcon /></div> <span className="hidden lg:inline ml-1">PlayGround</span>
+                    </HeaderButton>
+                </Link>
+            )}
 
             <Link to="/public-decks">
                 <HeaderButton as="span" className={isActive('/public-decks') ? "bg-gradient-to-r from-blue-500 to-purple-600 text-white border-transparent shadow-md shadow-blue-500/30" : "text-blue-600 dark:text-blue-400 bg-transparent border-transparent hover:bg-blue-50 dark:hover:bg-blue-900/20"}>
                     <div className="scale-90 md:scale-100"><UsersIcon /></div> <span className="hidden lg:inline ml-1">Public</span>
                 </HeaderButton>
             </Link>
-            
+            <Link to="/deck-builder">
+                <HeaderButton className={isActive('/deck-builder') ? "bg-gradient-to-r from-blue-500 to-cyan-600 text-white border-transparent shadow-md shadow-blue-500/30" : "text-blue-600 dark:text-cyan-400 bg-transparent border-transparent hover:bg-blue-50 dark:hover:bg-blue-900/20"}>
+                    <div className="scale-90 md:scale-100"><LayersIcon /></div> <span className="hidden lg:inline ml-1">Deck Lab</span>
+                </HeaderButton>
+            </Link>
             <div className="scale-90 md:scale-100"><NotificationCenter userEmail={userProfile?.email} /></div>
 
             {userProfile && (
@@ -145,7 +150,7 @@ export default function Header({
         </div>
       </div>
 
-      {/* --- ส่วนที่ 2: แผงเลื่อน (Slide Panel) --- */}
+      {/* --- ส่วนที่ 2: แผงเลื่อน (Quick Actions) --- */}
       <div className={`overflow-hidden transition-all duration-300 ease-in-out border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/95 ${isPanelOpen ? 'max-h-80 opacity-100 py-4' : 'max-h-0 opacity-0 py-0'}`}>
           <div className="max-w-7xl mx-auto px-4">
               <p className="text-[10px] uppercase font-bold text-slate-400 mb-3 tracking-widest text-center">เมนูเพิ่มเติม (Quick Actions)</p>
@@ -166,6 +171,15 @@ export default function Header({
                       <span className="text-[10px] font-bold text-slate-600 dark:text-slate-300">เครดิตผู้ใช้</span>
                   </button>
 
+                  {/* 🟢 ปุ่ม Community (ย้ายมาตรงนี้) */}
+                  <Link to="/community" onClick={() => setIsPanelOpen(false)} className="flex flex-col items-center gap-1 group w-full">
+                      <div className="w-10 h-10 rounded-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center text-pink-500 group-hover:text-pink-600 group-hover:border-pink-500 transition-all shadow-sm">
+                          <MessageCircleIcon />
+                      </div>
+                      <span className="text-[10px] font-bold text-slate-600 dark:text-slate-300">พูดคุยสาธารณะ</span>
+                  </Link>
+                  
+
                   <button onClick={handleBlackListClick} className="flex flex-col items-center gap-1 group w-full">
                       <div className="w-10 h-10 rounded-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center text-red-500 group-hover:text-red-600 group-hover:border-red-500 transition-all shadow-sm">
                           <ShieldBanIcon />
@@ -180,6 +194,7 @@ export default function Header({
                       <span className="text-[10px] font-bold text-slate-600 dark:text-slate-300">คู่มือ / กฏ</span>
                   </button>
 
+                  {/* Render Coming Soon Items */}
                   {comingSoonItems.map((item, index) => (
                       <div key={index} className="flex flex-col items-center gap-1 w-full opacity-50 grayscale cursor-not-allowed select-none">
                           <div className="w-10 h-10 rounded-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-400 shadow-sm">
