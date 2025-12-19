@@ -1,10 +1,12 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { supabase } from './supabaseClient';
 import { Link, useNavigate, useLocation } from 'react-router-dom'; 
 import { createPortal } from "react-dom";
 import { googleLogout } from '@react-oauth/google';
 import { db } from './firebase';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { Helmet } from 'react-helmet-async'; // 🟢 1. Import Helmet สำหรับ SEO
+
 import FleaMarket from './FleaMarket';
 import ManagementDashboard from './components/ManagementDashboard';
 import AdminDashboardModal from './AdminDashboardModal';
@@ -58,8 +60,8 @@ const LEDBanner = () => {
       <div className="w-full bg-black border-y-2 border-red-600/50 overflow-hidden relative py-2 shadow-[0_0_15px_rgba(220,38,38,0.3)] mb-4 mx-0 md:mx-4 md:w-auto md:rounded-xl mt-4 flex">
         {/* ใช้ Class ใหม่ animate-marquee-custom */}
         <div className="animate-marquee-custom flex items-center whitespace-nowrap">
-          <span className={`text-white-500 font-led font-bold text-base md:text-lg tracking-wider whitespace-nowrap ${gapClass}`}>{message}</span>
-          <span className={`text-white-500 font-led font-bold text-base md:text-lg tracking-wider whitespace-nowrap ${gapClass}`}>{message}</span>
+          <span className={`text-red-500 font-led font-bold text-base md:text-lg tracking-wider whitespace-nowrap ${gapClass}`}>{message}</span>
+          <span className={`text-red-500 font-led font-bold text-base md:text-lg tracking-wider whitespace-nowrap ${gapClass}`}>{message}</span>
         </div>
       </div>
     </>
@@ -392,6 +394,13 @@ export default function AuctionMarket() {
   return (
     <div className="h-screen flex flex-col bg-slate-100 dark:bg-black text-slate-900 dark:text-white transition-colors duration-300 overflow-hidden">
       
+      {/* 🟢 2. เพิ่มส่วน SEO ตรงนี้ */}
+      <Helmet>
+        <title>ตลาดประมูลการ์ด | ซื้อขาย-ประมูล Card Game Real-time</title>
+        <meta name="description" content="เข้าร่วมการประมูลการ์ดเกมหายากแบบ Real-time หรือเลือกซื้อการ์ดในตลาด Flea Market ราคาดี ปลอดภัย เชื่อถือได้" />
+        <meta name="keywords" content="ประมูลการ์ด, ตลาดการ์ด, ซื้อการ์ดเกม, ขายการ์ดเกม, Auction, Card Market" />
+      </Helmet>
+
       <div className="flex-none z-50 bg-slate-100 dark:bg-black border-b border-slate-200 dark:border-slate-800 shadow-sm relative">
           <Header userProfile={userProfile} displayUser={displayUser} userReputation={userReputation[userProfile?.email]} setIsSettingsOpen={setIsSettingsOpen} setIsAdminOpen={setIsAdminOpen} setIsMyDecksOpen={setIsDeckListModalOpen} />
           <div className="flex justify-center pb-2 pt-9 px-2 md:px-4">
@@ -449,7 +458,7 @@ export default function AuctionMarket() {
         )}
       </main>
 
-      <SettingsDrawer isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} userProfile={displayUser} onEditProfile={() => setIsProfileModalOpen(true)} onLogout={handleLogout} theme={theme} setTheme={setTheme} onOpenAdmin={() => setIsAdminOpen(true)} userStats={userReputation[userProfile?.email]} onOpenMyDecks={() => setIsDeckListModalOpen(true)} onOpenFeedback={() => setIsFeedbackOpen(true)} />
+      <SettingsDrawer isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} userProfile={userProfile} onEditProfile={() => setIsProfileModalOpen(true)} onLogout={handleLogout} theme={theme} setTheme={setTheme} onOpenAdmin={() => setIsAdminOpen(true)} userStats={userReputation[userProfile?.email]} onOpenMyDecks={() => setIsDeckListModalOpen(true)} onOpenFeedback={() => setIsFeedbackOpen(true)} />
       <ProfileSetupModal isOpen={isProfileModalOpen} onClose={() => setIsProfileModalOpen(false)} userProfile={userProfile} onSave={handleSaveProfile} />
       <BidHistoryModal isOpen={!!historyAuction} onClose={() => setHistoryAuction(null)} auction={historyAuction} />
       <CompletedAuctionsModal isOpen={isCompletedModalOpen} onClose={() => setIsCompletedModalOpen(false)} userProfile={userProfile} />

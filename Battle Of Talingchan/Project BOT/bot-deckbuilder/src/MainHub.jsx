@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { Helmet } from 'react-helmet-async'; // 🟢 1. Import Helmet สำหรับ SEO
 import { 
   LayersIcon, StoreIcon, GamepadIcon, 
   MessageCircleIcon, UsersIcon, ChevronRightIcon, 
@@ -107,6 +108,13 @@ export default function MainHub({ userProfile }) {
   return (
     <div className="min-h-screen w-full bg-[#030303] text-white font-sans selection:bg-white selection:text-black overflow-x-hidden relative">
       
+      {/* 🟢 2. เพิ่มส่วน SEO ตรงนี้ (Google จะอ่านตรงนี้) */}
+      <Helmet>
+        <title>Deck Builder & Auction Market | ศูนย์รวมการ์ดเกมอันดับ 1</title>
+        <meta name="description" content="เว็บไซต์จัดเด็คการ์ดออนไลน์ ตลาดประมูลซื้อขายการ์ดเกม แลกเปลี่ยนเทคนิค และคอมมูนิตี้ผู้เล่นที่ใหญ่ที่สุด" />
+        <meta name="keywords" content="จัดเด็ค, การ์ดเกม, ตลาดการ์ด, ประมูลการ์ด, Card Game, Deck Builder, Auction Market, ซื้อขายการ์ด" />
+      </Helmet>
+
       {/* Mouse Spotlight */}
       <div 
         className="pointer-events-none fixed inset-0 z-0 transition-opacity duration-300"

@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+
+# 🟢 แก้เป็นลิ้งค์ Vercel ของคุณ
+Sitemap: https://deckbuilderbot0125.vercel.app/sitemap.xml
